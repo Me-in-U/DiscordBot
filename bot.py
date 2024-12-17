@@ -5,13 +5,14 @@ from datetime import datetime, time, timedelta, timezone
 import discord
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
-from openai import OpenAI
+
+from clientGPT import send_to_chatgpt
+from riot import get_rank_data
 
 # 환경 변수를 .env 파일에서 로딩
 load_dotenv()
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
-OPENAI_KEY = os.getenv("OPENAI_KEY")
-CHANNEL_ID = os.getenv("MY_CHANNEL_ID")
+CHANNEL_ID = int(os.getenv("MY_CHANNEL_ID"))
 
 # Client 설정
 intents = discord.Intents.default()
@@ -20,7 +21,6 @@ intents.members = True
 client = commands.Bot(command_prefix="!", intents=intents)
 client.remove_command("help")
 
-clientGPT = OpenAI(api_key=OPENAI_KEY)
 
 # 유저별 채팅팅 저장용 딕셔너리
 user_messages = {}
@@ -105,7 +105,9 @@ async def summary(ctx, *, text: str = None):
         },
         {
             "role": "system",
-            "content": "전체적인 내용을 5줄 이내로 요약. 그 이후 각 유저가 한 말을 따로 요약한걸 추가해줘 닉네임 : 요약 형식으로 ",
+            "content": """전체적인 내용을 5줄 이내로 요약. 
+            그 이후 각 유저가 한 말을 따로 요약한걸 추가해줘 
+            닉네임 : 요약 형식으로 """,
         },
         {
             "role": "system",
@@ -153,7 +155,9 @@ async def translate(ctx, *, text: str = None):
     messages = [
         {
             "role": "system",
-            "content": "당신은 전문 번역가입니다. 대화 내용을 직역보다는 자연스럽게 한국어로 번역해 주세요. 번역된 문장 이외에 추가적인 설명은 필요 없습니다.",
+            "content": """당신은 전문 번역가입니다. 
+            대화 내용을 직역보다는 자연스럽게 한국어로 번역해 주세요. 
+            번역된 문장 이외에 추가적인 설명은 필요 없습니다.""",
         },
         {
             "role": "system",
@@ -249,6 +253,8 @@ async def custom_help(ctx):
         ),
         ("!채팅 [텍스트]", "봇이 입력된 텍스트를 대신 전송합니다."),
         ("!도움", "봇의 모든 명령어와 사용 방법을 출력합니다."),
+        ("!솔랭 [닉네임#테그]", "롤 솔로랭크 데이터를 출력합니다."),
+        ("!자랭 [닉네임#테그]", "롤 자유랭크 데이터를 출력합니다."),
     ]
     # 명령어 설명 생성
     help_message = "## 봇 명령어 목록:\n\n"
@@ -257,6 +263,30 @@ async def custom_help(ctx):
 
     # 명령어 출력
     await ctx.reply(help_message)
+
+
+@client.command(aliases=["솔랭"], help="")
+async def print_solo_rank(ctx, *, text: str = None):
+    """
+    봇의 명령어 목록과 설명을 출력합니다.
+    """
+    game_name = text.split("#")[0]
+    tag_line = text.split("#")[1]
+
+    # 명령어 출력
+    await ctx.reply(get_rank_data(game_name, tag_line, "solo"))
+
+
+@client.command(aliases=["자랭"], help="")
+async def print_flex_rank(ctx, *, text: str = None):
+    """
+    봇의 명령어 목록과 설명을 출력합니다.
+    """
+    game_name = text.split("#")[0]
+    tag_line = text.split("#")[1]
+
+    # 명령어 출력
+    await ctx.reply(get_rank_data(game_name, tag_line, "flex"))
 
 
 #! client.loop
@@ -279,9 +309,14 @@ async def reset_user_messages():
 
     global user_messages
     user_messages.clear()
-
     print(f"[{datetime.now()}] user_messages 초기화 완료.")
-    await target_channel.send("📢 새로운 하루가 시작됩니다.")
+    await target_channel.send(
+        "📢 새로운 하루가 시작됩니다. 일일 성락이의 솔랭 정보 출력"
+    )
+
+    game_name = "손성락"
+    tag_line = "KR2"
+    await target_channel.send(get_rank_data(game_name, tag_line, "solo"))
 
 
 #! def
@@ -337,19 +372,6 @@ async def load_recent_messages():
 
     for user in user_messages:
         user_messages[user] = list(reversed(user_messages[user]))
-
-
-def send_to_chatgpt(messages, model="gpt-4o-mini-2024-07-18", temperature=0.5):
-    response = clientGPT.chat.completions.create(
-        model=model,
-        messages=messages,
-        max_tokens=500,
-        temperature=temperature,
-    )
-    message = response.choices[0].message.content
-    print(message)
-    messages.append(response.choices[0].message)
-    return message
 
 
 client.run(DISCORD_TOKEN)
