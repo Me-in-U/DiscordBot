@@ -1,4 +1,3 @@
-# This example requires the 'message_content' intent.
 import os
 from datetime import datetime, time, timedelta, timezone
 
@@ -41,7 +40,10 @@ async def on_ready():
     print(f"Logged on as {client.user}!")
     await load_all_nicknames()  # 채널의 모든 멤버 닉네임 저장
     await load_recent_messages()  # 최근 메시지 로드
+    await update_presence()
+
     reset_user_messages.start()  # 자정 루프 시작
+    presence_update_task.start()  # 1분마다 Presence 업데이트 태스크 시작
     # print_time.start()  # 1초마다 현재 시간 출력 시작
 
 
@@ -76,6 +78,43 @@ async def question(ctx):
     user_messages[ctx.author].append({"role": "user", "content": ctx.message.content})
     # ChatGPT에 메시지 전달
     response = send_to_chatgpt(user_messages[ctx.author], temperature=0.4)
+    # 봇 응답 기록
+    user_messages[ctx.author].append({"role": "assistant", "content": response})
+    await ctx.reply(f"{response}")
+
+
+@client.command(
+    aliases=["신이시여"],
+    help="ChatGPT에게 질문합니다. '!신이시여 [질문 내용]' 형식으로 사용하세요.",
+)
+async def to_god(ctx, *, text: str = None):
+    """
+    커맨드 질문 처리
+    ChatGPT
+    """
+    # 저장된 모든 대화 기록 확인
+    if not user_messages:
+        await ctx.reply("**요약할 대화 내용이 없습니다.**")
+        return
+
+    message = text if text else ""
+
+    messages = [
+        {
+            "role": "system",
+            "content": "당신은 세계 최고 정상화의 신, 신창섭 디렉터이다. 당신은 모든것을 정상화 하는 능력이 있다. 신으로써 아래 질문에 대한 답을 해야한다. 당신은 모든것을 알고있다. 이에 답을하라",
+        },
+        {
+            "role": "system",
+            "content": "정상화의 신이 말하는 말투로 말해라. 문제가 있다면 해결하는 방향으로 정상화 시켜라",
+        },
+        {
+            "role": "user",
+            "content": message,
+        },
+    ]
+    # ChatGPT에 메시지 전달
+    response = send_to_chatgpt(messages, temperature=0.7)
     # 봇 응답 기록
     user_messages[ctx.author].append({"role": "assistant", "content": response})
     await ctx.reply(f"{response}")
@@ -319,6 +358,14 @@ async def reset_user_messages():
     await target_channel.send(get_rank_data(game_name, tag_line, "solo"))
 
 
+@tasks.loop(minutes=1)
+async def presence_update_task():
+    """
+    1분마다 Discord 봇 상태(Presence)를 갱신합니다.
+    """
+    await update_presence()
+
+
 #! def
 async def load_all_nicknames():
     """
@@ -372,6 +419,20 @@ async def load_recent_messages():
 
     for user in user_messages:
         user_messages[user] = list(reversed(user_messages[user]))
+
+
+async def update_presence():
+    """
+    Discord 봇 상태(Presence)를 업데이트합니다.
+    """
+    total_messages = sum(len(msg_list) for msg_list in user_messages.values())
+    # 천 단위로 콤마 추가
+    formatted_total_messages = f"{total_messages:,}"
+    activity = discord.Activity(
+        type=discord.ActivityType.watching,
+        name=f"!도움 | {formatted_total_messages}개의 채팅 메시지",
+    )
+    await client.change_presence(activity=activity)
 
 
 client.run(DISCORD_TOKEN)
