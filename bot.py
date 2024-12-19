@@ -85,7 +85,7 @@ async def question(ctx):
 
 @client.command(
     aliases=["신이시여"],
-    help="ChatGPT에게 질문합니다. '!신이시여 [질문 내용]' 형식으로 사용하세요.",
+    help="정상화의 신에게 질문합니다. '!신이시여 [질문 내용]' 형식으로 사용하세요.",
 )
 async def to_god(ctx, *, text: str = None):
     """
@@ -281,6 +281,7 @@ async def custom_help(ctx):
     """
     commands_info = [
         ("!질문 [질문 내용]", "ChatGPT에게 질문하고 답변을 받습니다."),
+        ("!신이시여 [질문 내용]", "정상화의 신에게 질문하고 답변을 받습니다."),
         ("!요약 [추가 요청 사항 (선택)]", "최근 채팅 내용을 요약합니다."),
         (
             "!번역 [텍스트 (선택)]",
