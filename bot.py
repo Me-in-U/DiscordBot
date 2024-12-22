@@ -1,3 +1,4 @@
+import json
 import os
 from datetime import datetime, time, timedelta, timezone
 
@@ -12,6 +13,9 @@ from riot import get_rank_data
 load_dotenv()
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 CHANNEL_ID = int(os.getenv("MY_CHANNEL_ID"))
+
+# settingData 파일 이름
+SETTING_DATA = "settingData.json"
 
 # Client 설정
 intents = discord.Intents.default()
@@ -31,6 +35,12 @@ nicknames = {}
 seoul_tz = timezone(timedelta(hours=9))
 
 
+# 일일 랭크 유저 정보
+game_name = ""
+tag_line = ""
+daily_rank_loop = True
+
+
 #! client.event
 @client.event
 async def on_ready():
@@ -38,6 +48,7 @@ async def on_ready():
     봇 실행 준비.
     """
     print(f"Logged on as {client.user}!")
+    await load_json()  # settingData.json 로드
     await load_all_nicknames()  # 채널의 모든 멤버 닉네임 저장
     await load_recent_messages()  # 최근 메시지 로드
     await update_presence()
@@ -84,7 +95,7 @@ async def question(ctx):
 
 
 @client.command(
-    aliases=["신이시여"],
+    aliases=["신이시여", "신이여", "창섭님"],
     help="정상화의 신에게 질문합니다. '!신이시여 [질문 내용]' 형식으로 사용하세요.",
 )
 async def to_god(ctx, *, text: str = None):
@@ -92,12 +103,7 @@ async def to_god(ctx, *, text: str = None):
     커맨드 질문 처리
     ChatGPT
     """
-    # 저장된 모든 대화 기록 확인
-    if not user_messages:
-        await ctx.reply("**요약할 대화 내용이 없습니다.**")
-        return
-
-    message = text if text else ""
+    message = text.strip() if text else ""
 
     messages = [
         {
@@ -134,7 +140,7 @@ async def summary(ctx, *, text: str = None):
         await ctx.reply("**요약할 대화 내용이 없습니다.**")
         return
 
-    request_message = text if text else ""
+    request_message = text.strip() if text else ""
 
     # 요약 요청 메시지 생성
     messages = [
@@ -169,7 +175,7 @@ async def summary(ctx, *, text: str = None):
 
 
 @client.command(
-    aliases=["번역"],
+    aliases=["번역", "버녁"],
     help="이전 채팅 내용을 한국어로 번역하거나 '!번역 [문장]' 형식으로 번역합니다.",
 )
 async def translate(ctx, *, text: str = None):
@@ -178,7 +184,7 @@ async def translate(ctx, *, text: str = None):
     """
     if text:
         # 명령어 뒤에 입력된 문장이 있을 경우 해당 문장 번역
-        target_message = text
+        target_message = text.strip()
     else:
         # 최근 메시지 탐색
         async for message in ctx.channel.history(limit=10):  # 최근 최대 10개 탐색
@@ -221,7 +227,7 @@ async def interpret(ctx, *, text: str = None):
     """
     if text:
         # 명령어 뒤에 입력된 문장이 있을 경우 해당 문장 번역
-        target_message = text
+        target_message = text.strip()
     else:
         # 최근 메시지 탐색
         async for message in ctx.channel.history(limit=10):  # 최근 최대 10개 탐색
@@ -273,7 +279,8 @@ async def echo(ctx, *, text: str = None):
 
 
 @client.command(
-    aliases=["help", "도움"], help="봇의 모든 명령어와 사용 방법을 출력합니다."
+    aliases=["help", "도움", "도뭉", "동움"],
+    help="봇의 모든 명령어와 사용 방법을 출력합니다.",
 )
 async def custom_help(ctx):
     """
@@ -293,11 +300,19 @@ async def custom_help(ctx):
         ),
         ("!채팅 [텍스트]", "봇이 입력된 텍스트를 대신 전송합니다."),
         ("!도움", "봇의 모든 명령어와 사용 방법을 출력합니다."),
-        ("!솔랭 [닉네임#테그]", "롤 솔로랭크 데이터를 출력합니다."),
-        ("!자랭 [닉네임#테그]", "롤 자유랭크 데이터를 출력합니다."),
+        ("!솔랭 [닉네임#태그]", "롤 솔로랭크 데이터를 출력합니다."),
+        ("!자랭 [닉네임#태그]", "롤 자유랭크 데이터를 출력합니다."),
+        (
+            "!일일랭크변경 [닉네임#태그]",
+            "자정 솔랭 정보 출력을 새로운 사용자로 변경합니다.",
+        ),
+        (
+            "!일일랭크",
+            "현재 자정 솔랭 출력 사용자를 출력합니다.",
+        ),
     ]
     # 명령어 설명 생성
-    help_message = "## 봇 명령어 목록:\n\n"
+    help_message = "## ℹ️ 봇 명령어 목록:\n\n"
     for command, description in commands_info:
         help_message += f"- **{command}**\n\t {description}\n"
 
@@ -310,11 +325,12 @@ async def print_solo_rank(ctx, *, text: str = None):
     """
     봇의 명령어 목록과 설명을 출력합니다.
     """
+    text = text.strip()
     game_name = text.split("#")[0]
     tag_line = text.split("#")[1]
 
     # 명령어 출력
-    await ctx.reply(get_rank_data(game_name, tag_line, "solo"))
+    await ctx.reply(print_rank_data(get_rank_data(game_name, tag_line, "solo")))
 
 
 @client.command(aliases=["자랭"], help="")
@@ -326,7 +342,96 @@ async def print_flex_rank(ctx, *, text: str = None):
     tag_line = text.split("#")[1]
 
     # 명령어 출력
-    await ctx.reply(get_rank_data(game_name, tag_line, "flex"))
+    await ctx.reply(print_rank_data(get_rank_data(game_name, tag_line, "flex")))
+
+
+@client.command(
+    aliases=["일일랭크"],
+    help="자정 솔랭 출력 정보를 출력합니다",
+)
+async def daily_rank(ctx):
+    """
+    현재 설정된 일일 랭크 정보를 출력합니다.
+    """
+    # 변경 성공 메시지
+    await ctx.reply(
+        f"✅ **현재 일일솔로랭크 출력 예정 정보**\n- 닉네임: {game_name}\n- 태그: {tag_line}"
+    )
+
+
+@client.command(
+    aliases=["일일랭크변경"],
+    help="자정 솔랭 출력 닉네임#태그를 업데이트합니다.",
+)
+async def update_daily_rank(ctx, *, text: str = None):
+    """
+    game_name과 tag_line을 업데이트하고 JSON 파일에 저장한 후 알림을 보냅니다.
+    """
+    global game_name, tag_line  # 기존 변수를 수정할 수 있도록 global 선언
+
+    try:
+        # 명령어에서 새로운 game_name과 tag_line 추출
+        if text and "#" in text:
+            new_game_name, new_tag_line = text.strip().split("#")
+        else:
+            await ctx.reply(
+                "**올바른 형식으로 입력해주세요. 예: !일일랭크변경 닉네임#태그**"
+            )
+            return
+
+        # JSON 파일 업데이트
+        with open(SETTING_DATA, "r", encoding="utf-8") as file:
+            settings = json.load(file)
+        settings["dailySoloRank"]["userData"]["game_name"] = new_game_name
+        settings["dailySoloRank"]["userData"]["tag_line"] = new_tag_line
+        with open(SETTING_DATA, "w", encoding="utf-8") as file:
+            json.dump(settings, file, ensure_ascii=False, indent=4)
+
+        # 변수 업데이트
+        game_name, tag_line = new_game_name, new_tag_line
+
+        # 변경 성공 메시지
+        await ctx.reply(
+            f"✅ **성공적으로 업데이트되었습니다.**\n새 값:\n- 닉네임: {game_name}\n- 태그: {tag_line}"
+        )
+    except Exception as e:
+        await ctx.reply(f"⚠️ **업데이트 중 오류가 발생했습니다.**\n{str(e)}")
+
+
+@client.command(
+    aliases=["일일랭크루프"],
+    help="자정 루프 실행 여부를 설정합니다. 예: !일일랭크루프 true/false",
+)
+async def toggle_daily_loop(ctx, *, status: str = None):
+    """
+    자정 루프 실행 여부를 설정합니다.
+    """
+    global daily_rank_loop
+
+    try:
+        if status is None or status.lower() not in ["true", "false"]:
+            await ctx.reply(
+                "**올바른 형식으로 입력해주세요. 예: !일일랭크루프 true/false**"
+            )
+            return
+
+        # JSON 파일 업데이트
+        new_loop_status = status.lower() == "true"
+        with open(SETTING_DATA, "r", encoding="utf-8") as file:
+            settings = json.load(file)
+        settings["dailySoloRank"]["loop"] = new_loop_status
+        with open(SETTING_DATA, "w", encoding="utf-8") as file:
+            json.dump(settings, file, ensure_ascii=False, indent=4)
+
+        # 변수 업데이트
+        daily_rank_loop = new_loop_status
+
+        # 변경 성공 메시지
+        await ctx.reply(
+            f"✅ **루프 상태가 {'활성화' if daily_rank_loop else '비활성화'}로 변경되었습니다.**"
+        )
+    except Exception as e:
+        await ctx.reply(f"⚠️ **루프 상태 변경 중 오류가 발생했습니다.**\n{str(e)}")
 
 
 #! client.loop
@@ -350,13 +455,13 @@ async def reset_user_messages():
     global user_messages
     user_messages.clear()
     print(f"[{datetime.now()}] user_messages 초기화 완료.")
-    await target_channel.send(
-        "📢 새로운 하루가 시작됩니다. 일일 성락이의 솔랭 정보 출력"
-    )
-
-    game_name = "손성락"
-    tag_line = "KR2"
-    await target_channel.send(get_rank_data(game_name, tag_line, "solo"))
+    if daily_rank_loop:
+        await target_channel.send("📢 새로운 하루가 시작됩니다. 일일 솔랭 정보 출력")
+        await target_channel.send(
+            print_rank_data(get_rank_data(game_name, tag_line, "solo"))
+        )
+    else:
+        await target_channel.send("📢 새로운 하루가 시작됩니다.")
 
 
 @tasks.loop(minutes=1)
@@ -368,22 +473,46 @@ async def presence_update_task():
 
 
 #! def
+async def load_json():
+    global game_name, tag_line, daily_rank_loop
+    # JSON 파일에서 닉네임 로드
+    print("-------------------- 설정 로드 --------------------")
+    with open(SETTING_DATA, "r", encoding="utf-8") as file:
+        settings = json.load(file)
+        game_name = (
+            settings.get("dailySoloRank", {}).get("userData", {}).get("game_name")
+        )
+        tag_line = settings.get("dailySoloRank", {}).get("userData", {}).get("tag_line")
+        daily_rank_loop = settings.get("dailySoloRank", {}).get("loop", True)
+        if game_name and tag_line:
+            print(f"랭크 검색할 닉네임 로드: {game_name}#{tag_line}")
+        else:
+            print("JSON 파일에서 닉네임 데이터를 로드하지 못했습니다.")
+            game_name, tag_line = None, None
+        print(
+            f"일일 랭크 출력 루프 상태: {'활성화' if daily_rank_loop else '비활성화'}"
+        )
+    print("---------------------------------------------------\n")
+
+
 async def load_all_nicknames():
     """
     채널에 있는 모든 멤버의 닉네임을 저장합니다.
     """
     # 봇이 참여한 모든 길드(서버) 확인
+    print("------------------- 닉네임 로드 -------------------")
     for guild in client.guilds:
         print(f"서버 '{guild.name}'에서 멤버 목록을 불러옵니다...")
         for member in guild.members:
             nicknames[member] = (
                 member.display_name if member.display_name else member.name
             )
+    print("---------------------------------------------------\n")
 
 
 async def load_recent_messages():
     target_channel = client.get_channel(CHANNEL_ID)
-
+    print("------------------- 메시지 로드 -------------------")
     if not target_channel:
         print("대상 채널을 찾을 수 없습니다.")
         return
@@ -416,7 +545,7 @@ async def load_recent_messages():
             user_messages[message.author].append(
                 {"role": "user", "content": message.content}
             )
-    print("최근 메시지 로드 완료.")
+    print("---------------------------------------------------\n")
 
     for user in user_messages:
         user_messages[user] = list(reversed(user_messages[user]))
@@ -434,6 +563,15 @@ async def update_presence():
         name=f"!도움 | {formatted_total_messages}개의 채팅 메시지",
     )
     await client.change_presence(activity=activity)
+
+
+def print_rank_data(data):
+    return (
+        f'## "{data["game_name"]}#{data["tag_line"]}" {data["rank_type_kor"]} 정보\n'
+        f"티어: {data['tier']} {data['rank']} {data['league_points']}포인트\n"
+        f"승리: {data['wins']} ({data['win_rate']:.2f}%)\n"
+        f"패배: {data['losses']}"
+    )
 
 
 client.run(DISCORD_TOKEN)
