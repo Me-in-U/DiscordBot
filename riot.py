@@ -18,7 +18,7 @@ REQUEST_HEADERS = {
 }
 
 
-def get_rank_data(game_name, tag_line, rank_type="solo"):
+def get_rank_data(game_name, tag_line, rank_type="solo", raw=False):
     try:
         # Riot ID로 PUUID 조회
         player_data = requests.get(
@@ -52,21 +52,19 @@ def get_rank_data(game_name, tag_line, rank_type="solo"):
         index = 1 - index if not first_is_solo else index
 
         rank_data = player_info[index]
-        tier = rank_data["tier"]
-        rank = rank_data["rank"]
-        league_points = rank_data["leaguePoints"]
-        wins = rank_data["wins"]
-        losses = rank_data["losses"]
-
-        rank_type_kor = "솔랭" if rank_type == "solo" else "자랭"
-        win_rate = (wins / (wins + losses)) * 100
         # 반환 메시지
-        return (
-            f'## "{game_name}#{tag_line}" {rank_type_kor} 정보\n'
-            f"티어: {tier} {rank} {league_points}포인트\n"
-            f"승리: {wins} ({win_rate:.2f}%)\n"
-            f"패배: {losses}"
-        )
+        return {
+            "game_name": game_name,
+            "tag_line": tag_line,
+            "tier": rank_data["tier"],
+            "rank": rank_data["rank"],
+            "league_points": rank_data["leaguePoints"],
+            "wins": rank_data["wins"],
+            "losses": rank_data["losses"],
+            "rank_type_kor": "솔랭" if rank_type == "solo" else "자랭",
+            "win_rate": (rank_data["wins"] / (rank_data["wins"] + rank_data["losses"]))
+            * 100,
+        }
     except Exception as e:
         print(f"데이터를 가져오는 중 오류가 발생했습니다: {e}")
         return '데이터를 가져오는 중 오류가 발생했습니다\n "닉네임#테그"를 다시 확인해주세요요'
