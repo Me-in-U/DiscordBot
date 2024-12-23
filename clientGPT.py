@@ -26,7 +26,39 @@ def send_to_chatgpt(messages, model="gpt-4o-mini-2024-07-18", temperature=0.5):
     response = clientGPT.chat.completions.create(
         model=model,
         messages=messages,
-        max_tokens=500,
+        max_tokens=5000,
+        temperature=temperature,
+    )
+    message = response.choices[0].message.content
+    print(message)
+    messages.append(response.choices[0].message)
+    return message
+
+
+def image_analysis(
+    messages, model="gpt-4o-mini-2024-07-18", image_url="", temperature=0.5
+):
+    messages.append(
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "이미지가 있습니다. 이미지 내용을 확인하세요",
+                },
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": image_url,
+                    },
+                },
+            ],
+        },
+    )
+    response = clientGPT.chat.completions.create(
+        model=model,
+        messages=messages,
+        max_tokens=5000,
         temperature=temperature,
     )
     message = response.choices[0].message.content
