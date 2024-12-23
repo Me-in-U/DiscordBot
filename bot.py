@@ -15,7 +15,8 @@ DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 CHANNEL_ID = int(os.getenv("MY_CHANNEL_ID"))
 
 # settingData 파일 이름
-SETTING_DATA = "settingData.json"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+SETTING_DATA = os.path.join(BASE_DIR, "settingData.json")
 
 # Client 설정
 intents = discord.Intents.default()
