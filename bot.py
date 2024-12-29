@@ -489,19 +489,48 @@ async def print_time():
 @tasks.loop(time=time(hour=0, minute=0, tzinfo=seoul_tz))  # 매일 자정
 async def reset_user_messages():
     """
-    매일 자정에 user_messages를 초기화합니다.
+    매일 자정에 user_messages를 초기화하고 랭킹 정보를 업데이트합니다.
     """
-    # 손팬
     target_channel = client.get_channel(CHANNEL_ID)
-
     global user_messages
     user_messages.clear()
     print(f"[{datetime.now()}] user_messages 초기화 완료.")
+
     if daily_rank_loop:
-        await target_channel.send("📢 새로운 하루가 시작됩니다. 일일 솔랭 정보 출력")
-        await target_channel.send(
-            print_rank_data(get_rank_data(game_name, tag_line, "solo"))
-        )
+        try:
+            await target_channel.send(
+                "📢 새로운 하루가 시작됩니다. 일일 솔랭 정보 출력"
+            )
+            today_rank_data = get_rank_data(game_name, tag_line, "solo")
+
+            # JSON 파일 로드 및 업데이트
+            with open(SETTING_DATA, "r", encoding="utf-8") as file:
+                settings = json.load(file)
+
+            yesterday_data = settings["dailySoloRank"]["yesterdayData"]
+
+            # 새로운 유저 확인
+            if (
+                yesterday_data["game_name"] != today_rank_data["game_name"]
+                or yesterday_data["tag_line"] != today_rank_data["tag_line"]
+            ):
+                await target_channel.send("🆕 새로운 유저가 감지되었습니다!")
+                settings["dailySoloRank"]["yesterdayData"] = today_rank_data
+                rank_update_message = print_rank_data(today_rank_data)
+            else:
+                # 어제 데이터를 업데이트
+                settings["dailySoloRank"]["yesterdayData"] = today_rank_data
+                rank_update_message = print_rank_data(today_rank_data, yesterday_data)
+            await target_channel.send(rank_update_message)
+
+            # JSON 파일 저장
+            with open(SETTING_DATA, "w", encoding="utf-8") as file:
+                json.dump(settings, file, ensure_ascii=False, indent=4)
+
+        except Exception as e:
+            await target_channel.send(
+                f"❌ 랭킹 정보를 업데이트하는 중 오류가 발생했습니다: {e}"
+            )
     else:
         await target_channel.send("📢 새로운 하루가 시작됩니다.")
 
@@ -607,13 +636,36 @@ async def update_presence():
     await client.change_presence(activity=activity)
 
 
-def print_rank_data(data):
-    return (
+def print_rank_data(data, yesterday_data=None):
+    """
+    랭킹 데이터를 출력합니다.
+    어제 데이터와 비교하여 변경된 점을 강조 표시합니다.
+    """
+    message = (
         f'## "{data["game_name"]}#{data["tag_line"]}" {data["rank_type_kor"]} 정보\n'
-        f"티어: {data['tier']} {data['rank']} {data['league_points']}포인트\n"
-        f"승리: {data['wins']} ({data['win_rate']:.2f}%)\n"
-        f"패배: {data['losses']}"
     )
+    message += f"티어: {data['tier']} {data['rank']} {data['league_points']}포인트\n"
+    message += f"승리: {data['wins']} ({data['win_rate']:.2f}%)\n"
+    message += f"패배: {data['losses']}\n"
+
+    if yesterday_data:
+        changes = []
+        if data["tier"] != yesterday_data["tier"]:
+            changes.append(f"티어: {yesterday_data['tier']} -> {data['tier']}")
+        if data["league_points"] != yesterday_data["league_points"]:
+            changes.append(
+                f"포인트: {yesterday_data['league_points']} -> {data['league_points']}"
+            )
+        if data["wins"] != yesterday_data["wins"]:
+            changes.append(f"승리: {yesterday_data['wins']} -> {data['wins']}")
+        if data["losses"] != yesterday_data["losses"]:
+            changes.append(f"패배: {yesterday_data['losses']} -> {data['losses']}")
+        if changes:
+            message += "\n📈 변경된 점:\n" + "\n".join(changes)
+        else:
+            return f'## "{data["game_name"]}#{data["tag_line"]}" {data["rank_type_kor"]} 정보\n - 📈어제와 랭크 데이터 변화가 없습니다.'
+
+    return message
 
 
 client.run(DISCORD_TOKEN)
