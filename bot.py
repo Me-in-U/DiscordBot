@@ -74,14 +74,8 @@ async def on_message(message):
     if message.author == DISCORD_CLIENT.user:
         return  # client 스스로가 보낸 메세지는 무시
 
-    # 심심이 모드 토글
+    # 심심이  모드
     global simsim_mode  # 심심이 모드 상태를 전역 변수로 관리
-    if message.content == "심심이":
-        simsim_mode = not simsim_mode
-        if simsim_mode:
-            await message.channel.send("심심이 모드 ON")
-        else:
-            await message.channel.send("심심이 모드 OFF")
     if simsim_mode:
         simsim_chats.append({"role": "user", "content": message.content})
         messages = [
@@ -106,6 +100,14 @@ async def on_message(message):
         # 봇 응답 기록
         simsim_chats.append({"role": "assistant", "content": response})
         await message.channel.send(f"{response}")
+
+    # 심심이 모드 토글
+    if message.content == "심심이":
+        simsim_mode = not simsim_mode
+        if simsim_mode:
+            await message.channel.send("심심이 모드 ON")
+        else:
+            await message.channel.send("심심이 모드 OFF")
 
     # 명령어 처리 루틴 호출
     await DISCORD_CLIENT.process_commands(message)
