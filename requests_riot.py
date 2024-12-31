@@ -1,4 +1,5 @@
 import os
+
 import requests
 from dotenv import load_dotenv
 
@@ -18,7 +19,7 @@ REQUEST_HEADERS = {
 }
 
 
-def get_rank_data(game_name, tag_line, rank_type="solo", raw=False):
+def get_rank_data(game_name, tag_line, rank_type="solo"):
     try:
         # Riot ID로 PUUID 조회
         player_data = requests.get(
