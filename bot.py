@@ -29,6 +29,8 @@ CHANNEL_ID = int(os.getenv("MY_CHANNEL_ID"))
 # 기타 변수
 NICKNAMES = {}  # 유저 닉네임 저장
 SEOUL_TZ = timezone(timedelta(hours=9))  # 서울 시간대 설정 (UTC+9)
+simsim_mode = False
+simsim_chats = []
 
 
 # Cog 로드
@@ -71,6 +73,40 @@ async def on_message(message):
         )
     if message.author == DISCORD_CLIENT.user:
         return  # client 스스로가 보낸 메세지는 무시
+
+    # 심심이 모드 토글
+    global simsim_mode  # 심심이 모드 상태를 전역 변수로 관리
+    if message.content == "심심이":
+        simsim_mode = not simsim_mode
+        if simsim_mode:
+            await message.channel.send("심심이 모드 ON")
+        else:
+            await message.channel.send("심심이 모드 OFF")
+    if simsim_mode:
+        simsim_chats.append({"role": "user", "content": message.content})
+        messages = [
+            {
+                "role": "system",
+                "content": """당신은 심심이로 행동해야 합니다.
+                심심이는 한국에서 유명했던 인공지능 대화형 봇으로, 유머러스하고 재미있게 대화를 제공하는 것이 특징입니다.
+                대화 내용중 사용자가 입력한 정보와 원하는 행동 있다면 그대로 행동하세요.
+                추가적인 질문같은거는 하지마라. 친구처럼 얘기해. ~해요, ~입니다 이런 말투 쓰지마.
+                너무 길게 채팅하지마. 짧게 말해. 너무 친근하게 말하지마. 알아서 잘 대답해.
+                아래는 현재 대화 기록입니다.""",
+            },
+            {
+                "role": "system",
+                "content": f"전체 대화 내용 : {simsim_chats}",
+            },
+        ]
+
+        # ChatGPT에 메시지 전달
+        response = send_to_chatgpt(messages, temperature=0.8)
+
+        # 봇 응답 기록
+        simsim_chats.append({"role": "assistant", "content": response})
+        await message.channel.send(f"{response}")
+
     # 명령어 처리 루틴 호출
     await DISCORD_CLIENT.process_commands(message)
 
