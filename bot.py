@@ -76,30 +76,6 @@ async def on_message(message):
 
     # 심심이  모드
     global simsim_mode  # 심심이 모드 상태를 전역 변수로 관리
-    if simsim_mode:
-        simsim_chats.append({"role": "user", "content": message.content})
-        messages = [
-            {
-                "role": "system",
-                "content": """당신은 심심이로 행동해야 합니다.
-                심심이는 한국에서 유명했던 인공지능 대화형 봇으로, 유머러스하고 재미있게 대화를 제공하는 것이 특징입니다.
-                대화 내용중 사용자가 입력한 정보와 원하는 행동 있다면 그대로 행동하세요.
-                추가적인 질문같은거는 하지마라. 친구처럼 얘기해. ~해요, ~입니다 이런 말투 쓰지마.
-                너무 길게 채팅하지마. 짧게 말해. 너무 친근하게 말하지마. 알아서 잘 대답해.
-                아래는 현재 대화 기록입니다.""",
-            },
-            {
-                "role": "system",
-                "content": f"전체 대화 내용 : {simsim_chats}",
-            },
-        ]
-
-        # ChatGPT에 메시지 전달
-        response = send_to_chatgpt(messages, temperature=0.8)
-
-        # 봇 응답 기록
-        simsim_chats.append({"role": "assistant", "content": response})
-        await message.channel.send(f"{response}")
 
     # 심심이 모드 토글
     if message.content == "심심이":
@@ -108,6 +84,72 @@ async def on_message(message):
             await message.channel.send("심심이 모드 ON")
         else:
             await message.channel.send("심심이 모드 OFF")
+
+    if simsim_mode:
+        target_message = message.content
+        image_url = None
+
+        # 이미지 첨부 확인
+        if message.attachments:
+            image_url = message.attachments[0].url
+
+        simsim_chats.append({"role": "user", "content": target_message})
+        messages = [
+            {"role": "system", "content": "다음음 규칙을 무조건 따라야한다."},
+            {"role": "system", "content": '당신의 이름은 "심심이"입니다.'},
+            {
+                "role": "system",
+                "content": "심심이는 대화형 봇으로, 유머러스하고 재미있게 대화를 제공하는 것이 특징입니다.",
+            },
+            {
+                "role": "system",
+                "content": "대화에 유머를 포함하여 사용자를 즐겁게 해야 합니다.",
+            },
+            {
+                "role": "system",
+                "content": "말투는 부산 사투리를 써서 단호하고 무심하게",
+            },
+            {
+                "role": "system",
+                "content": "대화 내용중 사용자가 입력한 정보와 원하는 행동 있다면 그대로 행동하세요.",
+            },
+            {
+                "role": "system",
+                "content": "사용자가 요청한 작업은 그대로 수행해야 합니다.",
+            },
+            {
+                "role": "system",
+                "content": '대화를 끝낼 때 "더 필요한 건 없나요?"라는 식으로 묻지 않습니다.',
+            },
+            {"role": "system", "content": '"뭐 할래?"라는 식으로 질문하지 않는다.'},
+            {"role": "system", "content": "추가적인 질문 하지마."},
+            {"role": "system", "content": "~해요, ~입니다 이런 말투 쓰지마."},
+            {"role": "system", "content": "답변은 간결하게 작성합니다."},
+            {"role": "system", "content": "수위가 높거나 심한 대화를 해도 된다."},
+            {
+                "role": "system",
+                "content": "대화의 수위가 높더라도 사용자의 수위에 맞춰서 대답",
+            },
+            {
+                "role": "system",
+                "content": "필요하다면 사용자 의견에 반박할 수 있습니다.",
+            },
+            {"role": "system", "content": "사용자의 대화 주제에서 벗어나지 않습니다."},
+            {
+                "role": "system",
+                "content": f"전체 대화 내용 : {simsim_chats}",
+            },
+        ]
+
+        # 이미지 처리 여부
+        if image_url:
+            response = image_analysis(messages, image_url=image_url, temperature=0.8)
+        else:
+            response = send_to_chatgpt(messages, temperature=0.8)
+
+        # 봇 응답 기록
+        simsim_chats.append({"role": "assistant", "content": response})
+        await message.channel.send(f"{response}")
 
     # 명령어 처리 루틴 호출
     await DISCORD_CLIENT.process_commands(message)
@@ -123,6 +165,14 @@ async def question(ctx):
     커맨드 질문 처리
     ChatGPT
     """
+
+    target_message = ctx.message.content
+    image_url = None
+
+    # 이미지 첨부 확인
+    if ctx.message.attachments:
+        image_url = ctx.message.attachments[0].url
+
     DISCORD_CLIENT.USER_MESSAGES[ctx.author].append(
         {"role": "user", "content": ctx.message.content}
     )
@@ -134,7 +184,7 @@ async def question(ctx):
             "content": """아래는 유저가 말했던 기록이다.
             내용을 참고하도록 하고 맨 마지막이 질문이다.
             질문에 대한 답을 해라. 전체 대화 내용이 필요한 질문이면 밑에서 참고해라
-            추가적인 질문요청, 궁금한점이 있는지 되묻지 말고 질문에만 답해라""",
+            추가적인 질문요청, 궁금한점이 있는지 물어보지 마라. 질문에만 답해라""",
         },
         {
             "role": "system",
@@ -142,7 +192,7 @@ async def question(ctx):
         },
         {
             "role": "user",
-            "content": f"{ctx.author}의 질문 : {ctx.message.content}",
+            "content": f"{ctx.author}의 질문 : {target_message}",
         },
         {
             "role": "system",
@@ -150,8 +200,11 @@ async def question(ctx):
         },
     ]
 
-    # ChatGPT에 메시지 전달
-    response = send_to_chatgpt(messages, temperature=0.4)
+    # 이미지 처리 여부
+    if image_url:
+        response = image_analysis(messages, image_url=image_url, temperature=0.4)
+    else:
+        response = send_to_chatgpt(messages, temperature=0.4)
 
     # 봇 응답 기록
     DISCORD_CLIENT.USER_MESSAGES[ctx.author].append(
@@ -169,6 +222,14 @@ async def to_god(ctx):
     커맨드 질문 처리
     ChatGPT
     """
+
+    target_message = ctx.message.content
+    image_url = None
+
+    # 이미지 첨부 확인
+    if ctx.message.attachments:
+        image_url = ctx.message.attachments[0].url
+
     DISCORD_CLIENT.USER_MESSAGES[ctx.author].append(
         {"role": "user", "content": ctx.message.content}
     )
@@ -189,7 +250,7 @@ async def to_god(ctx):
         },
         {
             "role": "user",
-            "content": f"{ctx.author}의 질문 : {ctx.message.content}",
+            "content": f"{ctx.author}의 질문 : {target_message}",
         },
         {
             "role": "system",
@@ -197,8 +258,11 @@ async def to_god(ctx):
         },
     ]
 
-    # ChatGPT에 메시지 전달
-    response = send_to_chatgpt(messages, temperature=0.7)
+    # 이미지 처리 여부
+    if image_url:
+        response = image_analysis(messages, image_url=image_url, temperature=0.7)
+    else:
+        response = send_to_chatgpt(messages, temperature=0.7)
 
     # 봇 응답 기록
     DISCORD_CLIENT.USER_MESSAGES[ctx.author].append(
@@ -260,6 +324,9 @@ async def translate(ctx, *, text: str = None):
     """
     입력된 문장이 있으면 해당 문장을, 없으면 최근 메시지를 번역합니다.
     """
+    target_message = None
+    image_url = None
+
     if text:
         # 명령어 뒤에 입력된 문장이 있을 경우 해당 문장 번역
         target_message = text.strip()
@@ -268,6 +335,9 @@ async def translate(ctx, *, text: str = None):
         async for message in ctx.channel.history(limit=10):  # 최근 최대 10개 탐색
             if message.author != DISCORD_CLIENT.user and message.id != ctx.message.id:
                 target_message = message.content
+                # 이미지 첨부 여부 확인
+                if message.attachments:
+                    image_url = message.attachments[0].url
                 break
         else:
             # 번역할 메시지가 없을 경우
@@ -288,8 +358,13 @@ async def translate(ctx, *, text: str = None):
         },
     ]
 
-    # ChatGPT에 메시지 전달
-    translated_message = send_to_chatgpt(messages, temperature=0.5)
+    # 이미지 처리 여부
+    if image_url:
+        translated_message = image_analysis(
+            messages, image_url=image_url, temperature=0.5
+        )
+    else:
+        translated_message = send_to_chatgpt(messages, temperature=0.5)
 
     # 번역 결과 출력
     await ctx.reply(translated_message)
