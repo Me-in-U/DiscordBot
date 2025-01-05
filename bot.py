@@ -17,6 +17,7 @@ intents.members = True
 DISCORD_CLIENT = commands.Bot(command_prefix="!", intents=intents)
 DISCORD_CLIENT.remove_command("help")
 DISCORD_CLIENT.USER_MESSAGES = {}  # 유저별 채팅팅 저장용 딕셔너리
+DISCORD_CLIENT.NICKNAMES = {}  # 유저 닉네임 저장
 DISCORD_CLIENT.SETTING_DATA = os.path.join(
     BASE_DIR, "settingData.json"
 )  # settingData 파일 이름
@@ -27,7 +28,6 @@ DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 CHANNEL_ID = int(os.getenv("MY_CHANNEL_ID"))
 
 # 기타 변수
-NICKNAMES = {}  # 유저 닉네임 저장
 SEOUL_TZ = timezone(timedelta(hours=9))  # 서울 시간대 설정 (UTC+9)
 simsim_mode = False
 simsim_chats = []
@@ -196,7 +196,7 @@ async def question(ctx):
         },
         {
             "role": "system",
-            "content": f"아래는 닉네임 정보:\n{NICKNAMES}\n",
+            "content": f"아래는 닉네임 정보:\n{DISCORD_CLIENT.NICKNAMES}\n",
         },
     ]
 
@@ -254,7 +254,7 @@ async def to_god(ctx):
         },
         {
             "role": "system",
-            "content": f"아래는 닉네임 정보:\n{NICKNAMES}\n",
+            "content": f"아래는 닉네임 정보:\n{DISCORD_CLIENT.NICKNAMES}\n",
         },
     ]
 
@@ -304,7 +304,7 @@ async def summary(ctx, *, text: str = None):
         },
         {
             "role": "system",
-            "content": f"아래는 닉네임 정보:\n{NICKNAMES}\n",
+            "content": f"아래는 닉네임 정보:\n{DISCORD_CLIENT.NICKNAMES}\n",
         },
         {"role": "system", "content": "대화에 참여하지 않은 유저는 알려주지마"},
     ]
@@ -542,7 +542,7 @@ async def load_all_nicknames():
     for guild in DISCORD_CLIENT.guilds:
         print(f"서버 '{guild.name}'에서 멤버 목록을 불러옵니다...")
         for member in guild.members:
-            NICKNAMES[member] = (
+            DISCORD_CLIENT.NICKNAMES[member] = (
                 member.display_name if member.display_name else member.name
             )
     print("---------------------------------------------------\n")
