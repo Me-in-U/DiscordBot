@@ -2,6 +2,11 @@ import asyncio
 import os
 from datetime import datetime, timedelta, timezone
 
+from def_youtube_summary import (
+    extract_youtube_link,
+    is_youtube_link,
+    process_youtube_link,
+)
 import discord
 from discord.ext import commands
 from dotenv import load_dotenv
@@ -73,6 +78,23 @@ async def on_message(message):
         )
     if message.author == DISCORD_CLIENT.user:
         return  # client 스스로가 보낸 메세지는 무시
+
+    if is_youtube_link(message.content):
+        youtube_url = extract_youtube_link(message.content)
+        if youtube_url:
+            try:
+                await message.channel.send(
+                    "유튜브 영상 음성 분석 및 요약 중입니다. 잠시만 기다려주세요..."
+                )
+
+                # mp3 변환 -> STT -> GPT 요약
+                summary_result = await process_youtube_link(youtube_url)
+
+                # 결과 전송
+                await message.channel.send(f"**[영상 요약]**\n{summary_result}")
+
+            except Exception as e:
+                await message.channel.send(f"오류가 발생했습니다: {e}")
 
     # 심심이  모드
     global simsim_mode  # 심심이 모드 상태를 전역 변수로 관리
