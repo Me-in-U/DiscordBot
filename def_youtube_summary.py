@@ -1,9 +1,12 @@
 # def_youtube_summary.py
 import os
 import re
+
 import whisper
+from moviepy import AudioFileClip
 from pytube import YouTube
-from moviepy.editor import AudioFileClip
+from pytube.exceptions import VideoUnavailable
+from yt_dlp import YoutubeDL
 
 # request_gpt.py 에 정의된 함수들 임포트
 # send_to_chatgpt, image_analysis 등을 필요에 맞게 사용 가능
@@ -34,31 +37,55 @@ def extract_youtube_link(text: str) -> str:
 
 async def youtube_to_mp3(url: str, output_path: str = "youtube_audio.mp3") -> None:
     """
-    pytube로 유튜브 영상을 다운로드(mp4) 한 뒤, moviepy로 mp3로 변환
+    유튜브 영상을 다운로드(mp4) 한 뒤, mp3로 변환
     """
-    yt = YouTube(url)
-    # 오디오 스트림만 필터링
-    stream = yt.streams.filter(only_audio=True).first()
-    downloaded_file = stream.download()  # mp4 파일 다운로드
+    file_name = "youtube.mp4"
 
-    # moviepy를 사용해 mp4 -> mp3 변환
-    audio_clip = AudioFileClip(downloaded_file)
-    audio_clip.write_audiofile(output_path)
-    audio_clip.close()
+    try:
+        # yt-dlp를 사용하여 오디오만 다운로드
+        ydl_opts = {
+            "format": "bestaudio/best",
+            "outtmpl": file_name,
+            "quiet": True,
+        }
+        with YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
 
-    # 임시 mp4 파일은 제거
-    if os.path.exists(downloaded_file):
-        os.remove(downloaded_file)
+        audio_clip = AudioFileClip(file_name)
+        audio_clip.write_audiofile(output_path)
+        audio_clip.close()
+        # 파일 쓰기 완료 후 확인
+
+        if os.path.exists(output_path):
+            print("MP3 파일이 생성되었습니다.")
+        else:
+            raise FileNotFoundError(f"{output_path} 파일이 생성되지 않았습니다.")
+
+    except VideoUnavailable:
+        print("해당 유튜브 영상을 다운로드할 수 없습니다.")
+    except Exception as e:
+        print(f"유튜브 다운로드 중 오류가 발생했습니다: {e}")
+    finally:
+        # 파일 정리
+        if os.path.exists(file_name):
+            os.remove(file_name)
+            print("MP4 파일 삭제.")
 
 
 async def speech_to_text(audio_path: str) -> str:
     """
     whisper로 mp3 -> 텍스트(STT) 변환
     """
-    model = whisper.load_model(
-        "small"
-    )  # 모델 크기(base, small, medium, large 등 상황에 맞게)
-    result = model.transcribe(audio_path)
+    full_path = os.path.abspath(audio_path)
+
+    # 파일 존재 여부 확인
+    if not os.path.exists(full_path):
+        raise FileNotFoundError(f"{full_path} 파일을 찾을 수 없습니다.")
+
+    print("경로", full_path)
+    model = whisper.load_model("tiny")
+    result = model.transcribe(full_path)
+    print("result", result)
     return result["text"]
 
 
@@ -100,17 +127,28 @@ async def process_youtube_link(url: str) -> str:
 
     try:
         # 1) mp3 다운로드
+        print("process_youtube_link 1)")
         await youtube_to_mp3(url, mp3_path)
 
-        # 2) STT (음성을 텍스트로 변환)
-        stt_text = await speech_to_text(mp3_path)
+        print("process_youtube_link 2)")
+        # 2) Whisper가 MP3 파일을 찾을 수 있는지 확인
+        if not os.path.exists(mp3_path):
+            raise FileNotFoundError(f"{mp3_path} 파일을 찾을 수 없습니다.")
 
-        # 3) GPT 요약
+        # 3) STT (음성을 텍스트로 변환)
+        print("process_youtube_link 3)")
+        stt_text = await speech_to_text(mp3_path)
+        print(stt_text)
+
+        # 4) GPT 요약
+        print("process_youtube_link 4)")
         summary_text = await summarize_text_with_gpt(stt_text)
 
     finally:
-        # mp3 파일 정리 (에러 발생 여부와 무관하게 수행)
-        if os.path.exists(mp3_path):
-            os.remove(mp3_path)
+        # mp3 파일 정리
+        # if os.path.exists(mp3_path):
+        #     os.remove(mp3_path)
+        #     print("MP3 파일 삭제.")
+        print("finally")
 
     return summary_text
