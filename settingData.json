@@ -1,20 +1,20 @@
 {
-    "dailySoloRank": {
-        "userData": {
-            "game_name": "손성락",
-            "tag_line": "KR2"
-        },
-        "yesterdayData": {
-            "game_name": "손성락",
-            "tag_line": "KR2",
-            "tier": "MASTER",
-            "rank": "I",
-            "league_points": 92,
-            "wins": 119,
-            "losses": 109,
-            "rank_type_kor": "솔랭",
-            "win_rate": 52.19298245614035
-        },
-        "loop": true
-    }
+	"dailySoloRank": {
+		"userData": {
+			"game_name": "손성락",
+			"tag_line": "KR2"
+		},
+		"yesterdayData": {
+			"game_name": "손성락",
+			"tag_line": "KR2",
+			"tier": "MASTER",
+			"rank": "I",
+			"league_points": 92,
+			"wins": 119,
+			"losses": 109,
+			"rank_type_kor": "솔랭",
+			"win_rate": 52.19298245614035
+		},
+		"loop": false
+	}
 }

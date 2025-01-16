@@ -35,41 +35,36 @@ def extract_youtube_link(text: str) -> str:
     return ""
 
 
-async def youtube_to_mp3(url: str, output_path: str = "youtube_audio.mp3") -> None:
+async def youtube_to_mp3(url: str, output_path: str = "youtube_audio") -> None:
     """
     유튜브 영상을 다운로드(mp4) 한 뒤, mp3로 변환
     """
-    file_name = "youtube.mp4"
-
     try:
         # yt-dlp를 사용하여 오디오만 다운로드
         ydl_opts = {
             "format": "bestaudio/best",
-            "outtmpl": file_name,
-            "quiet": True,
+            "outtmpl": "youtube_audio",
+            "postprocessors": [
+                {  # Post-process to convert to MP3
+                    "key": "FFmpegExtractAudio",
+                    "preferredcodec": "mp3",  # Convert to mp3
+                    "preferredquality": "320",  # '0' means best quality, auto-determined by source
+                }
+            ],
         }
         with YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
 
-        audio_clip = AudioFileClip(file_name)
-        audio_clip.write_audiofile(output_path)
-        audio_clip.close()
-
         # 파일 쓰기 완료 후 확인
-        if os.path.exists(output_path):
+        if os.path.exists("youtube_audio.mp3"):
             print("MP3 파일이 생성되었습니다.")
         else:
-            raise FileNotFoundError(f"{output_path} 파일이 생성되지 않았습니다.")
+            raise FileNotFoundError(f"{"youtube_audio.mp3"} 파일이 생성되지 않았습니다.")
 
     except VideoUnavailable:
         print("해당 유튜브 영상을 다운로드할 수 없습니다.")
     except Exception as e:
         print(f"유튜브 다운로드 중 오류가 발생했습니다: {e}")
-    finally:
-        # 파일 정리
-        if os.path.exists(file_name):
-            os.remove(file_name)
-            print("MP4 파일 삭제.")
 
 
 async def speech_to_text(audio_path: str) -> str:
@@ -83,7 +78,7 @@ async def speech_to_text(audio_path: str) -> str:
         raise FileNotFoundError(f"{full_path} 파일을 찾을 수 없습니다.")
 
     print("경로", full_path)
-    model = whisper.load_model("small")
+    model = whisper.load_model("tiny").to("cpu")
     result = model.transcribe(full_path)
     print("result", result)
     return result["text"]
@@ -129,7 +124,7 @@ async def process_youtube_link(url: str) -> str:
     try:
         # 1) mp3 다운로드
         print("process_youtube_link 1)")
-        await youtube_to_mp3(url, mp3_path)
+        await youtube_to_mp3(url)
 
         print("process_youtube_link 2)")
         # 2) Whisper가 MP3 파일을 찾을 수 있는지 확인
