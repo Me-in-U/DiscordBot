@@ -83,7 +83,7 @@ async def speech_to_text(audio_path: str) -> str:
         raise FileNotFoundError(f"{full_path} 파일을 찾을 수 없습니다.")
 
     print("경로", full_path)
-    model = whisper.load_model("tiny")
+    model = whisper.load_model("small")
     result = model.transcribe(full_path)
     print("result", result)
     return result["text"]
