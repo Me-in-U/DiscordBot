@@ -99,7 +99,8 @@ async def summarize_text_with_gpt(text: str) -> str:
             "role": "system",
             "content": (
                 "당신은 전문 요약가입니다. "
-                "다음 텍스트의 주요 내용을 5~6줄 이내로 간결하게 요약하세요. "
+                "다음은 유튜브 내용을 텍스트로 바꾼것입니다. "
+                "주요내용에 대해서 요약해주세요. "
                 "중요 맥락이 누락되지 않도록 유의하세요."
             ),
         },
@@ -146,9 +147,9 @@ async def process_youtube_link(url: str) -> str:
 
     finally:
         # mp3 파일 정리
-        # if os.path.exists(mp3_path):
-        #     os.remove(mp3_path)
-        #     print("MP3 파일 삭제.")
+        if os.path.exists(mp3_path):
+            os.remove(mp3_path)
+            print("MP3 파일 삭제.")
         print("finally")
 
     return summary_text
