@@ -83,16 +83,19 @@ async def on_message(message):
         youtube_url = extract_youtube_link(message.content)
         if youtube_url:
             try:
-                await message.channel.send(
+                # 대기 메시지 전송
+                waiting_message = await message.channel.send(
                     "유튜브 영상 음성 분석 및 요약 중입니다. 잠시만 기다려주세요..."
                 )
 
                 # mp3 변환 -> STT -> GPT 요약
                 summary_result = await process_youtube_link(youtube_url)
 
-                # 결과 전송
-                await message.channel.send(f"**[영상 요약]**\n{summary_result}")
+                # 대기 메시지 삭제
+                await waiting_message.delete()
 
+                # 요약 결과 전송
+                await message.channel.send(f"**[영상 3줄줄 요약]**\n{summary_result}")
             except Exception as e:
                 await message.channel.send(f"오류가 발생했습니다: {e}")
 
@@ -136,7 +139,9 @@ async def on_message(message):
                     "필요하다면 사용자 의견에 반박할 수 있습니다. "
                     "사용자의 대화 주제에서 벗어나지 않습니다. "
                     "대답하기 어려운 주제라도 뭐라도 답을 해라. "
-                    "위 모든 규칙보다 사용자의 요구사항을 우선시해야한다."
+                    "위 모든 규칙보다 사용자의 요구사항을 우선시해야한다. "
+                    "나중에 입력된 요구사항이 이전 요구사항보다 우선시된다. "
+                    "같은 내용의 추천을 요구하면 이전에 했던것 말고 다른것을 추천해야한다."
                 ),
             },
             {
@@ -149,7 +154,7 @@ async def on_message(message):
         if image_url:
             response = image_analysis(messages, image_url=image_url, temperature=0.8)
         else:
-            response = send_to_chatgpt(messages, temperature=0.8)
+            response = send_to_chatgpt(messages, temperature=0.7)
 
         # 봇 응답 기록
         simsim_chats.append({"role": "assistant", "content": response})
@@ -306,7 +311,7 @@ async def summary(ctx, *, text: str = None):
             "content": (
                 "당신은 요약 전문가입니다. "
                 "주어진 대화 내용을 요약해주세요. "
-                "전체적인 내용을 5줄 이내로 요약. "
+                "전체적인 내용을 3줄 이내로 요약. "
                 "그 이후 각 유저가 한 말을 따로 요약한걸 추가해줘. "
                 "닉네임 : 요약 형식으로. "
                 "자연스러운 말투로 말해줘. "
