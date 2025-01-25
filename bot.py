@@ -110,6 +110,12 @@ async def on_message(message):
         else:
             await message.channel.send("심심이 모드 OFF")
 
+    # 심심이 모드에서 "초기화" 명령 처리
+    if simsim_mode and message.content == "초기화":
+        simsim_chats.clear()  # USER_MESSAGES 초기화
+        await message.channel.send("모든 대화 기록이 초기화되었습니다.")
+        return  # 초기화 후 다른 처리는 하지 않음
+
     if simsim_mode:
         target_message = message.content
         image_url = None
