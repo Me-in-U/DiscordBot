@@ -95,7 +95,7 @@ async def on_message(message):
                 await waiting_message.delete()
 
                 # 요약 결과 전송
-                await message.channel.send(f"**[영상 3줄줄 요약]**\n{summary_result}")
+                await message.channel.send(f"**[영상 3줄 요약]**\n{summary_result}")
             except Exception as e:
                 await message.channel.send(f"오류가 발생했습니다: {e}")
 
