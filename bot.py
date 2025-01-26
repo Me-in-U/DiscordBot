@@ -127,7 +127,7 @@ async def on_message(message):
         simsim_chats.append({"role": "user", "content": target_message})
         messages = [
             {
-                "role": "system",
+                "role": "developer",
                 "content": (
                     "다음음 규칙을 무조건 따라야한다."
                     '당신의 이름은 "심심이"입니다.'
@@ -151,7 +151,7 @@ async def on_message(message):
                 ),
             },
             {
-                "role": "system",
+                "role": "developer",
                 "content": f"전체 대화 내용 : {simsim_chats}",
             },
         ]
@@ -195,35 +195,40 @@ async def question(ctx):
     # ChatGPT에 메시지 전달
     messages = [
         {
-            "role": "system",
+            "role": "developer",
             "content": (
-                "아래는 유저가 말했던 기록이다. "
-                "내용을 참고하도록 하고 맨 마지막이 질문이다. "
                 "질문에 대한 답을 해라. "
-                "전체 대화 내용이 필요한 질문이면 밑에서 참고해라"
                 "추가적인 질문요청, 궁금한점이 있는지 물어보지 마라. "
-                "질문에만 답해라"
+                "질문에만 답해라. "
+                "누가 질문했는지는 언급하지마라."
             ),
         },
         {
-            "role": "system",
-            "content": f"전체 대화 내용 : {DISCORD_CLIENT.USER_MESSAGES}",
+            "role": "developer",
+            "content": (
+                "내용을 참고하도록 하고 맨 마지막이 질문이다. "
+                "전체 대화 내용이 필요한 질문이면 밑에서 참고해라"
+                "다음은 유저가 말했던 기록이다. "
+                f"전체 대화 내용 : {DISCORD_CLIENT.USER_MESSAGES}"
+            ),
         },
         {
             "role": "user",
             "content": f"{ctx.author}의 질문 : {target_message}",
         },
         {
-            "role": "system",
+            "role": "developer",
             "content": f"아래는 닉네임 정보:\n{DISCORD_CLIENT.NICKNAMES}\n",
         },
     ]
 
     # 이미지 처리 여부
     if image_url:
-        response = image_analysis(messages, image_url=image_url, temperature=0.4)
+        response = image_analysis(
+            messages, model="gpt-4o", image_url=image_url, temperature=0.4
+        )
     else:
-        response = send_to_chatgpt(messages, temperature=0.4)
+        response = send_to_chatgpt(messages, model="gpt-4o", temperature=0.4)
 
     # 봇 응답 기록
     DISCORD_CLIENT.USER_MESSAGES[ctx.author].append(
@@ -256,7 +261,7 @@ async def to_god(ctx):
     # ChatGPT에 메시지 전달
     messages = [
         {
-            "role": "system",
+            "role": "developer",
             "content": (
                 "당신은 세계 최고 정상화의 신, 게임 메이플스토리의 신창섭 디렉터이다. "
                 "당신은 모든것을 정상화 하는 능력이 있다. "
@@ -268,7 +273,7 @@ async def to_god(ctx):
             ),
         },
         {
-            "role": "system",
+            "role": "developer",
             "content": f"전체 대화 내용 : {DISCORD_CLIENT.USER_MESSAGES}",
         },
         {
@@ -276,16 +281,18 @@ async def to_god(ctx):
             "content": f"{ctx.author}의 질문 : {target_message}",
         },
         {
-            "role": "system",
+            "role": "developer",
             "content": f"아래는 닉네임 정보:\n{DISCORD_CLIENT.NICKNAMES}\n",
         },
     ]
 
     # 이미지 처리 여부
     if image_url:
-        response = image_analysis(messages, image_url=image_url, temperature=0.7)
+        response = image_analysis(
+            messages, model="gpt-4o", image_url=image_url, temperature=0.7
+        )
     else:
-        response = send_to_chatgpt(messages, temperature=0.7)
+        response = send_to_chatgpt(messages, model="gpt-4o", temperature=0.7)
 
     # 봇 응답 기록
     DISCORD_CLIENT.USER_MESSAGES[ctx.author].append(
@@ -313,7 +320,7 @@ async def summary(ctx, *, text: str = None):
     # 요약 요청 메시지 생성
     messages = [
         {
-            "role": "system",
+            "role": "developer",
             "content": (
                 "당신은 요약 전문가입니다. "
                 "주어진 대화 내용을 요약해주세요. "
@@ -322,22 +329,22 @@ async def summary(ctx, *, text: str = None):
                 "닉네임 : 요약 형식으로. "
                 "자연스러운 말투로 말해줘. "
                 "추가 요청 사항이 있다면 위 내용보다 우선 처리 해줘줘"
+                "대화에 참여하지 않은 유저는 알려주지마"
             ),
         },
-        {"role": "system", "content": f"추가 요청 사항 : {request_message}"},
+        {"role": "developer", "content": f"추가 요청 사항 : {request_message}"},
         {
-            "role": "system",
+            "role": "developer",
             "content": f"아래 채팅 내용을 요약해 주세요:\n{DISCORD_CLIENT.USER_MESSAGES}\n",
         },
         {
-            "role": "system",
+            "role": "developer",
             "content": f"아래는 닉네임 정보:\n{DISCORD_CLIENT.NICKNAMES}\n",
         },
-        {"role": "system", "content": "대화에 참여하지 않은 유저는 알려주지마"},
     ]
 
     # ChatGPT에 메시지 전달
-    response = send_to_chatgpt(messages, temperature=0.6)
+    response = send_to_chatgpt(messages, model="gpt-4o", temperature=0.6)
 
     # 응답 출력
     await ctx.reply(f"{response}")
@@ -374,7 +381,7 @@ async def translate(ctx, *, text: str = None):
     # 번역 요청 메시지 생성
     messages = [
         {
-            "role": "system",
+            "role": "developer",
             "content": (
                 "당신은 전문 번역가입니다. "
                 "대화 내용을 직역보다는 자연스럽게 한국어로 번역해 주세요. "
@@ -382,7 +389,7 @@ async def translate(ctx, *, text: str = None):
             ),
         },
         {
-            "role": "system",
+            "role": "developer",
             "content": f"아래는 번역할 대화 내용입니다:\n{target_message}",
         },
     ]
@@ -390,10 +397,10 @@ async def translate(ctx, *, text: str = None):
     # 이미지 처리 여부
     if image_url:
         translated_message = image_analysis(
-            messages, image_url=image_url, temperature=0.5
+            messages, model="gpt-4o", image_url=image_url, temperature=0.5
         )
     else:
-        translated_message = send_to_chatgpt(messages, temperature=0.5)
+        translated_message = send_to_chatgpt(messages, model="gpt-4o", temperature=0.5)
 
     # 번역 결과 출력
     await ctx.reply(translated_message)
@@ -433,24 +440,26 @@ async def interpret(ctx, *, text: str = None):
     # 번역 요청 메시지 생성
     messages = [
         {
-            "role": "system",
+            "role": "developer",
             "content": (
                 "당신은 문장 해석 전문가입니다. "
-                "대화 내용의 의미나 숨겨진 뜻을 찾아서 해석해주세요."
+                "대화 내용의 의미나 숨겨진 뜻이 있을것 같으면 찾아서 해석해주세요."
             ),
         },
         {
-            "role": "system",
+            "role": "developer",
             "content": f"아래는 해석할 대화 내용입니다:\n{target_message}",
         },
     ]
 
     if image_url:
         # 이미지와 텍스트를 처리
-        interpreted = image_analysis(messages, image_url=image_url, temperature=0.6)
+        interpreted = image_analysis(
+            messages, model="gpt-4o", image_url=image_url, temperature=0.6
+        )
     else:
         # 텍스트만 처리
-        interpreted = send_to_chatgpt(messages, temperature=0.6)
+        interpreted = send_to_chatgpt(messages, model="gpt-4o", temperature=0.6)
 
     # 번역 결과 출력
     await ctx.reply(interpreted)
