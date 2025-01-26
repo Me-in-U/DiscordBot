@@ -13,11 +13,11 @@ if not OPENAI_KEY:
 clientGPT = OpenAI(api_key=OPENAI_KEY)
 
 
-def send_to_chatgpt(messages, model="gpt-4o-mini-2024-07-18", temperature=0.5):
+def send_to_chatgpt(messages, model="gpt-4o-mini", temperature=0.5):
     """
     OpenAI ChatGPT API를 호출하여 응답을 반환합니다.
 
-    :param messages: 대화 형식의 메시지 리스트. 각 항목은 {"role": "user|assistant|system", "content": "내용"} 형식.
+    :param messages: 대화 형식의 메시지 리스트. 각 항목은 {"role": "user|assistant|developer", "content": "내용"} 형식.
     :param model: 사용할 모델 이름. 기본값은 "gpt-4".
     :param temperature: 생성의 무작위성 제어 (0.0~1.0). 기본값은 0.5.
     :param max_tokens: 출력 최대 토큰 수. 기본값은 500.
@@ -26,7 +26,6 @@ def send_to_chatgpt(messages, model="gpt-4o-mini-2024-07-18", temperature=0.5):
     response = clientGPT.chat.completions.create(
         model=model,
         messages=messages,
-        max_tokens=5000,
         temperature=temperature,
     )
     message = response.choices[0].message.content
@@ -35,9 +34,7 @@ def send_to_chatgpt(messages, model="gpt-4o-mini-2024-07-18", temperature=0.5):
     return message
 
 
-def image_analysis(
-    messages, model="gpt-4o-mini-2024-07-18", image_url="", temperature=0.5
-):
+def image_analysis(messages, model="gpt-4o-mini", image_url="", temperature=0.5):
     messages.append(
         {
             "role": "user",
@@ -58,7 +55,6 @@ def image_analysis(
     response = clientGPT.chat.completions.create(
         model=model,
         messages=messages,
-        max_tokens=5000,
         temperature=temperature,
     )
     message = response.choices[0].message.content
