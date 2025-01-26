@@ -24,11 +24,26 @@ def is_youtube_link(text: str) -> bool:
     return bool(YOUTUBE_PATTERN.search(text))
 
 
-def extract_youtube_link(text: str) -> str:
+def normalize_youtube_link(url: str) -> str:
+    """
+    유튜브 쇼츠 링크를 일반 유튜브 영상 링크로 변환
+    """
+    if "youtube.com/shorts/" in url:
+        # 쇼츠 링크를 일반 영상 링크로 변환
+        url = url.replace("youtube.com/shorts/", "youtube.com/watch?v=")
+        print("쇼츠 -> 일반영상 변환환 주소", url)
+        return url
+    print("일반 영상 주소", url)
+    return url
+
+
+def extract_youtube_link(link: str) -> str:
     """
     메시지(텍스트)에서 유튜브 링크를 추출
     """
-    match = YOUTUBE_PATTERN.search(text)
+    # 쇼츠 링크를 일반 링크로 변환
+    link = normalize_youtube_link(link)
+    match = YOUTUBE_PATTERN.search(link)
     if match:
         return match.group()
     return ""
@@ -188,7 +203,7 @@ async def summarize_text_with_gpt(text: str) -> str:
     # GPT에게 보낼 메시지
     messages = [
         {
-            "role": "system",
+            "role": "developer",
             "content": (
                 "당신은 전문 요약가입니다. "
                 "다음은 유튜브 내용을 텍스트로 바꾼것입니다. "
