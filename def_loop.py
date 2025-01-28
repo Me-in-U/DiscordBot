@@ -4,7 +4,7 @@ import json
 import discord
 from discord.ext import commands, tasks
 
-from bot import CHANNEL_ID, DISCORD_CLIENT, SEOUL_TZ
+from bot import CHANNEL_ID, SEOUL_TZ
 from requests_riot import get_rank_data
 
 
@@ -48,7 +48,7 @@ class LoopTasks(commands.Cog):
             print("대상 채널을 찾을 수 없습니다.")
             return
 
-        DISCORD_CLIENT.USER_MESSAGES = {}
+        self.bot.USER_MESSAGES = {}
         print(f"[{datetime.now()}] user_messages 초기화 완료.")
         await target_channel.send("📢 새로운 하루가 시작됩니다.")
 
