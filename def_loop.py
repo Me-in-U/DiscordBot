@@ -1,11 +1,14 @@
-from datetime import datetime, time
 import json
+from datetime import datetime, time
 
 import discord
+import holidays
 from discord.ext import commands, tasks
 
 from bot import CHANNEL_ID, SEOUL_TZ
 from requests_riot import get_rank_data
+
+SPECIAL_DAYS_FILE = "special_days.json"
 
 
 class LoopTasks(commands.Cog):
@@ -42,15 +45,39 @@ class LoopTasks(commands.Cog):
 
     @tasks.loop(time=time(hour=0, minute=0, tzinfo=SEOUL_TZ))  # 매일 자정
     async def new_day_clear(self):
-        """매일 자정에 user_messages를 초기화."""
+        """매일 자정에 user_messages를 초기화하고, 기념일 및 공휴일 정보를 알림."""
         target_channel = self.bot.get_channel(CHANNEL_ID)
         if not target_channel:
             print("대상 채널을 찾을 수 없습니다.")
             return
 
         self.bot.USER_MESSAGES = {}
+        today = datetime.now().date()
+        today_str = today.strftime("%m-%d")
+
+        # 한국 공휴일 정보 가져오기
+        holiday_kr = holidays.Korea()
+        holiday_list = []
+        if today in holiday_kr:
+            holiday_list.append(f"🇰🇷 한국 공휴일: {holiday_kr[today]}")
+
+        # JSON 파일에서 기념일 데이터 불러오기
+        try:
+            with open(SPECIAL_DAYS_FILE, "r", encoding="utf-8") as file:
+                special_days = json.load(file)
+
+            if today_str in special_days:
+                holiday_list.extend(special_days[today_str])
+        except Exception as e:
+            print(f"❌ 기념일 JSON 파일을 불러오는 중 오류 발생: {e}")
+
+        # 메시지 출력
+        message = "📢 새로운 하루가 시작됩니다."
+        if holiday_list:
+            message += "\n### 기념일\n- " + "\n- ".join(holiday_list)
+
         print(f"[{datetime.now()}] user_messages 초기화 완료.")
-        await target_channel.send("📢 새로운 하루가 시작됩니다.")
+        await target_channel.send(message)
 
     @tasks.loop(time=time(hour=0, minute=0, tzinfo=SEOUL_TZ))  # 매일 자정
     async def update_rank_data(self):
