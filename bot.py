@@ -89,7 +89,7 @@ async def on_message(message):
                 )
 
                 # mp3 변환 -> STT -> GPT 요약
-                summary_result = await process_youtube_link(youtube_url)
+                summary_result = await process_youtube_link(youtube_url).rstrip()
 
                 # 대기 메시지 삭제
                 await waiting_message.delete()
