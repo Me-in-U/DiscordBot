@@ -60,4 +60,4 @@ def image_analysis(messages, model="gpt-4o-mini", image_url="", temperature=0.5)
     message = response.choices[0].message.content
     print(message)
     messages.append(response.choices[0].message)
-    return message
+    return message.strip()

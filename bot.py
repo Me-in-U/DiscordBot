@@ -89,7 +89,7 @@ async def on_message(message):
                 )
 
                 # mp3 변환 -> STT -> GPT 요약
-                summary_result = await process_youtube_link(youtube_url).rstrip()
+                summary_result = await process_youtube_link(youtube_url)
 
                 # 대기 메시지 삭제
                 await waiting_message.delete()
@@ -315,7 +315,7 @@ async def summary(ctx, *, text: str = None):
         await ctx.reply("**요약할 대화 내용이 없습니다.**")
         return
 
-    request_message = text.strip() if text else ""
+    request_message = text if text else ""
 
     # 요약 요청 메시지 생성
     messages = [
