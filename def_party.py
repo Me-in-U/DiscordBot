@@ -26,8 +26,17 @@ class Party(commands.Cog):
             return
 
         msg = "### 현재 생성된 파티 목록:\n"
-        for c in self.bot.PARTY_LIST[guild_id]:
-            msg += f"- {c.name.rstrip('-파티')}\n"
+        for category in self.bot.PARTY_LIST[guild_id]:
+            # 파티 이름 추출 ("-파티" 접미사 제거)
+            party_name = category.name.rstrip("-파티")
+            # category의 overwrites에서 discord.Member 객체 중 view_channel 권한이 True인 멤버 수 계산 (봇 제외)
+            individual_members = []
+            for target, overwrite in category.overwrites.items():
+                if isinstance(target, discord.Member):
+                    if overwrite.view_channel is True and not target.bot:
+                        individual_members.append(target)
+            member_count = len(individual_members)
+            msg += f"- {party_name} ({member_count}명)\n"
         await ctx.reply(msg.strip())
 
     @commands.command(
@@ -68,13 +77,13 @@ class Party(commands.Cog):
             category = await ctx.guild.create_category(
                 name=target_category_name, overwrites=overwrites
             )
-            # 카테고리 내 텍스트 채널 생성 (예: "-채팅*" 접미사)
+            # 카테고리 내 텍스트 채널 생성 (예: "-채팅o" 접미사)
             text_channel = await category.create_text_channel(
-                name=f"{party_name}-채팅*", overwrites=overwrites
+                name=f"{party_name}-채팅o", overwrites=overwrites
             )
-            # 카테고리 내 음성 채널 생성 (예: "-음성*" 접미사)
+            # 카테고리 내 음성 채널 생성 (예: "-음성o" 접미사)
             voice_channel = await category.create_voice_channel(
-                name=f"{party_name}-음성*", overwrites=overwrites
+                name=f"{party_name}-음성o", overwrites=overwrites
             )
             # 해당 서버의 PARTY_LIST에 생성된 카테고리 추가
             self.bot.PARTY_LIST[guild_id].append(category)
@@ -89,10 +98,10 @@ class Party(commands.Cog):
 
     @commands.command(
         aliases=["초대", "추가"],
-        help="!초대 @닉네임 @닉네임... 형식으로 사용하면, 해당 파티 텍스트 채널(예: 이름이 '-채팅*'으로 끝남)에서 멘션된 유저에게 해당 파티(카테고리, 텍스트, 음성 채널)의 접근 권한을 부여합니다.",
+        help="!초대 @닉네임 @닉네임... 형식으로 사용하면, 해당 파티 텍스트 채널(예: 이름이 '-채팅o'으로 끝남)에서 멘션된 유저에게 해당 파티(카테고리, 텍스트, 음성 채널)의 접근 권한을 부여합니다.",
     )
     async def invite_party(self, ctx):
-        if not ctx.channel.name.endswith("-채팅*"):
+        if not ctx.channel.name.endswith("-채팅o"):
             await ctx.reply("파티 채널에서만 가능한 명령어 입니다.")
             return
         if not ctx.message.mentions:
@@ -131,7 +140,7 @@ class Party(commands.Cog):
         help="해당 파티 텍스트 채널에서 사용하면, 그 파티의 카테고리, 텍스트 채널, 음성 채널을 삭제합니다. 다른 채널에서 사용하면 '파티채널에서만 가능한 명령어 입니다'를 출력합니다.",
     )
     async def release_party(self, ctx):
-        if not ctx.channel.name.endswith("-채팅*"):
+        if not ctx.channel.name.endswith("-채팅o"):
             await ctx.reply("파티채널에서만 가능한 명령어 입니다")
             return
 
@@ -189,22 +198,27 @@ class Party(commands.Cog):
             await ctx.reply("존재하지 않는 파티입니다.")
             return
 
-        overwrite = target_category.overwrites_for(ctx.author)
-        if overwrite.view_channel is True:
+        # 카테고리의 overwrites에서 개별적으로 추가된 멤버들을 확인 (관리자 포함)
+        individual_members = []
+        for target, overwrite in target_category.overwrites.items():
+            if isinstance(target, discord.Member):
+                if overwrite.view_channel is True and not target.bot:
+                    individual_members.append(target)
+        if ctx.author in individual_members:
             await ctx.reply("이미 참가한 파티입니다.")
             return
 
         text_channel = None
         for ch in target_category.channels:
-            if isinstance(ch, discord.TextChannel) and ch.name.endswith("-채팅*"):
+            if isinstance(ch, discord.TextChannel) and ch.name.endswith("-채팅o"):
                 text_channel = ch
                 break
         if text_channel is None:
             await ctx.reply("해당 파티의 텍스트 채널을 찾을 수 없습니다.")
             return
 
-        # 즉시 파티에 참가 (기존 요청 방식 대신 바로 참가)
         try:
+            # 파티에 참가할 수 있도록 명시적으로 권한 부여
             await target_category.set_permissions(
                 ctx.author,
                 overwrite=discord.PermissionOverwrite(
@@ -240,7 +254,7 @@ class Party(commands.Cog):
         help="!수락 명령어를 사용하면, 최근 파티 참가 요청을 보낸 유저를 자동으로 초대합니다.",
     )
     async def accept_party(self, ctx):
-        if not ctx.channel.name.endswith("-채팅*"):
+        if not ctx.channel.name.endswith("-채팅o"):
             await ctx.reply("파티 채널에서만 가능한 명령어 입니다.")
             return
 
@@ -287,7 +301,7 @@ class Party(commands.Cog):
     )
     async def party_members(self, ctx):
         # 파티 텍스트 채널에서만 실행 가능하도록 체크
-        if not ctx.channel.name.endswith("-채팅*"):
+        if not ctx.channel.name.endswith("-채팅o"):
             await ctx.reply("파티 채널에서만 가능한 명령어 입니다.")
             return
 
@@ -300,16 +314,18 @@ class Party(commands.Cog):
         # 카테고리의 overwrites에서 discord.Member 객체로 추가된 멤버만 필터링
         for target, overwrite in category.overwrites.items():
             if isinstance(target, discord.Member):
-                # 권한이 view_channel True인 멤버만 개별 추가된 멤버로 간주 (봇 제외)
                 if overwrite.view_channel is True and not target.bot:
                     individual_members.append(target)
 
-        if not individual_members:
+        # 카테고리 이름에서 "-파티" 접미사를 제거하여 파티 이름 추출
+        party_name = category.name.rstrip("-파티")
+        member_count = len(individual_members)
+
+        if member_count == 0:
             await ctx.reply("개별로 추가된 파티 멤버가 없습니다.")
             return
 
-        # 결과 문자열을 "파티원:" 헤더와 각 멤버 이름 앞에 '-'를 붙여서 구성
-        result = "파티원:\n" + "\n".join(
+        result = f"**{party_name} ({member_count}명)**\n파티원:\n" + "\n".join(
             f"- {member.display_name}" for member in individual_members
         )
         await ctx.reply(result)
