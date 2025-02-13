@@ -202,12 +202,37 @@ class Party(commands.Cog):
         if text_channel is None:
             await ctx.reply("해당 파티의 텍스트 채널을 찾을 수 없습니다.")
             return
-        # 파티 참가 요청 메시지를 보낸 후, 해당 텍스트 채널 ID를 키로 해서 요청한 유저를 저장합니다.
-        self.join_requests[text_channel.id] = ctx.author
-        await text_channel.send(
-            f"{ctx.author.mention}가 파티참가를 원합니다. \n '!수락'을 입력하거나 '!초대 {ctx.author.mention}'를 입력하면 파티에 추가됩니다."
-        )
-        await ctx.reply("파티 참가 요청이 전송되었습니다.")
+
+        # 즉시 파티에 참가 (기존 요청 방식 대신 바로 참가)
+        try:
+            await target_category.set_permissions(
+                ctx.author,
+                overwrite=discord.PermissionOverwrite(
+                    view_channel=True, send_messages=True, connect=True, speak=True
+                ),
+            )
+            for channel in target_category.channels:
+                await channel.set_permissions(
+                    ctx.author,
+                    overwrite=discord.PermissionOverwrite(
+                        view_channel=True,
+                        send_messages=True,
+                        connect=True,
+                        speak=True,
+                    ),
+                )
+            await ctx.reply(
+                f"{ctx.author.mention}님, '{party_name}' 파티에 참여하셨습니다."
+            )
+        except Exception as e:
+            await ctx.reply(f"파티 참가 중 오류가 발생했습니다: {e}")
+
+        # 기존 파티 참가 요청 메시지 (참가 요청 기능)
+        # self.join_requests[text_channel.id] = ctx.author
+        # await text_channel.send(
+        #     f"{ctx.author.mention}가 파티참가를 원합니다. \n '!수락'을 입력하거나 '!초대 {ctx.author.mention}'를 입력하면 파티에 추가됩니다."
+        # )
+        # await ctx.reply("파티 참가 요청이 전송되었습니다.")
 
     @commands.command(
         name="수락",
