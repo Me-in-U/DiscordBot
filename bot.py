@@ -38,12 +38,28 @@ SEOUL_TZ = timezone(timedelta(hours=9))  # 서울 시간대 설정 (UTC+9)
 # Cog 로드
 async def load_cogs():
     """Cog를 로드하고 초기 설정값을 전달합니다."""
+    print("-------------------Cog 로드 시작-------------------")
     await DISCORD_CLIENT.load_extension("def_custom_help")
     await DISCORD_CLIENT.load_extension("def_loop")
     await DISCORD_CLIENT.load_extension("def_party")
     await DISCORD_CLIENT.load_extension("def_questions")
     await DISCORD_CLIENT.load_extension("def_rank")
-    print("Cog 로드 완료\n")
+    print("-------------------Cog 로드 완료-------------------\n")
+
+
+async def load_party_list():
+    """
+    모든 길드의 카테고리 중 이름이 '-파티'로 끝나는 카테고리들을 DISCORD_CLIENT.PARTY_LIST에 저장합니다.
+    """
+    print("---------------- 파티 카테고리 로드 ----------------")
+    party_list = []
+    for guild in DISCORD_CLIENT.guilds:
+        for category in guild.categories:
+            if category.name.endswith("-파티"):
+                party_list.append(category)
+    DISCORD_CLIENT.PARTY_LIST = party_list
+    print(f"로딩된 파티 카테고리: {[c.name for c in party_list]}")
+    print("---------------------------------------------------\n")
 
 
 async def load_variable():
@@ -51,7 +67,8 @@ async def load_variable():
     print()
     await load_recent_messages()
     await load_all_nicknames()
-    print("최근 메시지, 닉네임 로드 완료\n")
+    await load_party_list()
+    print("[최근 메시지, 닉네임, 파티] 로드 완료\n")
 
 
 #! client.event

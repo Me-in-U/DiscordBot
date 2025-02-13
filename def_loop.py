@@ -40,7 +40,7 @@ class LoopTasks(commands.Cog):
 
     @presence_update_task.before_loop
     async def before_presence_update_task(self):
-        print("봇 on ready 대기중...")
+        print("-------------봇 on ready 대기중...---------------")
         await self.bot.wait_until_ready()
 
     @tasks.loop(time=time(hour=0, minute=0, tzinfo=SEOUL_TZ))  # 매일 자정

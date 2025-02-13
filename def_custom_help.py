@@ -15,7 +15,7 @@ class HelpCommand(commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         """봇이 준비되었을 때 호출됩니다."""
-        print("self.bot on_ready() -> HelpCommand Cog : on ready!")
+        print("DISCORD_CLIENT -> HelpCommand Cog : on ready!")
 
     @commands.command(
         aliases=["help", "도움", "도뭉", "동움"],
@@ -52,6 +52,22 @@ class HelpCommand(commands.Cog):
             (
                 "!일일랭크루프 true/false",
                 "자정 솔랭 출력 기능 on/off.",
+            ),
+            # 파티 관련 명령어 추가
+            ("!파티", "현재 생성되어 있는 파티 리스트를 출력합니다."),
+            (
+                "!파티생성 [파티 이름]",
+                "파티를 생성합니다. (비공개 카테고리, 텍스트 채널, 음성 채널 생성)",
+            ),
+            (
+                "!초대 [@닉네임 ...]",
+                "해당 파티 텍스트 채널에서 멘션된 유저에게 접근 권한을 부여합니다.",
+            ),
+            ("!파티해제", "해당 파티 텍스트 채널에서 파티를 해제합니다."),
+            ("!참가 [파티명]", "파티에 참가 신청을 합니다. (초대 요청 메시지 전송)"),
+            (
+                "!수락",
+                "!수락 명령어를 사용하면, 최근 파티 참가 요청을 보낸 유저를 자동으로 초대합니다.",
             ),
         ]
         # 명령어 설명 생성
