@@ -25,6 +25,7 @@ DISCORD_CLIENT.SETTING_DATA = os.path.join(
 )  # settingData 파일 이름
 DISCORD_CLIENT.SIMSIM_MODE = False
 DISCORD_CLIENT.SIMSIM_CHATS = []
+DISCORD_CLIENT.PARTY_LIST = {}
 
 # 환경 변수를 .env 파일에서 로딩
 load_dotenv()
@@ -52,13 +53,17 @@ async def load_party_list():
     모든 길드의 카테고리 중 이름이 '-파티'로 끝나는 카테고리들을 DISCORD_CLIENT.PARTY_LIST에 저장합니다.
     """
     print("---------------- 파티 카테고리 로드 ----------------")
-    party_list = []
     for guild in DISCORD_CLIENT.guilds:
         for category in guild.categories:
             if category.name.endswith("-파티"):
-                party_list.append(category)
-    DISCORD_CLIENT.PARTY_LIST = party_list
-    print(f"로딩된 파티 카테고리: {[c.name for c in party_list]}")
+                if guild.id not in DISCORD_CLIENT.PARTY_LIST:
+                    DISCORD_CLIENT.PARTY_LIST[guild.id] = []
+                DISCORD_CLIENT.PARTY_LIST[guild.id].append(category)
+    # 저장된 결과를 서버 이름과 파티 목록으로 출력
+    for guild in DISCORD_CLIENT.guilds:
+        if guild.id in DISCORD_CLIENT.PARTY_LIST:
+            party_names = [cat.name for cat in DISCORD_CLIENT.PARTY_LIST[guild.id]]
+            print(f"{guild.name}: {party_names}")
     print("---------------------------------------------------\n")
 
 
