@@ -15,7 +15,7 @@ class QuestionCommands(commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         """봇이 준비되었을 때 호출됩니다."""
-        print("self.bot on_ready() -> QuestionCommands Cog : on ready!")
+        print("DISCORD_CLIENT -> QuestionCommands Cog : on ready!")
 
     @commands.command(
         aliases=["질문"],
