@@ -255,6 +255,39 @@ class Party(commands.Cog):
         except Exception as e:
             await ctx.reply(f"참가 요청 수락 중 오류가 발생했습니다: {e}")
 
+    @commands.command(
+        name="파티원",
+        help="개별로 추가된 파티 멤버들의 닉네임을 출력합니다. (역할로 부여된 멤버 제외)",
+    )
+    async def party_members(self, ctx):
+        # 파티 텍스트 채널에서만 실행 가능하도록 체크
+        if not ctx.channel.name.endswith("-파티채팅"):
+            await ctx.reply("파티 채널에서만 가능한 명령어 입니다.")
+            return
+
+        category = ctx.channel.category
+        if category is None:
+            await ctx.reply("이 채널은 카테고리에 속하지 않습니다.")
+            return
+
+        individual_members = []
+        # 카테고리의 overwrites에서 discord.Member 객체로 추가된 멤버만 필터링
+        for target, overwrite in category.overwrites.items():
+            if isinstance(target, discord.Member):
+                # 권한이 view_channel True인 멤버만 개별 추가된 멤버로 간주 (봇 제외)
+                if overwrite.view_channel is True and not target.bot:
+                    individual_members.append(target)
+
+        if not individual_members:
+            await ctx.reply("개별로 추가된 파티 멤버가 없습니다.")
+            return
+
+        # 결과 문자열을 "파티원:" 헤더와 각 멤버 이름 앞에 '-'를 붙여서 구성
+        result = "파티원:\n" + "\n".join(
+            f"- {member.display_name}" for member in individual_members
+        )
+        await ctx.reply(result)
+
 
 async def setup(bot):
     """Cog를 봇에 추가합니다."""
