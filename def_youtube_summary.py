@@ -224,7 +224,7 @@ async def summarize_text_with_gpt(text: str) -> str:
         model="gpt-4o-mini-2024-07-18",  # 필요에 맞게 수정
         temperature=0.3,
     )
-    return response_text.strip()
+    return response_text
 
 
 async def process_youtube_link(url: str) -> str:
@@ -264,4 +264,4 @@ async def process_youtube_link(url: str) -> str:
             os.remove(mp3_path)
             print("MP3 파일 삭제 완료.")
 
-    return summary_text
+    return summary_text.strip()
