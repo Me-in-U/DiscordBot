@@ -17,6 +17,29 @@ YOUTUBE_PATTERN = re.compile(
 )
 
 
+async def check_youtube_link(message):
+    youtube_url = None
+    if is_youtube_link(message.content):
+        youtube_url = extract_youtube_link(message.content)
+    if youtube_url:
+        try:
+            # 대기 메시지 전송
+            waiting_message = await message.channel.send(
+                "유튜브 영상 음성 분석 및 요약 중입니다. 잠시만 기다려주세요..."
+            )
+
+            # mp3 변환 -> STT -> GPT 요약
+            summary_result = await process_youtube_link(youtube_url)
+
+            # 대기 메시지 삭제
+            await waiting_message.delete()
+
+            # 요약 결과 전송
+            await message.channel.send(f"**[영상 3줄 요약]**\n{summary_result}")
+        except Exception as e:
+            await message.channel.send(f"오류가 발생했습니다: {e}")
+
+
 def is_youtube_link(text: str) -> bool:
     """
     메시지 텍스트에서 유튜브 링크가 있는지 간단히 판별
