@@ -68,13 +68,13 @@ class Party(commands.Cog):
             category = await ctx.guild.create_category(
                 name=target_category_name, overwrites=overwrites
             )
-            # 카테고리 내 텍스트 채널 생성 (예: "-파티채팅" 접미사)
+            # 카테고리 내 텍스트 채널 생성 (예: "-채팅*" 접미사)
             text_channel = await category.create_text_channel(
-                name=f"{party_name}-파티채팅", overwrites=overwrites
+                name=f"{party_name}-채팅*", overwrites=overwrites
             )
-            # 카테고리 내 음성 채널 생성 (예: "-파티음성" 접미사)
+            # 카테고리 내 음성 채널 생성 (예: "-음성*" 접미사)
             voice_channel = await category.create_voice_channel(
-                name=f"{party_name}-파티음성", overwrites=overwrites
+                name=f"{party_name}-음성*", overwrites=overwrites
             )
             # 해당 서버의 PARTY_LIST에 생성된 카테고리 추가
             self.bot.PARTY_LIST[guild_id].append(category)
@@ -89,10 +89,10 @@ class Party(commands.Cog):
 
     @commands.command(
         aliases=["초대", "추가"],
-        help="!초대 @닉네임 @닉네임... 형식으로 사용하면, 해당 파티 텍스트 채널(예: 이름이 '-파티채팅'으로 끝남)에서 멘션된 유저에게 해당 파티(카테고리, 텍스트, 음성 채널)의 접근 권한을 부여합니다.",
+        help="!초대 @닉네임 @닉네임... 형식으로 사용하면, 해당 파티 텍스트 채널(예: 이름이 '-채팅*'으로 끝남)에서 멘션된 유저에게 해당 파티(카테고리, 텍스트, 음성 채널)의 접근 권한을 부여합니다.",
     )
     async def invite_party(self, ctx):
-        if not ctx.channel.name.endswith("-파티채팅"):
+        if not ctx.channel.name.endswith("-채팅*"):
             await ctx.reply("파티 채널에서만 가능한 명령어 입니다.")
             return
         if not ctx.message.mentions:
@@ -131,7 +131,7 @@ class Party(commands.Cog):
         help="해당 파티 텍스트 채널에서 사용하면, 그 파티의 카테고리, 텍스트 채널, 음성 채널을 삭제합니다. 다른 채널에서 사용하면 '파티채널에서만 가능한 명령어 입니다'를 출력합니다.",
     )
     async def release_party(self, ctx):
-        if not ctx.channel.name.endswith("-파티채팅"):
+        if not ctx.channel.name.endswith("-채팅*"):
             await ctx.reply("파티채널에서만 가능한 명령어 입니다")
             return
 
@@ -196,7 +196,7 @@ class Party(commands.Cog):
 
         text_channel = None
         for ch in target_category.channels:
-            if isinstance(ch, discord.TextChannel) and ch.name.endswith("-파티채팅"):
+            if isinstance(ch, discord.TextChannel) and ch.name.endswith("-채팅*"):
                 text_channel = ch
                 break
         if text_channel is None:
@@ -214,7 +214,7 @@ class Party(commands.Cog):
         help="!수락 명령어를 사용하면, 최근 파티 참가 요청을 보낸 유저를 자동으로 초대합니다.",
     )
     async def accept_party(self, ctx):
-        if not ctx.channel.name.endswith("-파티채팅"):
+        if not ctx.channel.name.endswith("-채팅*"):
             await ctx.reply("파티 채널에서만 가능한 명령어 입니다.")
             return
 
@@ -261,7 +261,7 @@ class Party(commands.Cog):
     )
     async def party_members(self, ctx):
         # 파티 텍스트 채널에서만 실행 가능하도록 체크
-        if not ctx.channel.name.endswith("-파티채팅"):
+        if not ctx.channel.name.endswith("-채팅*"):
             await ctx.reply("파티 채널에서만 가능한 명령어 입니다.")
             return
 
