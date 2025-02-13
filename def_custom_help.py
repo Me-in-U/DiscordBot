@@ -1,6 +1,8 @@
 import json
 from datetime import datetime, time, timedelta, timezone
+import random
 
+import discord
 from discord.ext import commands, tasks
 
 from requests_gpt import image_analysis, send_to_chatgpt
@@ -78,6 +80,25 @@ class HelpCommand(commands.Cog):
 
         # 명령어 출력
         await ctx.reply(help_message)
+
+    @commands.command(name="기가채드", help="기가채드 이미지를 전송합니다.")
+    async def giga_chad(self, ctx):
+        image_urls = [
+            "https://i.namu.wiki/i/VZzcbIRzOFxvzAz9jXW4gLsF_SzASBb3SE4FVY1WqezMjZxQ-Tys4wmMTgVB16EDPXG8y-zvoSOx9H-JzEFwA_4LQqhRVYMnvdA6d6eg2EcyEuamO_-58gVX_k9lFeeVgNDTRCZG5cVrC5VkSeDUXA.webp",
+            "https://d394jeh9729epj.cloudfront.net/8DlybC0N7CU-GGKOVEZPVDc0/ab18db66-f798-4064-a86d-9a1b250e6b78.webp",
+            "https://postfiles.pstatic.net/MjAyNTAxMTFfMjky/MDAxNzM2NTk1MDEwOTM1.iBsghou0kr1LFH50J7ZaRcgl9p2O5v5hAgejdfuuQSog.O8ovlLU7S2hj4tqM2kZiihm7R6QkmjBXkEQWnAlpE_Ag.JPEG/gigachd.jpg?type=w966",
+            "https://img1.daumcdn.net/thumb/R1280x0/?fname=https://t1.daumcdn.net/brunch/service/user/hxCe/image/ZQdAnaMOcQvB8imsa8Wg-u_IdoA.jpg",
+            "https://www.dogdrip.net/dvs/d/25/01/12/84c65bb0050ee0697b39b99a098c9987.webp",
+            "https://i.seadn.io/gae/jAXmmkmtadX3_aPgJWPBPxugC4IgfqmauBMJKcxlVVVj7cF6LtqZgo41aPv3UZGUAzoMbvslwPqMs2BcFJYsTsHxpzoclK2zQK9Efw?auto=format&dpr=1&w=1000",
+            "https://ih1.redbubble.net/image.4995285836.9252/bg,f8f8f8-flat,750x,075,f-pad,750x1000,f8f8f8.jpg",
+            "https://preview.redd.it/behold-the-gigachad-v0-jrkvgoagzslb1.png?width=798&format=png&auto=webp&s=67b1473b0cb3978d677610adfcf8ccc7ab512d87",
+            "https://content.imageresizer.com/images/memes/GigaChad-meme-7.jpg",
+            "https://uploads.dailydot.com/2023/11/GigaChad.jpg?auto=compress&fm=pjpg",
+        ]
+        selected_image = random.choice(image_urls)
+        embed = discord.Embed(title="기가채드")
+        embed.set_image(url=selected_image)
+        await ctx.reply(embed=embed)
 
 
 async def setup(bot):
