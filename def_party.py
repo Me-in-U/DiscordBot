@@ -234,6 +234,7 @@ class Party(commands.Cog):
         # )
         # await ctx.reply("파티 참가 요청이 전송되었습니다.")
 
+    @DeprecationWarning
     @commands.command(
         name="수락",
         help="!수락 명령어를 사용하면, 최근 파티 참가 요청을 보낸 유저를 자동으로 초대합니다.",
