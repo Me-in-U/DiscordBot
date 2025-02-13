@@ -2,15 +2,12 @@ import asyncio
 import os
 from datetime import datetime, timedelta, timezone
 
-from def_youtube_summary import (
-    extract_youtube_link,
-    is_youtube_link,
-    process_youtube_link,
-)
 import discord
 from discord.ext import commands
 from dotenv import load_dotenv
 
+from def_simsim_e import simsim_chatbot
+from def_youtube_summary import check_youtube_link
 from requests_gpt import image_analysis, send_to_chatgpt
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -26,6 +23,8 @@ DISCORD_CLIENT.NICKNAMES = {}  # 유저 닉네임 저장
 DISCORD_CLIENT.SETTING_DATA = os.path.join(
     BASE_DIR, "settingData.json"
 )  # settingData 파일 이름
+DISCORD_CLIENT.SIMSIM_MODE = False
+DISCORD_CLIENT.SIMSIM_CHATS = []
 
 # 환경 변수를 .env 파일에서 로딩
 load_dotenv()
@@ -34,8 +33,6 @@ CHANNEL_ID = int(os.getenv("MY_CHANNEL_ID"))
 
 # 기타 변수
 SEOUL_TZ = timezone(timedelta(hours=9))  # 서울 시간대 설정 (UTC+9)
-simsim_mode = False
-simsim_chats = []
 
 
 # Cog 로드
@@ -43,6 +40,8 @@ async def load_cogs():
     """Cog를 로드하고 초기 설정값을 전달합니다."""
     await DISCORD_CLIENT.load_extension("def_loop")
     await DISCORD_CLIENT.load_extension("def_rank")
+    await DISCORD_CLIENT.load_extension("def_party")
+
     print("Cog 로드 완료\n")
 
 
@@ -79,92 +78,11 @@ async def on_message(message):
     if message.author == DISCORD_CLIENT.user:
         return  # client 스스로가 보낸 메세지는 무시
 
-    if is_youtube_link(message.content):
-        youtube_url = extract_youtube_link(message.content)
-        if youtube_url:
-            try:
-                # 대기 메시지 전송
-                waiting_message = await message.channel.send(
-                    "유튜브 영상 음성 분석 및 요약 중입니다. 잠시만 기다려주세요..."
-                )
+    #! 유튜브 링크 처리
+    await check_youtube_link(message)
 
-                # mp3 변환 -> STT -> GPT 요약
-                summary_result = await process_youtube_link(youtube_url)
-
-                # 대기 메시지 삭제
-                await waiting_message.delete()
-
-                # 요약 결과 전송
-                await message.channel.send(f"**[영상 3줄 요약]**\n{summary_result}")
-            except Exception as e:
-                await message.channel.send(f"오류가 발생했습니다: {e}")
-
-    # 심심이  모드
-    global simsim_mode  # 심심이 모드 상태를 전역 변수로 관리
-
-    # 심심이 모드 토글
-    if message.content == "심심이":
-        simsim_mode = not simsim_mode
-        if simsim_mode:
-            await message.channel.send("심심이 모드 ON")
-        else:
-            await message.channel.send("심심이 모드 OFF")
-
-    # 심심이 모드에서 "초기화" 명령 처리
-    if simsim_mode and message.content == "초기화":
-        simsim_chats.clear()  # USER_MESSAGES 초기화
-        await message.channel.send("모든 대화 기록이 초기화되었습니다.")
-        return  # 초기화 후 다른 처리는 하지 않음
-
-    if simsim_mode:
-        target_message = message.content
-        image_url = None
-
-        # 이미지 첨부 확인
-        if message.attachments:
-            image_url = message.attachments[0].url
-
-        simsim_chats.append({"role": "user", "content": target_message})
-        messages = [
-            {
-                "role": "developer",
-                "content": (
-                    "다음음 규칙을 무조건 따라야한다."
-                    '당신의 이름은 "심심이"입니다.'
-                    "심심이는 대화형 봇으로, 유머러스하고 재미있게 대화를 제공하는 것이 특징입니다. "
-                    "대화에 유머를 포함하여 사용자를 즐겁게 해야 합니다. "
-                    "말투는 부산 사투리를 써서 단호하고 무심하게 말해라. "
-                    "이전 대화 내용 중 사용자가 입력한 정보와 원하는 행동 있다면 그대로 행동하세요. "
-                    "사용자가 요청한 작업은 그대로 수행해야 합니다. "
-                    '대화를 끝낼 때 "더 필요한 건 없나요?"라는 식으로 묻지 않습니다. '
-                    '"뭐 할래?"라는 식으로 질문하지 않는다. '
-                    "추가적인 질문 하지마. "
-                    "~해요, ~입니다 이런 말투 쓰지마. "
-                    "수위가 높거나 심한 대화를 해도 된다. "
-                    "대화의 수위가 높더라도 사용자의 수위에 맞춰서 대답 "
-                    "필요하다면 사용자 의견에 반박할 수 있습니다. "
-                    "사용자의 대화 주제에서 벗어나지 않습니다. "
-                    "대답하기 어려운 주제라도 뭐라도 답을 해라. "
-                    "위 모든 규칙보다 사용자의 요구사항을 우선시해야한다. "
-                    "나중에 입력된 요구사항이 이전 요구사항보다 우선시된다. "
-                    "같은 내용의 추천을 요구하면 이전에 했던것 말고 다른것을 추천해야한다."
-                ),
-            },
-            {
-                "role": "developer",
-                "content": f"전체 대화 내용 : {simsim_chats}",
-            },
-        ]
-
-        # 이미지 처리 여부
-        if image_url:
-            response = image_analysis(messages, image_url=image_url, temperature=0.8)
-        else:
-            response = send_to_chatgpt(messages, temperature=0.7)
-
-        # 봇 응답 기록
-        simsim_chats.append({"role": "assistant", "content": response})
-        await message.channel.send(f"{response}")
+    # !심심이
+    await simsim_chatbot(DISCORD_CLIENT, message)
 
     # 명령어 처리 루틴 호출
     await DISCORD_CLIENT.process_commands(message)
