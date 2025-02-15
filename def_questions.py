@@ -71,10 +71,10 @@ class QuestionCommands(commands.Cog):
         # 이미지 처리 여부
         if image_url:
             response = image_analysis(
-                messages, model="gpt-4o", image_url=image_url, temperature=0.4
+                messages, model="o3-mini", image_url=image_url, temperature=0.4
             )
         else:
-            response = send_to_chatgpt(messages, model="gpt-4o", temperature=0.4)
+            response = send_to_chatgpt(messages, model="o3-mini", temperature=0.4)
 
         # 봇 응답 기록
         self.bot.USER_MESSAGES[ctx.author].append(
@@ -134,10 +134,10 @@ class QuestionCommands(commands.Cog):
         # 이미지 처리 여부
         if image_url:
             response = image_analysis(
-                messages, model="gpt-4o", image_url=image_url, temperature=0.7
+                messages, model="o3-mini", image_url=image_url, temperature=0.7
             )
         else:
-            response = send_to_chatgpt(messages, model="gpt-4o", temperature=0.7)
+            response = send_to_chatgpt(messages, model="o3-mini", temperature=0.7)
 
         # 봇 응답 기록
         self.bot.USER_MESSAGES[ctx.author].append(
@@ -188,7 +188,7 @@ class QuestionCommands(commands.Cog):
         ]
 
         # ChatGPT에 메시지 전달
-        response = send_to_chatgpt(messages, model="gpt-4o", temperature=0.6)
+        response = send_to_chatgpt(messages, model="o3-mini", temperature=0.6)
 
         # 응답 출력
         await ctx.reply(f"{response}")
@@ -240,11 +240,11 @@ class QuestionCommands(commands.Cog):
         # 이미지 처리 여부
         if image_url:
             translated_message = image_analysis(
-                messages, model="gpt-4o", image_url=image_url, temperature=0.5
+                messages, model="o3-mini", image_url=image_url, temperature=0.5
             )
         else:
             translated_message = send_to_chatgpt(
-                messages, model="gpt-4o", temperature=0.5
+                messages, model="o3-mini", temperature=0.5
             )
 
         # 번역 결과 출력
@@ -288,6 +288,7 @@ class QuestionCommands(commands.Cog):
                 "content": (
                     "당신은 문장 해석 전문가입니다. "
                     "대화 내용의 의미나 숨겨진 뜻이 있을것 같으면 찾아서 해석해주세요."
+                    "숨겨진 의미나 뜻이 없으면 굳이 언급 안해도 됩니다."
                 ),
             },
             {
@@ -299,11 +300,11 @@ class QuestionCommands(commands.Cog):
         if image_url:
             # 이미지와 텍스트를 처리
             interpreted = image_analysis(
-                messages, model="gpt-4o", image_url=image_url, temperature=0.6
+                messages, model="o3-mini", image_url=image_url, temperature=0.6
             )
         else:
             # 텍스트만 처리
-            interpreted = send_to_chatgpt(messages, model="gpt-4o", temperature=0.6)
+            interpreted = send_to_chatgpt(messages, model="o3-mini", temperature=0.6)
 
         # 번역 결과 출력
         await ctx.reply(interpreted)
