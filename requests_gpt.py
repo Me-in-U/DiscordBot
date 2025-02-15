@@ -13,7 +13,7 @@ if not OPENAI_KEY:
 clientGPT = OpenAI(api_key=OPENAI_KEY)
 
 
-def send_to_chatgpt(messages, model="o3-mini", temperature=0.5):
+def send_to_chatgpt(messages, model="gpt-4o", temperature=0.5):
     """
     OpenAI ChatGPT API를 호출하여 응답을 반환합니다.
 
@@ -34,7 +34,7 @@ def send_to_chatgpt(messages, model="o3-mini", temperature=0.5):
     return message
 
 
-def image_analysis(messages, model="o3-mini", image_url="", temperature=0.5):
+def image_analysis(messages, model="gpt-4o", image_url="", temperature=0.5):
     messages.append(
         {
             "role": "user",
