@@ -51,7 +51,7 @@ class LoopTasks(commands.Cog):
             print("대상 채널을 찾을 수 없습니다.")
             return
 
-        self.bot.USER_MESSAGES = {}
+        # self.bot.USER_MESSAGES = {}
         today = datetime.now().date()
         today_str = today.strftime("%m-%d")
 

@@ -194,16 +194,16 @@ async def load_recent_messages():
         "!일일랭크변경",
         "!일일랭크루프",
     ]
-    async for message in target_channel.history(limit=500):  # 최대 1000개 로드
+    async for message in target_channel.history(limit=1557):  # 최대 1000개 로드
         message_timestamp = message.created_at.astimezone(SEOUL_TZ).strftime(
             "%Y-%m-%d %H:%M:%S"
         )
-        message_date = message.created_at.astimezone(
-            SEOUL_TZ
-        ).date()  # 메시지 날짜 확인
-        if message_date != today:
-            # print("skip", message_date, message.author, message.content)
-            continue  # 오늘 날짜가 아니면 건너뛰기
+        # message_date = message.created_at.astimezone(
+        #     SEOUL_TZ
+        # ).date()  # 메시지 날짜 확인
+        # if message_date != today:
+        #     # print("skip", message_date, message.author, message.content)
+        #     continue  # 오늘 날짜가 아니면 건너뛰기
 
         # print("added", message_date, message.author, message.content)
         if message.author.name not in DISCORD_CLIENT.USER_MESSAGES:
