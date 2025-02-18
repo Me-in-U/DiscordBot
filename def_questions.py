@@ -34,10 +34,6 @@ class QuestionCommands(commands.Cog):
         if ctx.message.attachments:
             image_url = ctx.message.attachments[0].url
 
-        self.bot.USER_MESSAGES[ctx.author].append(
-            {"role": "user", "content": ctx.message.content}
-        )
-
         # ChatGPT에 메시지 전달
         messages = [
             {
@@ -76,10 +72,6 @@ class QuestionCommands(commands.Cog):
         else:
             response = send_to_chatgpt(messages, model="gpt-4o", temperature=0.4)
 
-        # 봇 응답 기록
-        self.bot.USER_MESSAGES[ctx.author].append(
-            {"role": "assistant", "content": response}
-        )
         await ctx.reply(f"{response}")
 
     @commands.command(
@@ -98,10 +90,6 @@ class QuestionCommands(commands.Cog):
         # 이미지 첨부 확인
         if ctx.message.attachments:
             image_url = ctx.message.attachments[0].url
-
-        self.bot.USER_MESSAGES[ctx.author].append(
-            {"role": "user", "content": ctx.message.content}
-        )
 
         # ChatGPT에 메시지 전달
         messages = [
@@ -139,10 +127,6 @@ class QuestionCommands(commands.Cog):
         else:
             response = send_to_chatgpt(messages, model="gpt-4o", temperature=0.7)
 
-        # 봇 응답 기록
-        self.bot.USER_MESSAGES[ctx.author].append(
-            {"role": "assistant", "content": response}
-        )
         await ctx.reply(f"{response}")
 
     @commands.command(
