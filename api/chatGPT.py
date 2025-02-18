@@ -2,7 +2,6 @@ import os
 
 from dotenv import load_dotenv
 from openai import OpenAI
-from pydantic import BaseModel
 
 # 환경 변수를 .env 파일에서 로딩
 load_dotenv()
@@ -14,7 +13,7 @@ if not OPENAI_KEY:
 clientGPT = OpenAI(api_key=OPENAI_KEY)
 
 
-def general_purpose_model(messages, model="gpt-4o-mini", temperature=0.5):
+def send_to_chatgpt(messages, model="gpt-4o", temperature=0.5):
     """
     OpenAI ChatGPT API를 호출하여 응답을 반환합니다.
 
@@ -30,35 +29,34 @@ def general_purpose_model(messages, model="gpt-4o-mini", temperature=0.5):
         temperature=temperature,
     )
     message = response.choices[0].message.content
-    return message.strip()
+    print(message)
+    messages.append(response.choices[0].message)
+    return message
 
 
-def reasoning_model(messages, model="o3-mini", reasoning_effort="medium"):
+def image_analysis(messages, model="gpt-4o", image_url="", temperature=0.5):
+    messages.append(
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "이미지가 있습니다. 이미지 내용을 확인하세요",
+                },
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": image_url,
+                    },
+                },
+            ],
+        },
+    )
     response = clientGPT.chat.completions.create(
-        model=model, messages=messages, reasoning_effort=reasoning_effort
+        model=model,
+        messages=messages,
+        temperature=temperature,
     )
     message = response.choices[0].message.content
+    messages.append(response.choices[0].message)
     return message.strip()
-
-
-class Exist1557(BaseModel):
-    exist: bool
-    imageToText: str
-    reason: str
-
-
-def structured_response(messages, model="gpt-4o-mini", rf=Exist1557):
-    try:
-        # clientGPT가 올바르게 정의되어 있는지 확인하세요.
-        completion = clientGPT.beta.chat.completions.parse(
-            model=model,
-            messages=messages,
-            response_format=rf,
-        )
-        # print("GPT 응답 전체:", completion)
-        parsed = completion.choices[0].message.parsed
-        # print("파싱된 응답:", parsed)
-        return parsed
-    except Exception as e:
-        print("structured_response 호출 중 에러 발생:", e)
-        raise
