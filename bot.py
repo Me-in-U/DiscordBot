@@ -6,9 +6,9 @@ import discord
 from discord.ext import commands
 from dotenv import load_dotenv
 
-from func.find1557 import find1557
-from func.simsim_e import simsim_chatbot
-from func.youtube_summary import check_youtube_link
+from def_simsim_e import simsim_chatbot
+from def_youtube_summary import check_youtube_link
+from requests_gpt import image_analysis, send_to_chatgpt
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -24,7 +24,7 @@ DISCORD_CLIENT.SETTING_DATA = os.path.join(
     BASE_DIR, "settingData.json"
 )  # settingData 파일 이름
 DISCORD_CLIENT.SIMSIM_MODE = False
-DISCORD_CLIENT.SIMSIM_CHATS = None
+DISCORD_CLIENT.SIMSIM_CHATS = []
 DISCORD_CLIENT.PARTY_LIST = {}
 
 # 환경 변수를 .env 파일에서 로딩
@@ -40,10 +40,11 @@ SEOUL_TZ = timezone(timedelta(hours=9))  # 서울 시간대 설정 (UTC+9)
 async def load_cogs():
     """Cog를 로드하고 초기 설정값을 전달합니다."""
     print("-------------------Cog 로드 시작-------------------")
-    for filename in os.listdir("cogs"):
-        if filename.endswith(".py"):
-            extension = "cogs." + filename[:-3]
-            await DISCORD_CLIENT.load_extension(extension)
+    await DISCORD_CLIENT.load_extension("def_custom_help")
+    await DISCORD_CLIENT.load_extension("def_loop")
+    await DISCORD_CLIENT.load_extension("def_party")
+    await DISCORD_CLIENT.load_extension("def_questions")
+    await DISCORD_CLIENT.load_extension("def_rank")
     print("-------------------Cog 로드 완료-------------------\n")
 
 
@@ -101,20 +102,15 @@ async def on_message(message):
     #! 일반 채팅 저장
     print(f"일반 => {message.author.name}: {message.content} {image_url}")
 
-    if message.author.name not in DISCORD_CLIENT.USER_MESSAGES:
-        DISCORD_CLIENT.USER_MESSAGES[message.author.name] = []
-
     #! 봇 메시지는 이하 명령 무시
     if message.author == DISCORD_CLIENT.user:
-        DISCORD_CLIENT.USER_MESSAGES[message.author.name].append(
-            {
-                "role": "assistant",
-                "content": message.content,
-                "time": timestamp,
-            }
+        DISCORD_CLIENT.USER_MESSAGES["神᲼"].append(
+            {"role": "assistant", "content": message.content, "time": timestamp}
         )
         return  # client 스스로가 보낸 메세지는 무시
     else:
+        if message.author.name not in DISCORD_CLIENT.USER_MESSAGES:
+            DISCORD_CLIENT.USER_MESSAGES[message.author.name] = []
         if image_url:
             DISCORD_CLIENT.USER_MESSAGES[message.author.name].append(
                 {"content": message.content, "image_url": image_url, "time": timestamp}
@@ -127,33 +123,11 @@ async def on_message(message):
     #! 유튜브 링크 처리
     await check_youtube_link(message)
 
-    # !명령어 처리 루틴 호출
-    await DISCORD_CLIENT.process_commands(message)
-
     # !심심이
     await simsim_chatbot(DISCORD_CLIENT, message)
-    await find1557(message)
-    # 사용자가 텍스트만으로 "1557" 메시지를 보냈는지 확인 (첨부파일 없이)
-    if (
-        message.author != DISCORD_CLIENT.user
-        and message.content.strip() == "1557"
-        and not message.attachments
-    ):
-        try:
-            await message.delete()
-        except discord.Forbidden:
-            print("메시지 삭제 권한이 없습니다.")
 
-        # 최근 limit개의 메시지를 확인
-        async for recent_msg in message.channel.history(limit=10):
-            if (
-                recent_msg.author == DISCORD_CLIENT.user
-                and recent_msg.content.strip() == "1557"
-            ):
-                try:
-                    await recent_msg.delete()
-                except discord.Forbidden:
-                    print("메시지 삭제 권한이 없습니다.")
+    # !명령어 처리 루틴 호출
+    await DISCORD_CLIENT.process_commands(message)
 
 
 #! client.command
@@ -188,34 +162,67 @@ async def load_recent_messages():
     last_response = ""
     print(f"채널 '{target_channel.name}'에서 오늘의 메시지를 불러옵니다...")
     today = datetime.now(SEOUL_TZ).date()  # UTC 기준 오늘 날짜
-    DISCORD_CLIENT.USER_MESSAGES["神᲼"] = []
-    async for message in target_channel.history(limit=1000):  # 최대 1000개 로드
-        # print(message)
+    command_prefix = [
+        "!질문",
+        "!요약",
+        "!번역",
+        "!버녁",
+        "!해석",
+        "!파티",
+        "!파티생성",
+        "!파티만들기",
+        "!초대",
+        "!추가",
+        "!파티해제",
+        "!해제",
+        "!해체",
+        "!파괴",
+        "!붕괴",
+        "!참가",
+        "!참여",
+        "!파티참가",
+        "!파티참여",
+        "!초대요청",
+        "!수락",
+        "!파티원",
+        "!신이시여",
+        "!신이여",
+        "!창섭님",
+        "!솔랭",
+        "!자랭",
+        "!일일랭크",
+        "!일일랭크변경",
+        "!일일랭크루프",
+    ]
+    async for message in target_channel.history(limit=500):  # 최대 1000개 로드
         message_timestamp = message.created_at.astimezone(SEOUL_TZ).strftime(
             "%Y-%m-%d %H:%M:%S"
         )
-        # message_date = message.created_at.astimezone(
-        #     SEOUL_TZ
-        # ).date()  # 메시지 날짜 확인
-        # if message_date != today:
-        #     # print("skip", message_date, message.author, message.content)
-        #     continue  # 오늘 날짜가 아니면 건너뛰기
+        message_date = message.created_at.astimezone(
+            SEOUL_TZ
+        ).date()  # 메시지 날짜 확인
+        if message_date != today:
+            # print("skip", message_date, message.author, message.content)
+            continue  # 오늘 날짜가 아니면 건너뛰기
 
         # print("added", message_date, message.author, message.content)
-
-        # !각 메시지 작성자의 기록이 없으면 초기화
         if message.author.name not in DISCORD_CLIENT.USER_MESSAGES:
             DISCORD_CLIENT.USER_MESSAGES[message.author.name] = []
 
+        # 봇 메시지 처리
         if message.author == DISCORD_CLIENT.user:
-            DISCORD_CLIENT.USER_MESSAGES[message.author.name].append(
-                {
-                    "role": "assistant",
-                    "content": message.content,
-                    "time": message_timestamp,
-                }
-            )
+            last_response = message.content
         else:
+            for a in command_prefix:
+                if message.content.startswith(a):
+                    DISCORD_CLIENT.USER_MESSAGES["神᲼"].append(
+                        {
+                            "role": "assistant",
+                            "content": last_response,
+                            "time": message_timestamp,
+                        }
+                    )
+                    break
             DISCORD_CLIENT.USER_MESSAGES[message.author.name].append(
                 {"content": message.content, "time": message_timestamp}
             )
@@ -225,7 +232,7 @@ async def load_recent_messages():
         DISCORD_CLIENT.USER_MESSAGES[user] = list(
             reversed(DISCORD_CLIENT.USER_MESSAGES[user])
         )
-    # print(DISCORD_CLIENT.USER_MESSAGES)
+    print(DISCORD_CLIENT.USER_MESSAGES)
 
 
 async def load_all_nicknames():
@@ -240,7 +247,7 @@ async def load_all_nicknames():
             DISCORD_CLIENT.NICKNAMES[member.name] = (
                 member.display_name if member.display_name else None
             )
-    # print(DISCORD_CLIENT.NICKNAMES)
+    print(DISCORD_CLIENT.NICKNAMES)
     print("---------------------------------------------------\n")
 
 
