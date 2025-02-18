@@ -230,8 +230,8 @@ async def summarize_text_with_gpt(text: str) -> str:
             "content": (
                 "당신은 전문 요약가입니다. "
                 "다음은 유튜브 내용을 텍스트로 바꾼것입니다. "
-                "주요내용에 대해서 요약해주세요. "
-                "중요 맥락이 누락되지 않도록 유의하세요. "
+                "주요 내용에 대해서 요약해주세요. "
+                "중요 대화 맥락이 누락되지 않도록 유의하세요. "
                 "내용을 간단한 문장으로 3줄 요약하세요. 1.~ 2.~ 3.~"
             ),
         },
@@ -245,7 +245,7 @@ async def summarize_text_with_gpt(text: str) -> str:
     response_text = send_to_chatgpt(
         messages,
         model="gpt-4o",  # 필요에 맞게 수정
-        temperature=0.3,
+        temperature=0.4,
     )
     return response_text
 
