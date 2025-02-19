@@ -64,12 +64,15 @@ class QuestionCommands(commands.Cog):
         ]
 
         # 이미지 처리 여부
-        if image_url:
-            response = image_analysis(
-                messages, model="gpt-4o", image_url=image_url, temperature=0.4
-            )
-        else:
-            response = send_to_chatgpt(messages, model="gpt-4o", temperature=0.4)
+        try:
+            if image_url:
+                response = image_analysis(
+                    messages, model="gpt-4o", image_url=image_url, temperature=0.4
+                )
+            else:
+                response = send_to_chatgpt(messages, model="gpt-4o", temperature=0.4)
+        except Exception as e:
+            response = f"Error: {e}"
 
         await ctx.reply(f"{response}")
 
@@ -122,12 +125,15 @@ class QuestionCommands(commands.Cog):
         ]
 
         # 이미지 처리 여부
-        if image_url:
-            response = image_analysis(
-                messages, model="gpt-4o", image_url=image_url, temperature=0.7
-            )
-        else:
-            response = send_to_chatgpt(messages, model="gpt-4o", temperature=0.7)
+        try:
+            if image_url:
+                response = image_analysis(
+                    messages, model="gpt-4o", image_url=image_url, temperature=0.7
+                )
+            else:
+                response = send_to_chatgpt(messages, model="gpt-4o", temperature=0.7)
+        except Exception as e:
+            response = f"Error: {e}"
 
         await ctx.reply(f"{response}")
 
@@ -174,7 +180,10 @@ class QuestionCommands(commands.Cog):
         ]
 
         # ChatGPT에 메시지 전달
-        response = send_to_chatgpt(messages, model="gpt-4o", temperature=0.6)
+        try:
+            response = send_to_chatgpt(messages, model="gpt-4o", temperature=0.6)
+        except Exception as e:
+            response = f"Error: {e}"
 
         # 응답 출력
         await ctx.reply(f"{response}")
@@ -224,14 +233,17 @@ class QuestionCommands(commands.Cog):
         ]
 
         # 이미지 처리 여부
-        if image_url:
-            translated_message = image_analysis(
-                messages, model="gpt-4o", image_url=image_url, temperature=0.5
-            )
-        else:
-            translated_message = send_to_chatgpt(
-                messages, model="gpt-4o", temperature=0.5
-            )
+        try:
+            if image_url:
+                translated_message = image_analysis(
+                    messages, model="gpt-4o", image_url=image_url, temperature=0.5
+                )
+            else:
+                translated_message = send_to_chatgpt(
+                    messages, model="gpt-4o", temperature=0.5
+                )
+        except Exception as e:
+            translated_message = f"Error: {e}"
 
         # 번역 결과 출력
         await ctx.reply(translated_message)
@@ -283,14 +295,15 @@ class QuestionCommands(commands.Cog):
             },
         ]
 
-        if image_url:
-            # 이미지와 텍스트를 처리
-            interpreted = image_analysis(
-                messages, model="gpt-4o", image_url=image_url, temperature=0.6
-            )
-        else:
-            # 텍스트만 처리
-            interpreted = send_to_chatgpt(messages, model="gpt-4o", temperature=0.6)
+        try:
+            if image_url:
+                interpreted = image_analysis(
+                    messages, model="gpt-4o", image_url=image_url, temperature=0.6
+                )
+            else:
+                interpreted = send_to_chatgpt(messages, model="gpt-4o", temperature=0.6)
+        except Exception as e:
+            interpreted = f"Error: {e}"
 
         # 번역 결과 출력
         await ctx.reply(interpreted)
