@@ -29,9 +29,7 @@ def send_to_chatgpt(messages, model="gpt-4o", temperature=0.5):
         temperature=temperature,
     )
     message = response.choices[0].message.content
-    print(message)
-    messages.append(response.choices[0].message)
-    return message
+    return message.strip()
 
 
 def image_analysis(messages, model="gpt-4o", image_url="", temperature=0.5):
@@ -58,5 +56,4 @@ def image_analysis(messages, model="gpt-4o", image_url="", temperature=0.5):
         temperature=temperature,
     )
     message = response.choices[0].message.content
-    messages.append(response.choices[0].message)
     return message.strip()
