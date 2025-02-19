@@ -232,7 +232,7 @@ async def load_recent_messages():
         DISCORD_CLIENT.USER_MESSAGES[user] = list(
             reversed(DISCORD_CLIENT.USER_MESSAGES[user])
         )
-    print(DISCORD_CLIENT.USER_MESSAGES)
+    # print(DISCORD_CLIENT.USER_MESSAGES)
 
 
 async def load_all_nicknames():
@@ -247,7 +247,7 @@ async def load_all_nicknames():
             DISCORD_CLIENT.NICKNAMES[member.name] = (
                 member.display_name if member.display_name else None
             )
-    print(DISCORD_CLIENT.NICKNAMES)
+    # print(DISCORD_CLIENT.NICKNAMES)
     print("---------------------------------------------------\n")
 
 
