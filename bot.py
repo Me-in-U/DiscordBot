@@ -102,15 +102,20 @@ async def on_message(message):
     #! 일반 채팅 저장
     print(f"일반 => {message.author.name}: {message.content} {image_url}")
 
+    if message.author.name not in DISCORD_CLIENT.USER_MESSAGES:
+        DISCORD_CLIENT.USER_MESSAGES[message.author.name] = []
+
     #! 봇 메시지는 이하 명령 무시
     if message.author == DISCORD_CLIENT.user:
-        DISCORD_CLIENT.USER_MESSAGES["神᲼"].append(
-            {"role": "assistant", "content": message.content, "time": timestamp}
+        DISCORD_CLIENT.USER_MESSAGES[message.author.name].append(
+            {
+                "role": "assistant",
+                "content": message.content,
+                "time": timestamp,
+            }
         )
         return  # client 스스로가 보낸 메세지는 무시
     else:
-        if message.author.name not in DISCORD_CLIENT.USER_MESSAGES:
-            DISCORD_CLIENT.USER_MESSAGES[message.author.name] = []
         if image_url:
             DISCORD_CLIENT.USER_MESSAGES[message.author.name].append(
                 {"content": message.content, "image_url": image_url, "time": timestamp}
@@ -162,39 +167,9 @@ async def load_recent_messages():
     last_response = ""
     print(f"채널 '{target_channel.name}'에서 오늘의 메시지를 불러옵니다...")
     today = datetime.now(SEOUL_TZ).date()  # UTC 기준 오늘 날짜
-    command_prefix = [
-        "!질문",
-        "!요약",
-        "!번역",
-        "!버녁",
-        "!해석",
-        "!파티",
-        "!파티생성",
-        "!파티만들기",
-        "!초대",
-        "!추가",
-        "!파티해제",
-        "!해제",
-        "!해체",
-        "!파괴",
-        "!붕괴",
-        "!참가",
-        "!참여",
-        "!파티참가",
-        "!파티참여",
-        "!초대요청",
-        "!수락",
-        "!파티원",
-        "!신이시여",
-        "!신이여",
-        "!창섭님",
-        "!솔랭",
-        "!자랭",
-        "!일일랭크",
-        "!일일랭크변경",
-        "!일일랭크루프",
-    ]
-    async for message in target_channel.history(limit=1557):  # 최대 1000개 로드
+    DISCORD_CLIENT.USER_MESSAGES["神᲼"] = []
+    async for message in target_channel.history(limit=1000):  # 최대 1000개 로드
+        print(message)
         message_timestamp = message.created_at.astimezone(SEOUL_TZ).strftime(
             "%Y-%m-%d %H:%M:%S"
         )
@@ -206,23 +181,20 @@ async def load_recent_messages():
         #     continue  # 오늘 날짜가 아니면 건너뛰기
 
         # print("added", message_date, message.author, message.content)
+
+        # !각 메시지 작성자의 기록이 없으면 초기화
         if message.author.name not in DISCORD_CLIENT.USER_MESSAGES:
             DISCORD_CLIENT.USER_MESSAGES[message.author.name] = []
 
-        # 봇 메시지 처리
         if message.author == DISCORD_CLIENT.user:
-            last_response = message.content
+            DISCORD_CLIENT.USER_MESSAGES[message.author.name].append(
+                {
+                    "role": "assistant",
+                    "content": message.content,
+                    "time": message_timestamp,
+                }
+            )
         else:
-            for a in command_prefix:
-                if message.content.startswith(a):
-                    DISCORD_CLIENT.USER_MESSAGES["神᲼"].append(
-                        {
-                            "role": "assistant",
-                            "content": last_response,
-                            "time": message_timestamp,
-                        }
-                    )
-                    break
             DISCORD_CLIENT.USER_MESSAGES[message.author.name].append(
                 {"content": message.content, "time": message_timestamp}
             )
