@@ -67,10 +67,12 @@ class QuestionCommands(commands.Cog):
         try:
             if image_url:
                 response = image_analysis(
-                    messages, model="gpt-4o", image_url=image_url, temperature=0.4
+                    messages, model="GPT-4o mini", image_url=image_url, temperature=0.4
                 )
             else:
-                response = send_to_chatgpt(messages, model="gpt-4o", temperature=0.4)
+                response = send_to_chatgpt(
+                    messages, model="GPT-4o mini", temperature=0.4
+                )
         except Exception as e:
             response = f"Error: {e}"
 
@@ -128,10 +130,12 @@ class QuestionCommands(commands.Cog):
         try:
             if image_url:
                 response = image_analysis(
-                    messages, model="gpt-4o", image_url=image_url, temperature=0.7
+                    messages, model="GPT-4o mini", image_url=image_url, temperature=0.7
                 )
             else:
-                response = send_to_chatgpt(messages, model="gpt-4o", temperature=0.7)
+                response = send_to_chatgpt(
+                    messages, model="GPT-4o mini", temperature=0.7
+                )
         except Exception as e:
             response = f"Error: {e}"
 
@@ -181,7 +185,7 @@ class QuestionCommands(commands.Cog):
 
         # ChatGPT에 메시지 전달
         try:
-            response = send_to_chatgpt(messages, model="gpt-4o", temperature=0.6)
+            response = send_to_chatgpt(messages, model="GPT-4o mini", temperature=0.6)
         except Exception as e:
             response = f"Error: {e}"
 
@@ -236,11 +240,11 @@ class QuestionCommands(commands.Cog):
         try:
             if image_url:
                 translated_message = image_analysis(
-                    messages, model="gpt-4o", image_url=image_url, temperature=0.5
+                    messages, model="GPT-4o mini", image_url=image_url, temperature=0.5
                 )
             else:
                 translated_message = send_to_chatgpt(
-                    messages, model="gpt-4o", temperature=0.5
+                    messages, model="GPT-4o mini", temperature=0.5
                 )
         except Exception as e:
             translated_message = f"Error: {e}"
@@ -298,10 +302,12 @@ class QuestionCommands(commands.Cog):
         try:
             if image_url:
                 interpreted = image_analysis(
-                    messages, model="gpt-4o", image_url=image_url, temperature=0.6
+                    messages, model="GPT-4o mini", image_url=image_url, temperature=0.6
                 )
             else:
-                interpreted = send_to_chatgpt(messages, model="gpt-4o", temperature=0.6)
+                interpreted = send_to_chatgpt(
+                    messages, model="GPT-4o mini", temperature=0.6
+                )
         except Exception as e:
             interpreted = f"Error: {e}"
 
