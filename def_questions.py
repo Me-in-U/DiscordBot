@@ -48,15 +48,14 @@ class QuestionCommands(commands.Cog):
             {
                 "role": "developer",
                 "content": (
-                    "내용을 참고하도록 하고 맨 마지막이 질문이다. "
                     "전체 대화 내용이 필요한 질문이면 밑에서 참고해라"
-                    "다음은 유저가 말했던 기록이다. "
+                    "다음은 유저가 말했던 기록이다. \n"
                     f"전체 대화 내용 : {self.bot.USER_MESSAGES}"
                 ),
             },
             {
                 "role": "user",
-                "content": f"{ctx.author}의 질문 : {target_message}",
+                "content": f"{ctx.author.name}의 질문 : {target_message}",
             },
             {
                 "role": "developer",
@@ -75,7 +74,7 @@ class QuestionCommands(commands.Cog):
         await ctx.reply(f"{response}")
 
     @commands.command(
-        aliases=["신이시여", "신이여", "창섭님"],
+        aliases=["신이시여", "신이여", "창섭님", "창섭아"],
         help="정상화의 신에게 질문합니다. '!신이시여 [질문 내용]' 형식으로 사용하세요.",
     )
     async def to_god(self, ctx):
@@ -102,16 +101,19 @@ class QuestionCommands(commands.Cog):
                     "당신은 모든것을 알고있다. 이에 답을하라. "
                     "정상화의 신이 말하는 말투로 말해라."
                     "문제가 있다면 해결하는 방향으로 정상화 시켜라."
-                    "아래는 유저가 말했던 기록이다. 내용을 참고하도록 하고 맨 마지막이 질문이다."
                 ),
             },
             {
                 "role": "developer",
-                "content": f"전체 대화 내용 : {self.bot.USER_MESSAGES}",
+                "content": (
+                    "전체 대화 내용이 필요한 질문이면 밑에서 참고해라"
+                    "다음은 유저가 말했던 기록이다. \n"
+                    f"전체 대화 내용 : {self.bot.USER_MESSAGES}"
+                ),
             },
             {
                 "role": "user",
-                "content": f"{ctx.author}의 질문 : {target_message}",
+                "content": f"{ctx.author.name}의 질문 : {target_message}",
             },
             {
                 "role": "developer",
@@ -163,7 +165,7 @@ class QuestionCommands(commands.Cog):
             {"role": "developer", "content": f"추가 요청 사항 : {request_message}"},
             {
                 "role": "developer",
-                "content": f"아래 채팅 내용을 요약해 주세요:\n{self.bot.USER_MESSAGES}\n",
+                "content": f"다음은 유저가 말했던 기록이다. 채팅 내용을 요약해 주세요:\n{self.bot.USER_MESSAGES}\n",
             },
             {
                 "role": "developer",
