@@ -10,11 +10,79 @@ from yt_dlp import YoutubeDL
 # request_gpt.py 에 정의된 함수들 임포트
 # send_to_chatgpt, image_analysis 등을 필요에 맞게 사용 가능
 from requests_gpt import send_to_chatgpt
+from googleapiclient.discovery import build
+from dotenv import load_dotenv
 
+load_dotenv()
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+
+if not GOOGLE_API_KEY:
+    raise EnvironmentError("GOOGLE_API_KEY 환경 변수가 설정되지 않았습니다.")
 # 유튜브 링크 정규식 (간단 예시)
 YOUTUBE_PATTERN = re.compile(
     r"(https?://)?(www\.)?(youtube\.com|youtu\.be)/(watch\?v=)?[\w\-\_]+"
 )
+
+
+# --- 영상 ID 추출 함수 추가 ---
+def extract_video_id(url: str) -> str:
+    match = re.search(r"(?:v=|youtu\.be/)([\w\-]+)", url)
+    if match:
+        return match.group(1)
+    return ""
+
+
+# --- YouTube Data API를 활용하여 댓글을 가져오는 함수 추가 ---
+def fetch_youtube_comments(video_id: str, max_comments: int = 10) -> list:
+    """
+    주어진 영상 ID에 대해 최대 max_comments 개의 댓글을 가져옵니다.
+    """
+
+    api_key = GOOGLE_API_KEY
+    youtube = build("youtube", "v3", developerKey=api_key)
+    comments = []
+    try:
+        request = youtube.commentThreads().list(
+            part="snippet",
+            videoId=video_id,
+            maxResults=max_comments,
+            textFormat="plainText",
+        )
+        response = request.execute()
+        for item in response.get("items", []):
+            comment = item["snippet"]["topLevelComment"]["snippet"]["textDisplay"]
+            comments.append(comment)
+    except Exception as e:
+        print(f"댓글 가져오기 오류: {e}")
+    return comments
+
+
+# --- 댓글 요약을 위한 함수 추가 ---
+async def summarize_comments_with_gpt(comments: list) -> str:
+    """
+    가져온 댓글들을 1줄로 요약합니다.
+    """
+    comments_text = "\n".join(comments)
+    messages = [
+        {
+            "role": "developer",
+            "content": (
+                "당신은 전문 요약가입니다. "
+                "다음은 유튜브 영상의 댓글입니다. "
+                "주요 의견과 감정을 1로 압축 요약해주세요."
+            ),
+        },
+        {
+            "role": "user",
+            "content": comments_text,
+        },
+    ]
+    response_text = send_to_chatgpt(
+        messages,
+        model="gpt-4o-mini",
+        temperature=0.4,
+    )
+    return response_text
 
 
 async def check_youtube_link(message):
@@ -151,22 +219,44 @@ def download_youtube_subtitles(
 
 
 def read_subtitles_file(file_path: str) -> str:
-    """
-    VTT 자막 파일을 텍스트로 변환
-    """
     try:
         with open(file_path, "r", encoding="utf-8") as f:
             lines = f.readlines()
-        # VTT 파일에서 타임스탬프와 메타데이터를 제외한 텍스트만 추출
-        text = "\n".join(
-            line.strip()
-            for line in lines
-            if line.strip() and not re.match(r"\d{2}:\d{2}:\d{2}\.\d{3}", line)
-        )
-        return text
+
+        clean_lines = []
+        seen = set()
+
+        for line in lines:
+            # 양쪽 공백 제거
+            line = line.strip()
+            # WEBVTT 헤더 및 타임스탬프 라인은 건너뜁니다.
+            if line.startswith("WEBVTT") or re.match(r"\d{2}:\d{2}:\d{2}\.\d{3}", line):
+                continue
+
+            # 내부에 포함된 타임코드 태그(<00:00:00.799> 등) 제거
+            line = re.sub(r"<\d{2}:\d{2}:\d{2}\.\d{3}>", "", line)
+            # <c> 태그 제거
+            line = re.sub(r"</?c>", "", line)
+            # 만약 같은 내용이 이미 추가되었다면 스킵
+            if line and line not in seen:
+                clean_lines.append(line)
+                seen.add(line)
+
+        clean_text = remove_unnecessary_line_breaks("\n".join(clean_lines))
+        return clean_text
     except Exception as e:
         print(f"자막 파일 읽기 중 오류가 발생했습니다: {e}")
         return ""
+
+
+def remove_unnecessary_line_breaks(text: str) -> str:
+    # 모든 줄바꿈을 공백으로 변환합니다.
+    text = re.sub(r"\n+", " ", text)
+    # 문장 종결 부호 뒤에 줄바꿈을 추가합니다.
+    # 이 예시는 한국어 문장에서 "다", "요", "습니다" 뒤에 줄바꿈을 넣습니다.
+    text = re.sub(r"([다요습니다])\s+", r"\1\n", text)
+    # 양쪽 공백 제거 후 반환
+    return text.strip()
 
 
 async def youtube_to_mp3(url: str, output_path: str = "youtube_audio") -> None:
@@ -255,8 +345,9 @@ async def process_youtube_link(url: str) -> str:
     1) 자막 다운로드 (한글 -> 영어) -> 2) (자막 없으면) MP3/STT -> 3) GPT 요약
     """
     mp3_path = "youtube_audio.mp3"
+    summary_text = ""
     try:
-        # 1) 자막 다운로드 시도 (한글 -> 영어)
+        # ! 자막 다운로드 시도 (한글 -> 영어)
         subtitle_path = download_youtube_subtitles(
             url, primary_lang="ko", fallback_lang="en"
         )
@@ -280,6 +371,18 @@ async def process_youtube_link(url: str) -> str:
 
             stt_text = await speech_to_text(mp3_path)
             summary_text = await summarize_text_with_gpt(stt_text)
+
+        # !댓글 가져오기 및 요약 추가
+        video_id = extract_video_id(url)
+        if video_id:
+            comments = fetch_youtube_comments(video_id, max_comments=10)
+            if comments:
+                comments_summary = await summarize_comments_with_gpt(comments)
+                summary_text += "\n\n**[댓글 요약]**\n" + comments_summary
+            else:
+                print("댓글을 가져오지 못했습니다.")
+        else:
+            print("영상 ID를 추출하지 못했습니다.")
 
     finally:
         # MP3 파일 정리

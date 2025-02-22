@@ -169,7 +169,7 @@ async def load_recent_messages():
     today = datetime.now(SEOUL_TZ).date()  # UTC 기준 오늘 날짜
     DISCORD_CLIENT.USER_MESSAGES["神᲼"] = []
     async for message in target_channel.history(limit=1000):  # 최대 1000개 로드
-        print(message)
+        # print(message)
         message_timestamp = message.created_at.astimezone(SEOUL_TZ).strftime(
             "%Y-%m-%d %H:%M:%S"
         )
