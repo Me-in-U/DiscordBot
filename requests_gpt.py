@@ -39,7 +39,7 @@ def image_analysis(messages, model="gpt-4o-mini", image_url="", temperature=0.5)
             "content": [
                 {
                     "type": "text",
-                    "text": "이미지가 있습니다. 이미지 내용을 확인하세요",
+                    "text": "이미지를 보고 설명하세요.",
                 },
                 {
                     "type": "image_url",
