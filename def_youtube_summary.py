@@ -375,7 +375,7 @@ async def process_youtube_link(url: str) -> str:
         # !댓글 가져오기 및 요약 추가
         video_id = extract_video_id(url)
         if video_id:
-            comments = fetch_youtube_comments(video_id, max_comments=10)
+            comments = fetch_youtube_comments(video_id, max_comments=30)
             if comments:
                 comments_summary = await summarize_comments_with_gpt(comments)
                 summary_text += "\n\n**[댓글 요약]**\n" + comments_summary
