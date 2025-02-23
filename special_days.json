@@ -1,76 +1,250 @@
 {
-	"01-01": ["🎉 새해 첫날", "블러디 메리 데이 (Bloody Mary Day)"],
-	"01-02": ["**메이플스토리(MapleStory)** 2014년 영웅( ) 출시", "세계 소개팅의 날", "과학 허구의 날 (Science Fiction Day)"],
-	"01-03": ["**메이플스토리(MapleStory)** 2013년 레지스탕스(제논) 출시", "국제 마녀날 (International Mind-Body Wellness Day)", "초콜릿 체리 데이"],
-	"01-04": ["**메이플스토리(MapleStory)** 2019년 모험가(패스파인더) 출시", "세계 점자의 날", "스파게티 데이"],
-	"01-05": ["새 깃털을 위한 날 (Bird Day)"],
-	"01-06": ["세계 전통 의상 날 (Traditional Day)", "사과 나무 데이"],
-	"01-07": ["**메이플스토리(MapleStory)** 2021년 노바(카인) 출시", "국제 프로그램머 데이 (International Programmers' Day)", "늑대의 날"],
-	"01-08": ["버블 배스 데이 (Bubble Bath Day)"],
-	"01-09": ["세계 스태틱 일렉트리시티의 날 (Static Electricity Day)"],
-	"01-10": ["세계 고래의 날 (Save the Whales Day)"],
-	"01-11": ["세계 감사합니다의 날 (International Thank You Day)"],
-	"01-12": ["마스티프의 날 (Mastiff Day)"],
-	"01-13": ["세계 고무 오리의 날 (Rubber Ducky Day)"],
-	"01-14": ["국제 연어의 날 (International Salmon Day)"],
-	"01-15": ["위키피디아의 날", "국제 모자 데이 (Hat Day)"],
-	"01-16": ["**메이플스토리(MapleStory)** 2020년 레프(아델) 출시", "국제 온천 데이 (Hot and Spicy Food Day)"],
-	"01-17": ["국제 음료 빨대 없는 날 (Ditch New Year’s Resolutions Day)"],
-	"01-18": ["국제 눈사람의 날 (World Snowman Day)", "박쥐의 날"],
-	"01-19": ["**메이플스토리(MapleStory)** 2023년 레프(칼리) 출시", "찜질방데이", "세계 양털 양의 날"],
-	"01-20": ["펭귄 인식의 날 (Penguin Awareness Day)"],
-	"01-21": ["국제 포옹의 날 (National Hugging Day)", "스웨터의 날", "세계 종이의 날 (International Paper Day)"],
-	"01-22": ["세계 결혼기념일의 날 (National Answer Your Cat’s Questions Day)"],
-	"01-23": ["파이 데이 (Pie Day)"],
-	"01-24": ["세계 땅콩버터의 날 (National Peanut Butter Day)"],
-	"01-25": ["국제 아일랜드 커피의 날 (Irish Coffee Day)"],
-	"01-26": ["세계 녹색 주스의 날 (National Green Juice Day)"],
-	"01-27": ["국제 홀로코스트 희생자 추모의 날"],
-	"01-28": ["개인정보 보호의 날", "국제 블루베리 팬케이크의 날"],
-	"01-29": ["세계 퍼즐 데이 (Puzzle Day)"],
-	"01-30": ["크로와상 데이 (Croissant Day)"],
-	"01-31": ["거꾸로의 날 (Backwards Day)"],
-	"02-01": ["세계 히잡의 날 (World Hijab Day)"],
-	"02-02": ["세계 습지의 날 (World Wetlands Day)", "그라운드호그 데이 (Groundhog Day)"],
-	"02-03": ["당근 케이크의 날 (Carrot Cake Day)"],
-	"02-04": ["국제 암의 날 (World Cancer Day)", "세계 손 씻기의 날"],
-	"02-05": ["초콜릿 퐁듀의 날 (Chocolate Fondue Day)"],
-	"02-06": ["세계 여성할례 금지의 날 (International Day of Zero Tolerance for Female Genital Mutilation)"],
-	"02-07": ["국제 안전한 인터넷의 날 (Safer Internet Day)"],
-	"02-08": ["연인의 우정의 날 (Propose Day)"],
-	"02-09": ["세계 피자 데이 (World Pizza Day)"],
-	"02-10": ["세계 콩류의 날 (World Pulses Day)"],
-	"02-11": ["세계 과학분야 여성과 소녀의 날 (International Day of Women and Girls in Science)"],
-	"02-12": ["다윈의 날 (Darwin Day)"],
-	"02-13": ["세계 라디오의 날 (World Radio Day)"],
-	"02-14": ["💖 발렌타인데이 (Valentine’s Day)", "국제 책 선물의 날 (International Book Giving Day)"],
-	"02-15": ["국제 어린이 암의 날 (International Childhood Cancer Day)"],
-	"02-16": ["아몬드의 날 (National Almond Day)"],
-	"02-17": ["세계 랜덤 액트 오브 카인드니스 데이 (Random Acts of Kindness Day)", "세계 인간정신 건강의 날 (World Human Spirit Day)"],
-	"02-18": ["플루토 발견의 날 (Pluto Discovery Day)"],
-	"02-19": ["초콜릿 민트의 날 (Chocolate Mint Day)"],
-	"02-20": ["세계 사회 정의의 날 (World Day of Social Justice)"],
-	"02-21": ["세계 모국어의 날 (International Mother Language Day)"],
-	"02-22": ["세계 고양이의 날 (World Cat Day)", "국제 스카우트의 날"],
-	"02-23": ["인삼데이 (Ginseng Day)"],
-	"02-24": ["토르티야 칩의 날 (Tortilla Chip Day)"],
-	"02-25": ["**메이플스토리(MapleStory)** 2010년 모험가(듀얼블레이드) 출시", "국제 칼슘의 날 (International Calcium Day)"],
-	"02-26": ["피스타치오의 날 (Pistachio Day)"],
-	"02-27": ["국제 북극곰의 날 (International Polar Bear Day)"],
-	"02-28": ["세계 희귀질환의 날 (Rare Disease Day)"],
-	"02-29": ["윤년의 날 (Leap Day)", "국제 개구리 보호의 날 (International Frog Conservation Day)"],
-	"03-01": ["차별제로의 날 (Zero Discrimination Day)"],
-	"03-03": ["세계 야생동식물의 날 (World Wildlife Day)", "국립공원의 날", "삼겹살데이"],
-	"03-06": ["세계 치즈의 날 (World Cheese Day)"],
-	"03-08": ["세계 여성의 날 (International Women's Day)"],
-	"03-09": ["세계 DJ의 날 (World DJ Day)"],
-	"03-13": ["세계 낮잠의 날 (World Napping Day)"],
-	"03-14": ["🍫 화이트데이 (White Day)", "국제 수학의 날 (International Day of Mathematics)", "파이 데이 (Pi Day)", "국제 원주민 언어의 날 (International Day of Indienous Languages)"],
-	"03-15": ["세계 소비자의 날 (World Consumer Rights Day)"],
-	"03-17": ["세인트 패트릭스 데이 (Saint Patrick's Day)"],
-	"03-18": ["세계 재활 치료의 날 (World Rehabilitation Day)"],
-	"03-19": ["초콜릿 캐러멜 데이 (Chocolate Caramel Day)"],
-	"03-20": ["세계 행복의 날 (International Day of Happiness)", "유엔 프랑스어의 날 (UN French Language Day)"],
+	"01-01": [
+		"🎉 새해 첫날",
+		"블러디 메리 데이 (Bloody Mary Day)"
+	],
+	"01-02": [
+		"**메이플스토리(MapleStory)** 2014년 영웅( ) 출시",
+		"세계 소개팅의 날",
+		"과학 허구의 날 (Science Fiction Day)"
+	],
+	"01-03": [
+		"**메이플스토리(MapleStory)** 2013년 레지스탕스(제논) 출시",
+		"국제 마녀날 (International Mind-Body Wellness Day)",
+		"초콜릿 체리 데이"
+	],
+	"01-04": [
+		"**메이플스토리(MapleStory)** 2019년 모험가(패스파인더) 출시",
+		"세계 점자의 날",
+		"스파게티 데이"
+	],
+	"01-05": [
+		"새 깃털을 위한 날 (Bird Day)"
+	],
+	"01-06": [
+		"세계 전통 의상 날 (Traditional Day)",
+		"사과 나무 데이"
+	],
+	"01-07": [
+		"**메이플스토리(MapleStory)** 2021년 노바(카인) 출시",
+		"국제 프로그램머 데이 (International Programmers' Day)",
+		"늑대의 날"
+	],
+	"01-08": [
+		"버블 배스 데이 (Bubble Bath Day)"
+	],
+	"01-09": [
+		"세계 스태틱 일렉트리시티의 날 (Static Electricity Day)"
+	],
+	"01-10": [
+		"세계 고래의 날 (Save the Whales Day)"
+	],
+	"01-11": [
+		"세계 감사합니다의 날 (International Thank You Day)"
+	],
+	"01-12": [
+		"마스티프의 날 (Mastiff Day)"
+	],
+	"01-13": [
+		"세계 고무 오리의 날 (Rubber Ducky Day)"
+	],
+	"01-14": [
+		"국제 연어의 날 (International Salmon Day)"
+	],
+	"01-15": [
+		"위키피디아의 날",
+		"국제 모자 데이 (Hat Day)"
+	],
+	"01-16": [
+		"**메이플스토리(MapleStory)** 2020년 레프(아델) 출시",
+		"국제 온천 데이 (Hot and Spicy Food Day)"
+	],
+	"01-17": [
+		"국제 음료 빨대 없는 날 (Ditch New Year’s Resolutions Day)"
+	],
+	"01-18": [
+		"국제 눈사람의 날 (World Snowman Day)",
+		"박쥐의 날"
+	],
+	"01-19": [
+		"**메이플스토리(MapleStory)** 2023년 레프(칼리) 출시",
+		"찜질방데이",
+		"세계 양털 양의 날"
+	],
+	"01-20": [
+		"펭귄 인식의 날 (Penguin Awareness Day)"
+	],
+	"01-21": [
+		"국제 포옹의 날 (National Hugging Day)",
+		"스웨터의 날",
+		"세계 종이의 날 (International Paper Day)"
+	],
+	"01-22": [
+		"세계 결혼기념일의 날 (National Answer Your Cat’s Questions Day)"
+	],
+	"01-23": [
+		"파이 데이 (Pie Day)"
+	],
+	"01-24": [
+		"세계 땅콩버터의 날 (National Peanut Butter Day)"
+	],
+	"01-25": [
+		"국제 아일랜드 커피의 날 (Irish Coffee Day)"
+	],
+	"01-26": [
+		"세계 녹색 주스의 날 (National Green Juice Day)"
+	],
+	"01-27": [
+		"국제 홀로코스트 희생자 추모의 날"
+	],
+	"01-28": [
+		"개인정보 보호의 날",
+		"국제 블루베리 팬케이크의 날"
+	],
+	"01-29": [
+		"세계 퍼즐 데이 (Puzzle Day)"
+	],
+	"01-30": [
+		"크로와상 데이 (Croissant Day)"
+	],
+	"01-31": [
+		"거꾸로의 날 (Backwards Day)"
+	],
+	"02-01": [
+		"세계 히잡의 날 (World Hijab Day)"
+	],
+	"02-02": [
+		"세계 습지의 날 (World Wetlands Day)",
+		"그라운드호그 데이 (Groundhog Day)"
+	],
+	"02-03": [
+		"당근 케이크의 날 (Carrot Cake Day)"
+	],
+	"02-04": [
+		"국제 암의 날 (World Cancer Day)",
+		"세계 손 씻기의 날"
+	],
+	"02-05": [
+		"초콜릿 퐁듀의 날 (Chocolate Fondue Day)"
+	],
+	"02-06": [
+		"세계 여성할례 금지의 날 (International Day of Zero Tolerance for Female Genital Mutilation)"
+	],
+	"02-07": [
+		"국제 안전한 인터넷의 날 (Safer Internet Day)"
+	],
+	"02-08": [
+		"연인의 우정의 날 (Propose Day)"
+	],
+	"02-09": [
+		"세계 피자 데이 (World Pizza Day)"
+	],
+	"02-10": [
+		"세계 콩류의 날 (World Pulses Day)"
+	],
+	"02-11": [
+		"세계 과학분야 여성과 소녀의 날 (International Day of Women and Girls in Science)"
+	],
+	"02-12": [
+		"다윈의 날 (Darwin Day)"
+	],
+	"02-13": [
+		"세계 라디오의 날 (World Radio Day)"
+	],
+	"02-14": [
+		"💖 발렌타인데이 (Valentine’s Day)",
+		"국제 책 선물의 날 (International Book Giving Day)"
+	],
+	"02-15": [
+		"국제 어린이 암의 날 (International Childhood Cancer Day)"
+	],
+	"02-16": [
+		"아몬드의 날 (National Almond Day)"
+	],
+	"02-17": [
+		"세계 랜덤 액트 오브 카인드니스 데이 (Random Acts of Kindness Day)",
+		"세계 인간정신 건강의 날 (World Human Spirit Day)"
+	],
+	"02-18": [
+		"플루토 발견의 날 (Pluto Discovery Day)"
+	],
+	"02-19": [
+		"초콜릿 민트의 날 (Chocolate Mint Day)"
+	],
+	"02-20": [
+		"세계 사회 정의의 날 (World Day of Social Justice)"
+	],
+	"02-21": [
+		"세계 모국어의 날 (International Mother Language Day)"
+	],
+	"02-22": [
+		"국제 스카우트의 날"
+	],
+	"02-23": [
+		"인삼데이 (Ginseng Day)"
+	],
+	"02-24": [
+		"토르티야 칩의 날 (Tortilla Chip Day)"
+	],
+	"02-25": [
+		"**메이플스토리(MapleStory)** 2010년 모험가(듀얼블레이드) 출시",
+		"국제 칼슘의 날 (International Calcium Day)"
+	],
+	"02-26": [
+		"피스타치오의 날 (Pistachio Day)"
+	],
+	"02-27": [
+		"국제 북극곰의 날 (International Polar Bear Day)"
+	],
+	"02-28": [
+		"세계 희귀질환의 날 (Rare Disease Day)"
+	],
+	"02-29": [
+		"윤년의 날 (Leap Day)",
+		"국제 개구리 보호의 날 (International Frog Conservation Day)"
+	],
+	"03-01": [
+		"차별제로의 날 (Zero Discrimination Day)"
+	],
+	"03-03": [
+		"세계 야생동식물의 날 (World Wildlife Day)",
+		"국립공원의 날",
+		"삼겹살데이"
+	],
+	"03-06": [
+		"세계 치즈의 날 (World Cheese Day)"
+	],
+	"03-08": [
+		"세계 여성의 날 (International Women's Day)"
+	],
+	"03-09": [
+		"세계 DJ의 날 (World DJ Day)"
+	],
+	"03-13": [
+		"세계 낮잠의 날 (World Napping Day)"
+	],
+	"03-14": [
+		"🍫 화이트데이 (White Day)",
+		"국제 수학의 날 (International Day of Mathematics)",
+		"파이 데이 (Pi Day)",
+		"국제 원주민 언어의 날 (International Day of Indienous Languages)"
+	],
+	"03-15": [
+		"세계 소비자의 날 (World Consumer Rights Day)"
+	],
+	"03-17": [
+		"세인트 패트릭스 데이 (Saint Patrick's Day)"
+	],
+	"03-18": [
+		"세계 재활 치료의 날 (World Rehabilitation Day)"
+	],
+	"03-19": [
+		"초콜릿 캐러멜 데이 (Chocolate Caramel Day)"
+	],
+	"03-20": [
+		"세계 행복의 날 (International Day of Happiness)",
+		"유엔 프랑스어의 날 (UN French Language Day)"
+	],
 	"03-21": [
 		"국제 인종차별 철폐의 날 (International Day for the Elimination of Racial Discrimination)",
 		"세계 시의 날 (World Poetry Day)",
@@ -78,260 +252,773 @@
 		"국제 누루즈의 날 (International Nowruz Day)",
 		"국제 숲의 날 (International Day of Forests)"
 	],
-	"03-22": ["**메이플스토리(MapleStory)** 2012년 시그너스 기사단(미하일) 출시", "세계 물의 날 (World Water Day)"],
-	"03-23": ["세계 기상의 날 (World Meteorological Day)"],
-	"03-24": ["세계 결핵의 날 (World Tuberculosis Day)", "국제 모든 인권침해의 진실에 대한 권리와 희생자의 존엄을 위한 날"],
+	"03-22": [
+		"**메이플스토리(MapleStory)** 2012년 시그너스 기사단(미하일) 출시",
+		"세계 물의 날 (World Water Day)"
+	],
+	"03-23": [
+		"세계 기상의 날 (World Meteorological Day)"
+	],
+	"03-24": [
+		"세계 결핵의 날 (World Tuberculosis Day)",
+		"국제 모든 인권침해의 진실에 대한 권리와 희생자의 존엄을 위한 날"
+	],
 	"03-25": [
 		"노예제 및 대서양 노예 무역 희생자 국제 추모의 날 (International Day of Remembrance of the Victims of Slavery and the Transatlantic Slave Trade)",
 		"억류되고 행방불명된 활동가를 위한 국제 연대의 날"
 	],
-	"03-27": ["세계 연극의 날 (World Theatre Day)"],
-	"03-29": ["국제 자전거의 날 (International Bicycle Day)"],
-	"04-01": ["😂 만우절 (April Fool’s Day)", "국제 새들의 날 (International Bird Day)"],
-	"04-02": ["세계 자폐증 인식의 날 (World Autism Awareness Day)", "국제 어린이 책의 날 (International Children’s Book Day)"],
-	"04-03": ["지뢰 인식과 지뢰 제거 활동 국제 지원의 날 (International Day for Mine Awareness and Assistance in Mine Action)"],
-	"04-04": ["클로버데이 (Clover Day)", "세계 쥐의 날 (World Rat Day)"],
-	"04-05": ["식목일 (Arbor Day)"],
-	"04-06": ["발전과 평화를 위한 국제 스포츠의 날 (International Day of Sport for Development and Peace)"],
-	"04-07": ["세계 보건의 날 (World Health Day)", "1994년 르완다 집단 학살 국제 반성의 날 (International Day of Reflection on the 1994 Genocide Against the Tutsi in Rwanda)"],
-	"04-09": ["국제 유니콘의 날 (International Unicorn Day)"],
-	"04-10": ["전기의 날 (Electricity Day)", "세계 홈스테이의 날 (National Siblings Day)"],
-	"04-11": ["애완동물의 날 (National Pet Day)"],
-	"04-12": ["국제 유인우주 비행의 날 (International Day of Human Space Flight)", "세계 햄스터의 날 (World Hamster Day)"],
-	"04-13": ["국제 식물 인식의 날 (International Plant Appreciation Day)"],
-	"04-14": ["🍫 블랙데이 (Black Day)", "세계 사가스병의 날 (World Chagas Disease Day)"],
-	"04-16": ["국민안전의 날 (National Safety Day)"],
-	"04-17": ["세계 혈우병의 날 (World Hemophilia Day)"],
-	"04-18": ["국제 문화유산의 날 (International Day for Monuments and Sites)"],
-	"04-19": ["과학의 날 (Science Day)"],
-	"04-20": ["장애인의 날 (National Disabled Persons Day)"],
-	"04-21": ["세계 창의와 혁신의 날 (World Creativity and Innovation Day)"],
-	"04-22": ["지구의 날 (Earth Day)"],
+	"03-27": [
+		"세계 연극의 날 (World Theatre Day)"
+	],
+	"03-29": [
+		"국제 자전거의 날 (International Bicycle Day)"
+	],
+	"04-01": [
+		"😂 만우절 (April Fool’s Day)",
+		"국제 새들의 날 (International Bird Day)"
+	],
+	"04-02": [
+		"세계 자폐증 인식의 날 (World Autism Awareness Day)",
+		"국제 어린이 책의 날 (International Children’s Book Day)"
+	],
+	"04-03": [
+		"지뢰 인식과 지뢰 제거 활동 국제 지원의 날 (International Day for Mine Awareness and Assistance in Mine Action)"
+	],
+	"04-04": [
+		"클로버데이 (Clover Day)",
+		"세계 쥐의 날 (World Rat Day)"
+	],
+	"04-05": [
+		"식목일 (Arbor Day)"
+	],
+	"04-06": [
+		"발전과 평화를 위한 국제 스포츠의 날 (International Day of Sport for Development and Peace)"
+	],
+	"04-07": [
+		"세계 보건의 날 (World Health Day)",
+		"1994년 르완다 집단 학살 국제 반성의 날 (International Day of Reflection on the 1994 Genocide Against the Tutsi in Rwanda)"
+	],
+	"04-09": [
+		"국제 유니콘의 날 (International Unicorn Day)"
+	],
+	"04-10": [
+		"전기의 날 (Electricity Day)",
+		"세계 홈스테이의 날 (National Siblings Day)"
+	],
+	"04-11": [
+		"애완동물의 날 (National Pet Day)"
+	],
+	"04-12": [
+		"국제 유인우주 비행의 날 (International Day of Human Space Flight)",
+		"세계 햄스터의 날 (World Hamster Day)"
+	],
+	"04-13": [
+		"국제 식물 인식의 날 (International Plant Appreciation Day)"
+	],
+	"04-14": [
+		"🍫 블랙데이 (Black Day)",
+		"세계 사가스병의 날 (World Chagas Disease Day)"
+	],
+	"04-16": [
+		"국민안전의 날 (National Safety Day)"
+	],
+	"04-17": [
+		"세계 혈우병의 날 (World Hemophilia Day)"
+	],
+	"04-18": [
+		"국제 문화유산의 날 (International Day for Monuments and Sites)"
+	],
+	"04-19": [
+		"과학의 날 (Science Day)"
+	],
+	"04-20": [
+		"장애인의 날 (National Disabled Persons Day)"
+	],
+	"04-21": [
+		"세계 창의와 혁신의 날 (World Creativity and Innovation Day)"
+	],
+	"04-22": [
+		"지구의 날 (Earth Day)"
+	],
 	"04-23": [
 		"세계 책과 저작권의 날 (World Book and Copyright Day)",
 		"유엔 영어의 날 (UN English Language Day)",
 		"유엔 스페인어의 날 (UN Spanish Language Day)",
 		"국제 ICT분야 여성의 날 (Girls in ICT Day)"
 	],
-	"04-24": ["국제 다자주의 및 평화외교의 날 (International Day of Multilateralism and Diplomacy for Peace)"],
-	"04-25": ["국제 대표자의 날 (International Delegate’s Day)", "세계 말라리아의 날 (World Malaria Day)"],
-	"04-26": ["세계 지적재산권의 날 (World Intellectual Property Day)", "국제 체르노빌 원자력 발전 사고 추모의 날 (International Chernobyl Disaster Remembrance Day)"],
-	"04-27": ["국제 디자인의 날 (World Design Day)"],
-	"04-28": ["충무공 이순신 탄신일", "세계 노동 안전과 건강의 날 (World Day for Safety and Health at Work)"],
+	"04-24": [
+		"국제 다자주의 및 평화외교의 날 (International Day of Multilateralism and Diplomacy for Peace)"
+	],
+	"04-25": [
+		"국제 대표자의 날 (International Delegate’s Day)",
+		"세계 말라리아의 날 (World Malaria Day)"
+	],
+	"04-26": [
+		"세계 지적재산권의 날 (World Intellectual Property Day)",
+		"국제 체르노빌 원자력 발전 사고 추모의 날 (International Chernobyl Disaster Remembrance Day)"
+	],
+	"04-27": [
+		"국제 디자인의 날 (World Design Day)"
+	],
+	"04-28": [
+		"충무공 이순신 탄신일",
+		"세계 노동 안전과 건강의 날 (World Day for Safety and Health at Work)"
+	],
 	"04-29": [
 		"**메이플스토리(MapleStory)** 상용서비스 시작 N년차",
 		"**메이플스토리(MapleStory)** 2003년 모험가(히어로, 팔라딘, 다크나이트, 아크메이지, 비숍, 보우마스터, 신궁, 나이트 로드, 섀도어) 출시",
 		"세계 춤의 날 (International Dance Day)"
 	],
-	"04-30": ["세계 재즈의 날 (International Jazz Day)"],
-	"05-01": ["근로자의 날 (Labour Day)", "세계 레모네이드의 날 (World Lemonade Day)"],
-	"05-02": ["오이데이 (Cucumber Day)", "해리포터의 날 (International Harry Potter Day)"],
-	"05-03": ["오삼데이 (O-Sam Day)", "짝짝이 신발의 날 (Two Different Colored Shoes Day)", "세계 언론 자유의 날 (World Press Freedom Day)"],
-	"05-04": ["🌌 스타워즈 데이 (May the 4th Be With You)", "국제 소방관의 날 (International Firefighters' Day)"],
-	"05-05": ["어린이날 (Children's Day)", "세계 웃음의 날 (World Laughter Day)"],
-	"05-06": ["부처님 오신 날 (Buddha’s Birthday)", "국제 무용의 날 (International Dance Day)"],
-	"05-07": ["세계 비건의 날 (International Day of the Vegan)"],
-	"05-08": ["어버이날 (Parents’ Day)", "제2차 세계대전 희생자를 위한 추모와 화해의 기간-1"],
-	"05-09": ["제2차 세계대전 희생자를 위한 추모와 화해의 기간-2", "세계 철새의 날 (World Migratory Bird Day)"],
-	"05-10": ["세계 새우의 날 (World Shrimp Day)", "방 청소의 날 (Clean Your Room Day)"],
-	"05-11": ["세계 공정 무역의 날 (World Fair Trade Day)"],
-	"05-12": ["세계 간호사의 날 (International Nurses Day)"],
-	"05-13": ["국제 컬러스 데이 (International Color Day)"],
-	"05-14": ["세계 치킨 댄스의 날 (World Chicken Dance Day)"],
-	"05-15": ["스승의 날 (Teachers' Day)", "세종대왕 나신 날", "국제 가정의 날 (International Day of Families)"],
-	"05-16": ["국제 평화롭게 함께 사는 날 (International Day of Living Together in Peace)", "세계 빛의 날 (International Day of Light)"],
+	"04-30": [
+		"세계 재즈의 날 (International Jazz Day)"
+	],
+	"05-01": [
+		"근로자의 날 (Labour Day)"
+	],
+	"05-02": [
+		"오이데이 (Cucumber Day)",
+		"해리포터의 날 (International Harry Potter Day)"
+	],
+	"05-03": [
+		"오삼데이 (O-Sam Day)",
+		"짝짝이 신발의 날 (Two Different Colored Shoes Day)",
+		"세계 언론 자유의 날 (World Press Freedom Day)"
+	],
+	"05-04": [
+		"🌌 스타워즈 데이 (May the 4th Be With You)",
+		"국제 소방관의 날 (International Firefighters' Day)",
+		"세계 레모네이드의 날 (World Lemonade Day)"
+	],
+	"05-05": [
+		"어린이날 (Children's Day)",
+		"세계 웃음의 날 (World Laughter Day)"
+	],
+	"05-06": [
+		"부처님 오신 날 (Buddha’s Birthday)",
+		"국제 무용의 날 (International Dance Day)"
+	],
+	"05-07": [
+		"세계 비건의 날 (International Day of the Vegan)"
+	],
+	"05-08": [
+		"어버이날 (Parents’ Day)",
+		"제2차 세계대전 희생자를 위한 추모와 화해의 기간-1"
+	],
+	"05-09": [
+		"제2차 세계대전 희생자를 위한 추모와 화해의 기간-2",
+		"세계 철새의 날 (World Migratory Bird Day)"
+	],
+	"05-10": [
+		"세계 새우의 날 (World Shrimp Day)",
+		"방 청소의 날 (Clean Your Room Day)"
+	],
+	"05-11": [
+		"세계 공정 무역의 날 (World Fair Trade Day)"
+	],
+	"05-12": [
+		"세계 간호사의 날 (International Nurses Day)"
+	],
+	"05-13": [
+		"국제 컬러스 데이 (International Color Day)"
+	],
+	"05-14": [
+		"세계 치킨 댄스의 날 (World Chicken Dance Day)"
+	],
+	"05-15": [
+		"스승의 날 (Teachers' Day)",
+		"세종대왕 나신 날",
+		"국제 가정의 날 (International Day of Families)"
+	],
+	"05-16": [
+		"국제 평화롭게 함께 사는 날 (International Day of Living Together in Peace)",
+		"세계 빛의 날 (International Day of Light)"
+	],
 	"05-17": [
 		"세계 전자통신과 정보사회의 날 (World Telecommunication and Information Society Day)",
 		"국제 성소수자의 날 (International Day Against Homophobia, Transphobia, and Biphobia)",
 		"세계 제빵의 날 (World Baking Day)",
 		"세계 고양이 구조의 날 (World Stray Animals Day)"
 	],
-	"05-18": ["세계 박물관의 날 (International Museum Day)"],
-	"05-20": ["세계 피자 파티의 날 (World Pizza Party Day)", "세계 벌의 날 (World Bee Day)"],
+	"05-18": [
+		"세계 박물관의 날 (International Museum Day)"
+	],
+	"05-20": [
+		"세계 피자 파티의 날 (World Pizza Party Day)",
+		"세계 벌의 날 (World Bee Day)"
+	],
 	"05-21": [
 		"부부의 날 (Married Couples Day)",
 		"과일과 야채를 더 먹는 날 (Eat More Fruits and Vegetables Day)",
 		"국제 차의 날 (International Tea Day)",
 		"대화와 발전을 위한 세계 문화 다양성의 날 (World Day for Cultural Diversity for Dialogue and Development)"
 	],
-	"05-22": ["국제 생물 다양성의 날 (International Day for Biological Diversity)"],
-	"05-23": ["국제 산과적 누공 퇴치의 날 (International Day to End Obstetric Fistula)"],
-	"05-25": ["전국 노래자랑의 날 (National Singing Contest Day)", "수건의 날 (Towel Day)", "스타워즈 광팬의 날 (Geek Pride Day)"],
-	"05-27": ["세계 우유의 날 (World Milk Day)"],
-	"05-28": ["햄버거 데이(International Burger Day)", "세계 월경의 날 (Menstrual Hygiene Day)"],
-	"05-29": ["유엔평화유지군의 날 (International Day of UN Peacekeepers)"],
-	"05-30": ["세계 종교의 날 (World Religious Day)"],
-	"05-31": ["세계 금연의 날 (World No Tobacco Day)"],
-	"06-01": ["🌍 세계 우유의 날 (World Milk Day)", "세계 어버이의 날 (Global Day of Parents)", "국제 어린이의 날 (International Children's Day)"],
-	"06-02": ["유기농데이 (Organic Day)", "세계 자전거의 날 (World Bicycle Day)"],
-	"06-03": ["세계 러닝의 날 (Global Running Day)", "세계 자전거의 날 (World Bicycle Day)"],
+	"05-22": [
+		"국제 생물 다양성의 날 (International Day for Biological Diversity)"
+	],
+	"05-23": [
+		"국제 산과적 누공 퇴치의 날 (International Day to End Obstetric Fistula)"
+	],
+	"05-25": [
+		"전국 노래자랑의 날 (National Singing Contest Day)",
+		"수건의 날 (Towel Day)",
+		"스타워즈 광팬의 날 (Geek Pride Day)"
+	],
+	"05-27": [
+		"세계 우유의 날 (World Milk Day)"
+	],
+	"05-28": [
+		"햄버거 데이(International Burger Day)",
+		"세계 월경의 날 (Menstrual Hygiene Day)"
+	],
+	"05-29": [
+		"유엔평화유지군의 날 (International Day of UN Peacekeepers)"
+	],
+	"05-30": [
+		"세계 종교의 날 (World Religious Day)"
+	],
+	"05-31": [
+		"세계 금연의 날 (World No Tobacco Day)"
+	],
+	"06-01": [
+		"🌍 세계 우유의 날 (World Milk Day)",
+		"세계 어버이의 날 (Global Day of Parents)",
+		"국제 어린이의 날 (International Children's Day)"
+	],
+	"06-02": [
+		"유기농데이 (Organic Day)",
+		"세계 자전거의 날 (World Bicycle Day)"
+	],
+	"06-03": [
+		"세계 러닝의 날 (Global Running Day)",
+		"세계 자전거의 날 (World Bicycle Day)"
+	],
 	"06-04": [
 		"육포데이 (Jerky Day)",
 		"국제 침략 희생 어린이의 날 (International Day of Innocent Children Victims of Aggression)",
 		"세계 환경의 날 (World Environment Day)",
 		"국제 불법, 비보고, 비규제 어업 근절의 날 (International Day for the Fight Against Illegal, Unreported and Unregulated Fishing)"
 	],
-	"06-05": ["세계 환경의 날 (World Environment Day)"],
-	"06-06": ["현충일 (Memorial Day)", "고기데이 (Meat Day)", "유엔 러시아어의 날 (UN Russian Language Day)"],
-	"06-07": ["세계 식품 안전의 날 (World Food Safety Day)"],
-	"06-08": ["세계 해양의 날 (World Oceans Day)", "세계 최고의 친구의 날 (Best Friends Day)"],
-	"06-09": ["세계 아코디언의 날 (World Accordion Day)"],
-	"06-10": ["세계 아이스티의 날 (National Iced Tea Day)"],
-	"06-12": ["세계 아동 노동 반대의 날 (World Day Against Child Labour)"],
-	"06-13": ["국제 백색증 인식의 날 (International Albinism Awareness Day)"],
-	"06-14": ["세계 헌혈의 날 (World Blood Donor Day)"],
-	"06-15": ["세계 노인학대 인식의 날 (World Elder Abuse Awareness Day)"],
-	"06-16": ["국제 가족 승긍의 날 (International Day of Family Remittances)"],
-	"06-17": ["세계 사막화 방지의 날 (World Day to Combat Desertification and Drought)"],
-	"06-18": ["지속 가능한 미식의 날 (Sustainable Gastronomy Day)"],
-	"06-19": ["노예 해방일(Juneteenth National Independence Day)", "분쟁 중 성폭력 척결의 날 (International Day for the Elimination of Sexual Violence in Conflict)"],
-	"06-20": ["세계 난민의 날 (World Refugee Day)"],
-	"06-21": ["세계 요가의 날 (International Day of Yoga)", "국제 하지 기념일 (International Day of the Solstice)", "세계 음악의 날 (World Music Day)"],
-	"06-22": ["세계 개구리의 날 (World Frog Day)"],
-	"06-23": ["유엔 공공 서비스의 날 (United Nations Public Service Day)", "세계 미망인의 날 (International Widows' Day)"],
-	"06-24": ["세계 UFO의 날 (World UFO Day)"],
-	"06-25": ["선원의 날 (Day of the Seafarer)"],
-	"06-26": ["세계 마약 퇴치의 날 (International Day Against Drug Abuse and Illicit Trafficking)", "고문 희생자 국제 원조의 날 (United Nations International Day in Support of Victims of Torture)"],
-	"06-27": ["중소기업의 날 (Micro-, Small and Medium-sized Enterprises Day)", "아이스크림 케이크의 날 (National Ice Cream Cake Day)"],
-	"06-28": ["철도데이 (Railroad Day)", "국제 LGBTQ+ 자부심의 날 (International LGBTQ+ Pride Day)"],
-	"06-29": ["국제 열대 지방의 날 (International Day of the Tropics)"],
-	"06-30": ["국제 소행성의 날 (International Asteroid Day)", "국제 의회 제도의 날 (International Day of Parliamentarism)"],
-	"07-01": ["국제 재즈의 날 (International Jazz Day)", "세계 강아지의 날 (International Dog Day)"],
-	"07-02": ["세계 UFO의 날 (World UFO Day)"],
-	"07-03": ["플라스틱 없는 날 (International Plastic Bag Free Day)"],
-	"07-04": ["미국 독립기념일 (US Independence Day)"],
-	"07-05": ["추어탕 데이 (Chueotang Day)"],
+	"06-05": [
+		"세계 환경의 날 (World Environment Day)"
+	],
+	"06-06": [
+		"현충일 (Memorial Day)",
+		"고기데이 (Meat Day)",
+		"유엔 러시아어의 날 (UN Russian Language Day)"
+	],
+	"06-07": [
+		"세계 식품 안전의 날 (World Food Safety Day)"
+	],
+	"06-08": [
+		"세계 해양의 날 (World Oceans Day)",
+		"세계 최고의 친구의 날 (Best Friends Day)"
+	],
+	"06-09": [
+		"세계 아코디언의 날 (World Accordion Day)"
+	],
+	"06-10": [
+		"세계 아이스티의 날 (National Iced Tea Day)"
+	],
+	"06-12": [
+		"세계 아동 노동 반대의 날 (World Day Against Child Labour)"
+	],
+	"06-13": [
+		"국제 백색증 인식의 날 (International Albinism Awareness Day)"
+	],
+	"06-14": [
+		"세계 헌혈의 날 (World Blood Donor Day)"
+	],
+	"06-15": [
+		"세계 노인학대 인식의 날 (World Elder Abuse Awareness Day)"
+	],
+	"06-16": [
+		"국제 가족 승긍의 날 (International Day of Family Remittances)"
+	],
+	"06-17": [
+		"세계 사막화 방지의 날 (World Day to Combat Desertification and Drought)"
+	],
+	"06-18": [
+		"지속 가능한 미식의 날 (Sustainable Gastronomy Day)"
+	],
+	"06-19": [
+		"노예 해방일(Juneteenth National Independence Day)",
+		"분쟁 중 성폭력 척결의 날 (International Day for the Elimination of Sexual Violence in Conflict)"
+	],
+	"06-20": [
+		"세계 난민의 날 (World Refugee Day)"
+	],
+	"06-21": [
+		"세계 요가의 날 (International Day of Yoga)",
+		"국제 하지 기념일 (International Day of the Solstice)",
+		"세계 음악의 날 (World Music Day)"
+	],
+	"06-22": [
+		"세계 개구리의 날 (World Frog Day)"
+	],
+	"06-23": [
+		"유엔 공공 서비스의 날 (United Nations Public Service Day)",
+		"세계 미망인의 날 (International Widows' Day)"
+	],
+	"06-24": [
+		"세계 UFO의 날 (World UFO Day)"
+	],
+	"06-25": [
+		"선원의 날 (Day of the Seafarer)"
+	],
+	"06-26": [
+		"세계 마약 퇴치의 날 (International Day Against Drug Abuse and Illicit Trafficking)",
+		"고문 희생자 국제 원조의 날 (United Nations International Day in Support of Victims of Torture)"
+	],
+	"06-27": [
+		"중소기업의 날 (Micro-, Small and Medium-sized Enterprises Day)",
+		"아이스크림 케이크의 날 (National Ice Cream Cake Day)"
+	],
+	"06-28": [
+		"철도데이 (Railroad Day)",
+		"국제 LGBTQ+ 자부심의 날 (International LGBTQ+ Pride Day)"
+	],
+	"06-29": [
+		"국제 열대 지방의 날 (International Day of the Tropics)"
+	],
+	"06-30": [
+		"국제 소행성의 날 (International Asteroid Day)",
+		"국제 의회 제도의 날 (International Day of Parliamentarism)"
+	],
+	"07-01": [
+		"국제 재즈의 날 (International Jazz Day)",
+		"세계 강아지의 날 (International Dog Day)"
+	],
+	"07-02": [
+		"세계 UFO의 날 (World UFO Day)"
+	],
+	"07-03": [
+		"플라스틱 없는 날 (International Plastic Bag Free Day)"
+	],
+	"07-04": [
+		"미국 독립기념일 (US Independence Day)"
+	],
+	"07-05": [
+		"추어탕 데이 (Chueotang Day)"
+	],
 	"07-06": [
 		"**메이플스토리(MapleStory)** 2017년 노바(카데나) 출시",
 		"세계 키스의 날 (International Kissing Day)",
 		"국제 닭튀김의 날 (International Fried Chicken Day)",
 		"웹 관리자에게 점심 사주는 날(Take Your Webmaster to Lunch Day)"
 	],
-	"07-07": ["**메이플스토리(MapleStory)** 2011년 모험가(캐논슈터) 출시", "세계 초콜릿의 날 (World Chocolate Day)"],
-	"07-09": ["**메이플스토리(MapleStory)** 2009년 영웅(아란) 출시"],
-	"07-10": ["테디베어의 날 (Teddy Bear Picnic Day)"],
-	"07-11": ["세계 인구의 날 (World Population Day)"],
-	"07-12": ["**메이플스토리(MapleStory)** 2012년 영웅(루미너스) 출시", "말라리아의 날 (Malala Day)", "단순함의 날(Simplicity Day)"],
-	"07-13": ["세계 록앤롤의 날 (International Rock 'n' Roll Day)"],
-	"07-14": ["프랑스 혁명 기념일 (Bastille Day)"],
-	"07-15": ["**메이플스토리(MapleStory)** 2021년 아니마(라라) 출시", "세계 청년 기술의 날 (World Youth Skills Day)"],
-	"07-16": ["세계 뱀의 날 (World Snake Day)"],
-	"07-17": ["제헌절 (Constitution Day)", "세계 이모지의 날 (World Emoji Day)"],
-	"07-18": ["**메이플스토리(MapleStory)** 2013년 신의 아이(제로) 출시", "**메이플스토리(MapleStory)** 2019년 아니마(호영) 출시", "국제 넬슨 만델라의 날 (Nelson Mandela International Day)"],
-	"07-19": ["국제 아이스크림의 날 (National Ice Cream Day)"],
-	"07-20": ["세계 체스의 날 (World Chess Day)", "국제 달 착륙의 날 (International Moon Day)"],
-	"07-21": ["**메이플스토리(MapleStory)** 2011년 영웅(메르세데스 벤츠) 출시"],
-	"07-22": ["**메이플스토리(MapleStory)** 2010년 레지스탕스(배틀메이지, 와일드험터) 출시", "세계 뇌의 날 (World Brain Day)"],
-	"07-23": ["**메이플스토리(MapleStory)** 2015년 키네시스(키네시스) 출시"],
-	"07-24": ["세계 자외선 차단의 날 (International Self-Care Day)"],
-	"07-25": ["세계 수영의 날 (World Drowning Prevention Day)"],
-	"07-26": ["**메이플스토리(MapleStory)** 2012년 시그너스 노바(카이저) 출시", "국제 망명자의 날 (International Day for the Rights of Refugees)", "엘리베이터 대화 장려의 날(TalkInAnElevatorDay)"],
-	"07-27": ["세계 범죄 피해자의 날 (World Day for Crime Victims)"],
-	"07-28": ["세계 간염의 날 (World Hepatitis Day)"],
-	"07-29": ["국제 호랑이의 날 (International Tiger Day)"],
-	"07-30": ["국제 우정의 날 (International Friendship Day)", "세계 인신매매 반대의 날 (World Day Against Trafficking in Persons)"],
-	"07-31": ["세계 레인저의 날 (World Ranger Day)"],
-	"08-01": ["세계 모유 수유 주간 (World Breastfeeding Week) 시작", "국제 스파이더맨의 날 (International Spider-Man Day)"],
-	"08-02": ["국제 맥주의 날 (International Beer Day)"],
-	"08-03": ["수박의 날 (Watermelon Day)"],
-	"08-04": ["**메이플스토리(MapleStory)** 2011년 레지스탕스 데몬(데몬슬레이어) 출시", "국제 우정의 날 (Friendship Day)"],
-	"08-05": ["세계 장기 기증의 날 (World Organ Donation Day)"],
-	"08-06": ["세계 광복의 날 (Hiroshima Day)", "국제 봉사자의 날 (International Volunteer Day)"],
-	"08-07": ["국제 라즈베리의 날 (International Raspberry Day)"],
-	"08-08": ["🐱 세계 고양이의 날 (International Cat Day)", "🍜 라면의 날 (Ramen Day)"],
-	"08-09": ["**메이플스토리(MapleStory)** 2012년 노바(엔젤릭버스터) 출시", "세계 원주민의 날 (International Day of the World's Indigenous Peoples)"],
-	"08-10": ["**메이플스토리(MapleStory)** 2018년 레프(일리움) 출시", "국제 라즈베리 타르트의 날 (National Raspberry Tart Day)"],
-	"08-11": ["국제 산의 날 (International Mountain Day)"],
-	"08-12": ["**메이플스토리(MapleStory)** 2010년 레지스탕스(메카닉) 출시", "국제 청소년의 날 (International Youth Day)"],
-	"08-13": ["왼손잡이의 날 (International Left-Handers Day)"],
-	"08-14": ["일본군 '위안부' 피해자 기림의 날"],
-	"08-15": ["광복절 (National Liberation Day of Korea)"],
-	"08-16": ["세계 롤러코스터의 날 (National Roller Coaster Day)"],
-	"08-17": ["검은 고양이 인식의 날 (Black Cat Appreciation Day)"],
-	"08-18": ["쌀의 날 (Rice Day)"],
-	"08-19": ["세계 인도주의의 날 (World Humanitarian Day)"],
-	"08-20": ["세계 모기의 날 (World Mosquito Day)"],
-	"08-21": ["국제 테러 피해자 추모와 헌사의 날 (International Day of Remembrance and Tribute to the Victims of Terrorism)"],
-	"08-22": ["국제 종교폭력 희생자의 날 (International Day Commemorating the Victims of Acts of Violence Based on Religion or Belief)"],
-	"08-23": ["국제 노예무역 철폐 기념의 날 (International Day for the Remembrance of the Slave Trade and Its Abolition)"],
-	"08-24": ["세계 기네스북의 날 (Guinness World Records Day)"],
-	"08-25": ["세계 인스턴트 라면의 날 (Instant Ramen Day)"],
-	"08-26": ["국제 강아지의 날 (International Dog Day)"],
-	"08-27": ["세계 바나나 러버스의 날 (World Banana Lovers Day)"],
-	"08-28": ["세계 꿈의 날 (Dream Day)"],
-	"08-29": ["국제 핵실험 반대의 날 (International Day against Nuclear Tests)"],
-	"08-30": ["국제 강제실종 희생자의 날 (International Day of the Disappeared)"],
-	"08-31": ["세계 블로그의 날 (World Blog Day)"],
-	"09-01": ["세계 편지 쓰기의 날 (World Letter Writing Day)"],
-	"09-02": ["세계 코코넛의 날 (World Coconut Day)"],
-	"09-03": ["세계 수염의 날 (World Beard Day)"],
-	"09-04": ["세계 석유 노동자의 날 (World Petroleum Workers Day)"],
-	"09-05": ["국제 자선의 날 (International Day of Charity)"],
-	"09-06": ["읽기의 날 (National Read a Book Day)"],
-	"09-07": ["세계 청정 대기의 날 (International Day of Clean Air for Blue Skies)", "푸른 하늘을 위한 세계 청정 대기의 날"],
-	"09-08": ["국제 문해의 날 (International Literacy Day)"],
-	"09-09": ["닭고기 데이 (Chicken Day)"],
-	"09-10": ["세계 자살 예방의 날 (World Suicide Prevention Day)"],
-	"09-11": ["세계 응급 처치의 날 (World First Aid Day)"],
-	"09-12": ["남남 협력의 날 (United Nations Day for South-South Cooperation)"],
-	"09-13": ["국제 초콜릿의 날 (International Chocolate Day)"],
-	"09-14": ["먹는 아이스 크림의 날 (National Eat a Hoagie Day)"],
-	"09-15": ["세계 민주주의의 날 (International Day of Democracy)"],
-	"09-16": ["세계 오존층 보호의 날 (International Day for the Preservation of the Ozone Layer)"],
-	"09-17": ["고백데이 (Confession Day)"],
-	"09-18": ["국제 동일 임금의 날 (International Equal Pay Day)"],
-	"09-19": ["🏴‍☠️ 해적 말하기의 날 (International Talk Like a Pirate Day)"],
-	"09-20": ["국제 평화의 날 (International Day of Peace)"],
-	"09-21": ["세계 알츠하이머의 날 (World Alzheimer's Day)"],
-	"09-22": ["세계 차 없는 날 (World Car Free Day)"],
-	"09-23": ["세계 수어의 날 (International Day of Sign Languages)"],
-	"09-24": ["세계 해사의 날 (World Maritime Day)"],
-	"09-25": ["세계 꿈의 날 (World Dream Day)"],
-	"09-26": ["세계 핵무기 완전 제거의 날 (International Day for the Total Elimination of Nuclear Weapons)"],
-	"09-27": ["세계 관광의 날 (World Tourism Day)"],
-	"09-28": ["세계 보편적 정보 접근의 날 (International Day for Universal Access to Information)"],
-	"09-29": ["국제 커피의 날 (International Coffee Day)", "국제 식품손실과 폐기 인식의 날 (International Day of Awareness of Food Loss and Waste)"],
-	"09-30": ["세계 번역의 날 (International Translation Day)", "진실과 화해의 날(National Day for Truth and Reconciliation)"],
-	"10-01": ["국군의 날", "국제 커피의 날 (International Coffee Day)", "세계 노인의 날 (International Day of Older Persons)"],
-	"10-02": ["국제 비폭력의 날 (International Day of Non-Violence)"],
-	"10-03": ["개천절"],
-	"10-04": ["천사데이", "세계 동물의 날 (World Animal Day)"],
-	"10-05": ["세계 한인의 날", "세계 교사의 날 (World Teachers' Day)", "세계 주거의 날 (World Habitat Day)"],
-	"10-06": ["세계 뇌졸중의 날 (World Cerebral Palsy Day)"],
-	"10-07": ["세계 면의 날 (World Noodle Day)"],
-	"10-08": ["세계 문어의 날 (World Octopus Day)"],
-	"10-09": ["한글날"],
-	"10-10": ["임산부의 날", "세계 정신 건강의 날 (World Mental Health Day)", "세계 철새의 날"],
-	"10-11": ["세계 소녀의 날 (International Day of the Girl)"],
-	"10-12": ["세계 관절염의 날 (World Arthritis Day)"],
-	"10-13": ["국제 재난 위험 감소의 날 (International Day for Disaster Reduction)"],
-	"10-14": ["세계 표준의 날 (World Standards Day)"],
-	"10-15": ["국제 농촌 여성의 날 (International Day of Rural Women)", "세계 손 씻기의 날 (Global Handwashing Day)"],
-	"10-16": ["세계 식량의 날 (World Food Day)"],
-	"10-17": ["국제 빈곤 퇴치의 날 (International Day for the Eradication of Poverty)"],
-	"10-18": ["초콜릿 컵케이크의 날 (Chocolate Cupcake Day)"],
-	"10-20": ["세계 통계의 날 (World Statistics Day)"],
-	"10-21": ["경찰의 날", "국제 마녀의 날 (International Witch's Day)"],
-	"10-22": ["세계 너구리의 날 (International Raccoon Appreciation Day)"],
-	"10-23": ["분자학의 날 (Mole Day)"],
-	"10-24": ["국제연합일 (United Nations Day)", "유엔의 날"],
-	"10-25": ["독도의 날", "스파게티의 날 (World Pasta Day)"],
-	"10-26": ["세계 호박의 날 (National Pumpkin Day)"],
-	"10-27": ["세계 시청각 유산의 날 (World Day for Audiovisual Heritage)"],
-	"10-28": ["국제 애니메이션의 날 (International Animation Day)"],
-	"10-29": ["세계 뇌졸중의 날 (World Stroke Day)"],
-	"10-30": ["세계 트릭 오어 트릿의 날 (National Candy Corn Day)"],
-	"10-31": ["🎃 할로윈 (Halloween)", "세계 도시의 날 (World Cities Day)"],
-	"11-01": ["한우데이", "세계 채식주의자의 날 (World Vegan Day)"],
-	"11-02": ["국제 언론인 범죄 면책 종료의 날 (International Day to End Impunity for Crimes Against Journalists)"],
-	"11-03": ["학생독립운동기념일", "샌드위치의 날 (National Sandwich Day)"],
-	"11-04": ["국제 자선의 날 (National Candy Day)"],
-	"11-05": ["세계 쓰나미의 날 (World Tsunami Awareness Day)"],
-	"11-06": ["전쟁과 무력 분쟁 시 환경 착취 보호의 날 (International Day for Preventing the Exploitation of the Environment in War and Armed Conflict)"],
-	"11-07": ["비터초콜릿의 날 (National Bittersweet Chocolate with Almonds Day)"],
-	"11-08": ["브래지어데이 (National Cappuccino Day)"],
-	"11-09": ["소방의 날", "세계 자유의 날 (World Freedom Day)", "국제 페이스트리의 날 (National Pastry Day)"],
-	"11-10": ["평화와 발전을 위한 세계 과학의 날 (World Science Day for Peace and Development)"],
+	"07-07": [
+		"**메이플스토리(MapleStory)** 2011년 모험가(캐논슈터) 출시",
+		"세계 초콜릿의 날 (World Chocolate Day)"
+	],
+	"07-09": [
+		"**메이플스토리(MapleStory)** 2009년 영웅(아란) 출시"
+	],
+	"07-10": [
+		"테디베어의 날 (Teddy Bear Picnic Day)"
+	],
+	"07-11": [
+		"세계 인구의 날 (World Population Day)"
+	],
+	"07-12": [
+		"**메이플스토리(MapleStory)** 2012년 영웅(루미너스) 출시",
+		"말라리아의 날 (Malala Day)",
+		"단순함의 날(Simplicity Day)"
+	],
+	"07-13": [
+		"세계 록앤롤의 날 (International Rock 'n' Roll Day)"
+	],
+	"07-14": [
+		"프랑스 혁명 기념일 (Bastille Day)"
+	],
+	"07-15": [
+		"**메이플스토리(MapleStory)** 2021년 아니마(라라) 출시",
+		"세계 청년 기술의 날 (World Youth Skills Day)"
+	],
+	"07-16": [
+		"세계 뱀의 날 (World Snake Day)"
+	],
+	"07-17": [
+		"제헌절 (Constitution Day)",
+		"세계 이모지의 날 (World Emoji Day)"
+	],
+	"07-18": [
+		"**메이플스토리(MapleStory)** 2013년 신의 아이(제로) 출시",
+		"**메이플스토리(MapleStory)** 2019년 아니마(호영) 출시",
+		"국제 넬슨 만델라의 날 (Nelson Mandela International Day)"
+	],
+	"07-19": [
+		"국제 아이스크림의 날 (National Ice Cream Day)"
+	],
+	"07-20": [
+		"세계 체스의 날 (World Chess Day)",
+		"국제 달 착륙의 날 (International Moon Day)"
+	],
+	"07-21": [
+		"**메이플스토리(MapleStory)** 2011년 영웅(메르세데스 벤츠) 출시"
+	],
+	"07-22": [
+		"**메이플스토리(MapleStory)** 2010년 레지스탕스(배틀메이지, 와일드험터) 출시",
+		"세계 뇌의 날 (World Brain Day)"
+	],
+	"07-23": [
+		"**메이플스토리(MapleStory)** 2015년 키네시스(키네시스) 출시"
+	],
+	"07-24": [
+		"세계 자외선 차단의 날 (International Self-Care Day)"
+	],
+	"07-25": [
+		"세계 수영의 날 (World Drowning Prevention Day)"
+	],
+	"07-26": [
+		"**메이플스토리(MapleStory)** 2012년 시그너스 노바(카이저) 출시",
+		"국제 망명자의 날 (International Day for the Rights of Refugees)",
+		"엘리베이터 대화 장려의 날(TalkInAnElevatorDay)"
+	],
+	"07-27": [
+		"세계 범죄 피해자의 날 (World Day for Crime Victims)"
+	],
+	"07-28": [
+		"세계 간염의 날 (World Hepatitis Day)"
+	],
+	"07-29": [
+		"국제 호랑이의 날 (International Tiger Day)"
+	],
+	"07-30": [
+		"국제 우정의 날 (International Friendship Day)",
+		"세계 인신매매 반대의 날 (World Day Against Trafficking in Persons)"
+	],
+	"07-31": [
+		"세계 레인저의 날 (World Ranger Day)"
+	],
+	"08-01": [
+		"세계 모유 수유 주간 (World Breastfeeding Week) 시작",
+		"국제 스파이더맨의 날 (International Spider-Man Day)"
+	],
+	"08-02": [
+		"국제 맥주의 날 (International Beer Day)"
+	],
+	"08-03": [
+		"수박의 날 (Watermelon Day)"
+	],
+	"08-04": [
+		"**메이플스토리(MapleStory)** 2011년 레지스탕스 데몬(데몬슬레이어) 출시",
+		"국제 우정의 날 (Friendship Day)"
+	],
+	"08-05": [
+		"세계 장기 기증의 날 (World Organ Donation Day)"
+	],
+	"08-06": [
+		"세계 광복의 날 (Hiroshima Day)",
+		"국제 봉사자의 날 (International Volunteer Day)"
+	],
+	"08-07": [
+		"국제 라즈베리의 날 (International Raspberry Day)"
+	],
+	"08-08": [
+		"🐱 세계 고양이의 날 (International Cat Day)",
+		"🍜 라면의 날 (Ramen Day)"
+	],
+	"08-09": [
+		"**메이플스토리(MapleStory)** 2012년 노바(엔젤릭버스터) 출시",
+		"세계 원주민의 날 (International Day of the World's Indigenous Peoples)"
+	],
+	"08-10": [
+		"**메이플스토리(MapleStory)** 2018년 레프(일리움) 출시",
+		"국제 라즈베리 타르트의 날 (National Raspberry Tart Day)"
+	],
+	"08-11": [
+		"국제 산의 날 (International Mountain Day)"
+	],
+	"08-12": [
+		"**메이플스토리(MapleStory)** 2010년 레지스탕스(메카닉) 출시",
+		"국제 청소년의 날 (International Youth Day)"
+	],
+	"08-13": [
+		"왼손잡이의 날 (International Left-Handers Day)"
+	],
+	"08-14": [
+		"일본군 '위안부' 피해자 기림의 날"
+	],
+	"08-15": [
+		"광복절 (National Liberation Day of Korea)"
+	],
+	"08-16": [
+		"세계 롤러코스터의 날 (National Roller Coaster Day)"
+	],
+	"08-17": [
+		"검은 고양이 인식의 날 (Black Cat Appreciation Day)"
+	],
+	"08-18": [
+		"쌀의 날 (Rice Day)"
+	],
+	"08-19": [
+		"세계 인도주의의 날 (World Humanitarian Day)"
+	],
+	"08-20": [
+		"세계 모기의 날 (World Mosquito Day)"
+	],
+	"08-21": [
+		"국제 테러 피해자 추모와 헌사의 날 (International Day of Remembrance and Tribute to the Victims of Terrorism)"
+	],
+	"08-22": [
+		"국제 종교폭력 희생자의 날 (International Day Commemorating the Victims of Acts of Violence Based on Religion or Belief)"
+	],
+	"08-23": [
+		"국제 노예무역 철폐 기념의 날 (International Day for the Remembrance of the Slave Trade and Its Abolition)"
+	],
+	"08-24": [
+		"세계 기네스북의 날 (Guinness World Records Day)"
+	],
+	"08-25": [
+		"세계 인스턴트 라면의 날 (Instant Ramen Day)"
+	],
+	"08-26": [
+		"국제 강아지의 날 (International Dog Day)"
+	],
+	"08-27": [
+		"세계 바나나 러버스의 날 (World Banana Lovers Day)"
+	],
+	"08-28": [
+		"세계 꿈의 날 (Dream Day)"
+	],
+	"08-29": [
+		"국제 핵실험 반대의 날 (International Day against Nuclear Tests)"
+	],
+	"08-30": [
+		"국제 강제실종 희생자의 날 (International Day of the Disappeared)"
+	],
+	"08-31": [
+		"세계 블로그의 날 (World Blog Day)"
+	],
+	"09-01": [
+		"세계 편지 쓰기의 날 (World Letter Writing Day)"
+	],
+	"09-02": [
+		"세계 코코넛의 날 (World Coconut Day)"
+	],
+	"09-03": [
+		"세계 수염의 날 (World Beard Day)"
+	],
+	"09-04": [
+		"세계 석유 노동자의 날 (World Petroleum Workers Day)"
+	],
+	"09-05": [
+		"국제 자선의 날 (International Day of Charity)"
+	],
+	"09-06": [
+		"읽기의 날 (National Read a Book Day)"
+	],
+	"09-07": [
+		"세계 청정 대기의 날 (International Day of Clean Air for Blue Skies)",
+		"푸른 하늘을 위한 세계 청정 대기의 날"
+	],
+	"09-08": [
+		"국제 문해의 날 (International Literacy Day)"
+	],
+	"09-09": [
+		"닭고기 데이 (Chicken Day)"
+	],
+	"09-10": [
+		"세계 자살 예방의 날 (World Suicide Prevention Day)"
+	],
+	"09-11": [
+		"세계 응급 처치의 날 (World First Aid Day)"
+	],
+	"09-12": [
+		"남남 협력의 날 (United Nations Day for South-South Cooperation)"
+	],
+	"09-13": [
+		"국제 초콜릿의 날 (International Chocolate Day)"
+	],
+	"09-14": [
+		"먹는 아이스 크림의 날 (National Eat a Hoagie Day)"
+	],
+	"09-15": [
+		"세계 민주주의의 날 (International Day of Democracy)"
+	],
+	"09-16": [
+		"세계 오존층 보호의 날 (International Day for the Preservation of the Ozone Layer)"
+	],
+	"09-17": [
+		"고백데이 (Confession Day)"
+	],
+	"09-18": [
+		"국제 동일 임금의 날 (International Equal Pay Day)"
+	],
+	"09-19": [
+		"🏴‍☠️ 해적 말하기의 날 (International Talk Like a Pirate Day)"
+	],
+	"09-20": [
+		"국제 평화의 날 (International Day of Peace)"
+	],
+	"09-21": [
+		"세계 알츠하이머의 날 (World Alzheimer's Day)"
+	],
+	"09-22": [
+		"세계 차 없는 날 (World Car Free Day)"
+	],
+	"09-23": [
+		"세계 수어의 날 (International Day of Sign Languages)"
+	],
+	"09-24": [
+		"세계 해사의 날 (World Maritime Day)"
+	],
+	"09-25": [
+		"세계 꿈의 날 (World Dream Day)"
+	],
+	"09-26": [
+		"세계 핵무기 완전 제거의 날 (International Day for the Total Elimination of Nuclear Weapons)"
+	],
+	"09-27": [
+		"세계 관광의 날 (World Tourism Day)"
+	],
+	"09-28": [
+		"세계 보편적 정보 접근의 날 (International Day for Universal Access to Information)"
+	],
+	"09-29": [
+		"국제 커피의 날 (International Coffee Day)",
+		"국제 식품손실과 폐기 인식의 날 (International Day of Awareness of Food Loss and Waste)"
+	],
+	"09-30": [
+		"세계 번역의 날 (International Translation Day)",
+		"진실과 화해의 날(National Day for Truth and Reconciliation)"
+	],
+	"10-01": [
+		"국군의 날",
+		"국제 커피의 날 (International Coffee Day)",
+		"세계 노인의 날 (International Day of Older Persons)"
+	],
+	"10-02": [
+		"국제 비폭력의 날 (International Day of Non-Violence)"
+	],
+	"10-03": [
+		"개천절"
+	],
+	"10-04": [
+		"천사데이",
+		"세계 동물의 날 (World Animal Day)"
+	],
+	"10-05": [
+		"세계 한인의 날",
+		"세계 교사의 날 (World Teachers' Day)",
+		"세계 주거의 날 (World Habitat Day)"
+	],
+	"10-06": [
+		"세계 뇌졸중의 날 (World Cerebral Palsy Day)"
+	],
+	"10-07": [
+		"세계 면의 날 (World Noodle Day)"
+	],
+	"10-08": [
+		"세계 문어의 날 (World Octopus Day)"
+	],
+	"10-09": [
+		"한글날"
+	],
+	"10-10": [
+		"임산부의 날",
+		"세계 정신 건강의 날 (World Mental Health Day)",
+		"세계 철새의 날"
+	],
+	"10-11": [
+		"세계 소녀의 날 (International Day of the Girl)"
+	],
+	"10-12": [
+		"세계 관절염의 날 (World Arthritis Day)"
+	],
+	"10-13": [
+		"국제 재난 위험 감소의 날 (International Day for Disaster Reduction)"
+	],
+	"10-14": [
+		"세계 표준의 날 (World Standards Day)"
+	],
+	"10-15": [
+		"국제 농촌 여성의 날 (International Day of Rural Women)",
+		"세계 손 씻기의 날 (Global Handwashing Day)"
+	],
+	"10-16": [
+		"세계 식량의 날 (World Food Day)"
+	],
+	"10-17": [
+		"국제 빈곤 퇴치의 날 (International Day for the Eradication of Poverty)"
+	],
+	"10-18": [
+		"초콜릿 컵케이크의 날 (Chocolate Cupcake Day)"
+	],
+	"10-20": [
+		"세계 통계의 날 (World Statistics Day)"
+	],
+	"10-21": [
+		"경찰의 날",
+		"국제 마녀의 날 (International Witch's Day)"
+	],
+	"10-22": [
+		"세계 너구리의 날 (International Raccoon Appreciation Day)"
+	],
+	"10-23": [
+		"분자학의 날 (Mole Day)"
+	],
+	"10-24": [
+		"국제연합일 (United Nations Day)",
+		"유엔의 날"
+	],
+	"10-25": [
+		"독도의 날",
+		"스파게티의 날 (World Pasta Day)"
+	],
+	"10-26": [
+		"세계 호박의 날 (National Pumpkin Day)"
+	],
+	"10-27": [
+		"세계 시청각 유산의 날 (World Day for Audiovisual Heritage)"
+	],
+	"10-28": [
+		"국제 애니메이션의 날 (International Animation Day)"
+	],
+	"10-29": [
+		"세계 뇌졸중의 날 (World Stroke Day)"
+	],
+	"10-30": [
+		"세계 트릭 오어 트릿의 날 (National Candy Corn Day)"
+	],
+	"10-31": [
+		"🎃 할로윈 (Halloween)",
+		"세계 도시의 날 (World Cities Day)"
+	],
+	"11-01": [
+		"한우데이",
+		"세계 채식주의자의 날 (World Vegan Day)"
+	],
+	"11-02": [
+		"국제 언론인 범죄 면책 종료의 날 (International Day to End Impunity for Crimes Against Journalists)"
+	],
+	"11-03": [
+		"학생독립운동기념일",
+		"샌드위치의 날 (National Sandwich Day)"
+	],
+	"11-04": [
+		"국제 자선의 날 (National Candy Day)"
+	],
+	"11-05": [
+		"세계 쓰나미의 날 (World Tsunami Awareness Day)"
+	],
+	"11-06": [
+		"전쟁과 무력 분쟁 시 환경 착취 보호의 날 (International Day for Preventing the Exploitation of the Environment in War and Armed Conflict)"
+	],
+	"11-07": [
+		"비터초콜릿의 날 (National Bittersweet Chocolate with Almonds Day)"
+	],
+	"11-08": [
+		"브래지어데이 (National Cappuccino Day)"
+	],
+	"11-09": [
+		"소방의 날",
+		"세계 자유의 날 (World Freedom Day)",
+		"국제 페이스트리의 날 (National Pastry Day)"
+	],
+	"11-10": [
+		"평화와 발전을 위한 세계 과학의 날 (World Science Day for Peace and Development)"
+	],
 	"11-11": [
 		"🥨 빼빼로데이",
 		"농업인의 날",
@@ -340,30 +1027,94 @@
 		"유엔참전용사 국제추모의 날 (International Day of Remembrance for UN Peacekeepers)",
 		"세계 오리의 날 (National Origami Day)"
 	],
-	"11-12": ["세계 폐렴의 날 (World Pneumonia Day)"],
-	"11-13": ["세계 친절의 날 (World Kindness Day)"],
-	"11-14": ["세계 당뇨병의 날 (World Diabetes Day)", "국제 피클의 날 (International Pickle Day)"],
-	"11-15": ["세계 거리 교통 사고 희생자의 날 (World Day of Remembrance for Road Traffic Victims)"],
-	"11-16": ["세계 관용의 날 (International Day for Tolerance)"],
-	"11-17": ["순국선열의 날", "홈메이드 빵의 날 (Homemade Bread Day)"],
-	"11-18": ["미키 마우스의 날 (Mickey Mouse Day)"],
-	"11-19": ["세계 화장실의 날 (World Toilet Day)", "세계 철학의 날 (World Philosophy Day)"],
-	"11-20": ["아프리카 산업화의 날 (Africa Industrialization Day)", "세계 어린이의 날 (World Children's Day)"],
-	"11-21": ["세계 텔레비전의 날 (World Television Day)"],
-	"11-23": ["국제 에스프레소의 날 (National Espresso Day)"],
-	"11-24": ["국제 진저브레드의 날 (National Sardines Day)"],
-	"11-25": ["국제 여성 폭력 추방의 날 (International Day for the Elimination of Violence Against Women)"],
-	"11-26": ["케이크의 날 (National Cake Day)"],
-	"11-29": ["국제 팔레스타인 연대의 날 (International Day of Solidarity with the Palestinian People)"],
-	"11-30": ["화학전 피해자 추모의 날 (Day of Remembrance for All Victims of Chemical Warfare)", "세계 컴퓨터 보안의 날 (Computer Security Day)"],
-	"12-01": ["크리스마스 전등의 날(National Christmas Lights Day)", "세계 에이즈의 날 (World AIDS Day)", "빨간 사과 먹는 날 (Eat a Red Apple Day)"],
-	"12-02": ["국제 잡종견의 날(National Mutt Day)", "국제 노예제 철폐의 날 (International Day for the Abolition of Slavery)"],
-	"12-03": ["국제 장애인의 날 (International Day of Persons with Disabilities)", "레츠허그 데이(Let's Hug Day)"],
-	"12-04": ["국제 은행의 날 (International Bank Day)", "쿠키의 날(National Cookie Day)"],
-	"12-05": ["무역의 날", "국제 경제, 사회 발전을 위한 자원봉사자의 날 (International Volunteer Day for Economic and Social Development)", "세계 토양의 날 (World Soil Day)"],
-	"12-06": ["세인트 니콜라스 데이 (Saint Nicholas Day)", "가즈파쵸 데이(National Gazpacho Day)"],
-	"12-07": ["국제 민간 항공의 날 (International Civil Aviation Day)", "솜사탕의 날(National Cotton Candy Day)", "편지쓰기의 날(Letter Writing Day)"],
-	"12-08": ["국제 기후 행동의 날 (Global Climate Action Day)", "브라우니의 날(National Brownie Day)"],
+	"11-12": [
+		"세계 폐렴의 날 (World Pneumonia Day)"
+	],
+	"11-13": [
+		"세계 친절의 날 (World Kindness Day)"
+	],
+	"11-14": [
+		"세계 당뇨병의 날 (World Diabetes Day)",
+		"국제 피클의 날 (International Pickle Day)"
+	],
+	"11-15": [
+		"세계 거리 교통 사고 희생자의 날 (World Day of Remembrance for Road Traffic Victims)"
+	],
+	"11-16": [
+		"세계 관용의 날 (International Day for Tolerance)"
+	],
+	"11-17": [
+		"순국선열의 날",
+		"홈메이드 빵의 날 (Homemade Bread Day)"
+	],
+	"11-18": [
+		"미키 마우스의 날 (Mickey Mouse Day)"
+	],
+	"11-19": [
+		"세계 화장실의 날 (World Toilet Day)",
+		"세계 철학의 날 (World Philosophy Day)"
+	],
+	"11-20": [
+		"아프리카 산업화의 날 (Africa Industrialization Day)",
+		"세계 어린이의 날 (World Children's Day)"
+	],
+	"11-21": [
+		"세계 텔레비전의 날 (World Television Day)"
+	],
+	"11-23": [
+		"국제 에스프레소의 날 (National Espresso Day)"
+	],
+	"11-24": [
+		"국제 진저브레드의 날 (National Sardines Day)"
+	],
+	"11-25": [
+		"국제 여성 폭력 추방의 날 (International Day for the Elimination of Violence Against Women)"
+	],
+	"11-26": [
+		"케이크의 날 (National Cake Day)"
+	],
+	"11-29": [
+		"국제 팔레스타인 연대의 날 (International Day of Solidarity with the Palestinian People)"
+	],
+	"11-30": [
+		"화학전 피해자 추모의 날 (Day of Remembrance for All Victims of Chemical Warfare)",
+		"세계 컴퓨터 보안의 날 (Computer Security Day)"
+	],
+	"12-01": [
+		"크리스마스 전등의 날(National Christmas Lights Day)",
+		"세계 에이즈의 날 (World AIDS Day)",
+		"빨간 사과 먹는 날 (Eat a Red Apple Day)"
+	],
+	"12-02": [
+		"국제 잡종견의 날(National Mutt Day)",
+		"국제 노예제 철폐의 날 (International Day for the Abolition of Slavery)"
+	],
+	"12-03": [
+		"국제 장애인의 날 (International Day of Persons with Disabilities)",
+		"레츠허그 데이(Let's Hug Day)"
+	],
+	"12-04": [
+		"국제 은행의 날 (International Bank Day)",
+		"쿠키의 날(National Cookie Day)"
+	],
+	"12-05": [
+		"무역의 날",
+		"국제 경제, 사회 발전을 위한 자원봉사자의 날 (International Volunteer Day for Economic and Social Development)",
+		"세계 토양의 날 (World Soil Day)"
+	],
+	"12-06": [
+		"세인트 니콜라스 데이 (Saint Nicholas Day)",
+		"가즈파쵸 데이(National Gazpacho Day)"
+	],
+	"12-07": [
+		"국제 민간 항공의 날 (International Civil Aviation Day)",
+		"솜사탕의 날(National Cotton Candy Day)",
+		"편지쓰기의 날(Letter Writing Day)"
+	],
+	"12-08": [
+		"국제 기후 행동의 날 (Global Climate Action Day)",
+		"브라우니의 날(National Brownie Day)"
+	],
 	"12-09": [
 		"공익신고의 날",
 		"제노사이드 피해자 추모 및 해당 범죄 예방의 날 (International Day of Commemoration and Dignity of the Victims of the Crime of Genocide and of the Prevention of this Crime)",
@@ -371,36 +1122,92 @@
 		"루테피스크 데이(Lutefisk Day)",
 		"페이스트리의 날(National Pastry Day)"
 	],
-	"12-10": ["인권의 날 (Human Rights Day)", "세계 동물의 날 (International Animal Rights Day)"],
-	"12-11": ["국제 산의 날 (International Mountain Day)", "앱의 날(National App Day)"],
-	"12-12": ["국제 중립의 날 (International Neutrality Day)", "국제 전세계적 의료 보장의 날 (Universal Health Coverage Day)", "진저브레드 하우스 데이(Gingerbread House Day)"],
-	"12-13": ["세계 바이올린의 날 (World Violin Day)", "말의 날(National Horse Day)"],
-	"12-14": ["원숭이의 날 (Monkey Day)", "밤 구이의 날(Roast Chestnuts Day)"],
-	"12-15": ["세계 홍차의 날 (International Tea Day)", "컵케이크 데이(National Cupcake Day)"],
-	"12-16": ["초콜릿으로 덮인 모든 것의 날(National Chocolate-Covered-Anything Day)"],
-	"12-17": ["메이플스토리(MapleStory) 2009년 영웅(에반) 출시", "라이트 형제의 날 (Wright Brothers Day)", "메이플 시럽의 날(National Maple Syrup Day)"],
+	"12-10": [
+		"인권의 날 (Human Rights Day)",
+		"세계 동물의 날 (International Animal Rights Day)"
+	],
+	"12-11": [
+		"국제 산의 날 (International Mountain Day)",
+		"앱의 날(National App Day)"
+	],
+	"12-12": [
+		"국제 중립의 날 (International Neutrality Day)",
+		"국제 전세계적 의료 보장의 날 (Universal Health Coverage Day)",
+		"진저브레드 하우스 데이(Gingerbread House Day)"
+	],
+	"12-13": [
+		"세계 바이올린의 날 (World Violin Day)",
+		"말의 날(National Horse Day)"
+	],
+	"12-14": [
+		"원숭이의 날 (Monkey Day)",
+		"밤 구이의 날(Roast Chestnuts Day)"
+	],
+	"12-15": [
+		"세계 홍차의 날 (International Tea Day)",
+		"컵케이크 데이(National Cupcake Day)"
+	],
+	"12-16": [
+		"초콜릿으로 덮인 모든 것의 날(National Chocolate-Covered-Anything Day)"
+	],
+	"12-17": [
+		"메이플스토리(MapleStory) 2009년 영웅(에반) 출시",
+		"라이트 형제의 날 (Wright Brothers Day)",
+		"메이플 시럽의 날(National Maple Syrup Day)"
+	],
 	"12-18": [
 		"메이플스토리(MapleStory) 2007년 모험가(바이퍼, 캡틴틴) 출시",
 		"메이플스토리(MapleStory) 2008년 시그너스(소울마스터, 플레임위자드, 윈드브레이커, 나이트워커, 스트라이커커) 출시",
 		"세계 이주의 날 (International Migrants Day)",
 		"아랍어의 날 (UN Arabic Language Day)"
 	],
-	"12-19": ["오트밀 머핀 데이(National Oatmeal Muffin Day)"],
+	"12-19": [
+		"오트밀 머핀 데이(National Oatmeal Muffin Day)"
+	],
 	"12-20": [
 		"메이플스토리(MapleStory) 2012년 레지스탕스 데몬(데몬어밴져) 출시",
 		"메이플스토리 제8대 디렉터 **김창섭(金昌燮 | Kim Chang-seop)**님의 탄신일",
 		"국제 인간 단결의 날 (International Human Solidarity Day)",
 		"게임의 날(Games Day)"
 	],
-	"12-21": ["국제 단축 일의 날 (Short Girl Appreciation Day)", "햄버거의 날(National Hamburger Day)"],
-	"12-22": ["메이플스토리(MapleStory) 2015년 레지스탕스(블래스터) 출시", "쿠키 교환의 날(National Cookie Exchange Day)"],
-	"12-23": ["루돌프 사슴의 날 (Rudolph the Red-Nosed Reindeer Day)", "페퍼누스의 날(National Pfeffernüsse Day)"],
-	"12-24": ["크리스마스 이브 (Christmas Eve)"],
-	"12-25": ["🎄 크리스마스 (Christmas)"],
-	"12-26": ["지팡이 사탕 데이(Candy Cane Day)", "박싱데이 (Boxing Day)"],
-	"12-27": ["세계 팬데믹 준비의 날 (International Day of Epidemic Preparedness)", "눈송이 오리기 만드는 날(Make Cut-Out Snowflakes Day)"],
-	"12-28": ["세계 카드놀이의 날 (Card Playing Day)"],
-	"12-29": ["메이플스토리(MapleStory) 2011년 영웅(팬텀) 출시", "틱톡 데이(Tick Tock Day)"],
-	"12-30": ["베이컨 데이(Bacon Day)"],
-	"12-31": ["뉴 이어스 이브 (New Year's Eve)", "세계 샴페인의 날 (World Champagne Day)"]
+	"12-21": [
+		"국제 단축 일의 날 (Short Girl Appreciation Day)",
+		"햄버거의 날(National Hamburger Day)"
+	],
+	"12-22": [
+		"메이플스토리(MapleStory) 2015년 레지스탕스(블래스터) 출시",
+		"쿠키 교환의 날(National Cookie Exchange Day)"
+	],
+	"12-23": [
+		"루돌프 사슴의 날 (Rudolph the Red-Nosed Reindeer Day)",
+		"페퍼누스의 날(National Pfeffernüsse Day)"
+	],
+	"12-24": [
+		"크리스마스 이브 (Christmas Eve)"
+	],
+	"12-25": [
+		"🎄 크리스마스 (Christmas)"
+	],
+	"12-26": [
+		"지팡이 사탕 데이(Candy Cane Day)",
+		"박싱데이 (Boxing Day)"
+	],
+	"12-27": [
+		"세계 팬데믹 준비의 날 (International Day of Epidemic Preparedness)",
+		"눈송이 오리기 만드는 날(Make Cut-Out Snowflakes Day)"
+	],
+	"12-28": [
+		"세계 카드놀이의 날 (Card Playing Day)"
+	],
+	"12-29": [
+		"메이플스토리(MapleStory) 2011년 영웅(팬텀) 출시",
+		"틱톡 데이(Tick Tock Day)"
+	],
+	"12-30": [
+		"베이컨 데이(Bacon Day)"
+	],
+	"12-31": [
+		"뉴 이어스 이브 (New Year's Eve)",
+		"세계 샴페인의 날 (World Champagne Day)"
+	]
 }
