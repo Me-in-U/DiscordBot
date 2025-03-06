@@ -1,7 +1,12 @@
+import json
+from datetime import datetime, time, timedelta, timezone
 import random
 
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
+
+from requests_gpt import image_analysis, general_purpose_model
+from requests_riot import get_rank_data
 
 
 class HelpCommand(commands.Cog):
@@ -36,20 +41,20 @@ class HelpCommand(commands.Cog):
             ),
             ("!채팅 [텍스트]", "봇이 입력된 텍스트를 대신 전송합니다."),
             ("!도움", "봇의 모든 명령어와 사용 방법을 출력합니다."),
-            # ("!솔랭 [닉네임#태그]", "롤 솔로랭크 데이터를 출력합니다."),
-            # ("!자랭 [닉네임#태그]", "롤 자유랭크 데이터를 출력합니다."),
-            # (
-            #     "!일일랭크",
-            #     "현재 자정 솔랭 출력 사용자를 출력합니다.",
-            # ),
-            # (
-            #     "!일일랭크변경 [닉네임#태그]",
-            #     "자정 솔랭 정보 출력을 새로운 사용자로 변경합니다.",
-            # ),
-            # (
-            #     "!일일랭크루프 true/false",
-            #     "자정 솔랭 출력 기능 on/off.",
-            # ),
+            ("!솔랭 [닉네임#태그]", "롤 솔로랭크 데이터를 출력합니다."),
+            ("!자랭 [닉네임#태그]", "롤 자유랭크 데이터를 출력합니다."),
+            (
+                "!일일랭크",
+                "현재 자정 솔랭 출력 사용자를 출력합니다.",
+            ),
+            (
+                "!일일랭크변경 [닉네임#태그]",
+                "자정 솔랭 정보 출력을 새로운 사용자로 변경합니다.",
+            ),
+            (
+                "!일일랭크루프 true/false",
+                "자정 솔랭 출력 기능 on/off.",
+            ),
             # 파티 관련 명령어 추가
             ("!파티", "현재 생성되어 있는 파티 리스트를 출력합니다."),
             (

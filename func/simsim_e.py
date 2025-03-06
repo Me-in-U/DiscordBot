@@ -1,11 +1,30 @@
-from api.chatGPT import general_purpose_model
+from requests_gpt import image_analysis, general_purpose_model
 
 
 async def simsim_chatbot(DISCORD_CLIENT, message):
-    def init_simsim_chats():
-        print("심심이 초기화")
-        DISCORD_CLIENT.SIMSIM_CHATS = []
-        DISCORD_CLIENT.SIMSIM_CHATS.append(
+    if message.content == "심심이":
+        DISCORD_CLIENT.SIMSIM_MODE = not DISCORD_CLIENT.SIMSIM_MODE
+        if DISCORD_CLIENT.SIMSIM_MODE:
+            await message.channel.send("심심이 모드 ON")
+        else:
+            await message.channel.send("심심이 모드 OFF")
+
+    # !심심이 모드에서 "초기화" 명령 처리
+    if DISCORD_CLIENT.SIMSIM_MODE and message.content == "초기화":
+        DISCORD_CLIENT.SIMSIM_CHATS.clear()  # USER_MESSAGES 초기화
+        await message.channel.send("모든 대화 기록이 초기화되었습니다.")
+        return  # 초기화 후 다른 처리는 하지 않음
+
+    if DISCORD_CLIENT.SIMSIM_MODE:
+        target_message = message.content
+        image_url = None
+
+        # 이미지 첨부 확인
+        if message.attachments:
+            image_url = message.attachments[0].url
+
+        DISCORD_CLIENT.SIMSIM_CHATS.append({"role": "user", "content": target_message})
+        messages = [
             {
                 "role": "developer",
                 "content": (
@@ -29,76 +48,21 @@ async def simsim_chatbot(DISCORD_CLIENT, message):
                     "나중에 입력된 요구사항이 이전 요구사항보다 우선시된다. "
                     "같은 내용의 추천을 요구하면 이전에 했던것 말고 다른것을 추천해야한다."
                 ),
-            }
-        )
-        DISCORD_CLIENT.SIMSIM_CHATS.append(
+            },
             {
                 "role": "developer",
-                "content": "이후 내용은 전체 채팅 내역이다.",
-            }
-        )
+                "content": f"전체 대화 내용 : {DISCORD_CLIENT.SIMSIM_CHATS}",
+            },
+        ]
 
-        print("심심이 초기화 완료")
-
-    if message.content == "심심이":
-        if DISCORD_CLIENT.SIMSIM_CHATS == None:
-            init_simsim_chats()
-        DISCORD_CLIENT.SIMSIM_MODE = not DISCORD_CLIENT.SIMSIM_MODE
-        if DISCORD_CLIENT.SIMSIM_MODE:
-            await message.channel.send("심심이 모드 ON")
-        else:
-            await message.channel.send("심심이 모드 OFF")
-
-    # !심심이 모드에서 "초기화" 명령 처리
-    if DISCORD_CLIENT.SIMSIM_MODE and message.content == "초기화":
-        init_simsim_chats()
-        await message.channel.send("모든 대화 기록이 초기화되었습니다.")
-        return  # 초기화 후 다른 처리는 하지 않음
-
-    if DISCORD_CLIENT.SIMSIM_MODE:
-        target_message = message.content
-        image_url = None
-
-        # 이미지 첨부 확인
-        if message.attachments:
-            image_url = message.attachments[0].url
-
+        # 이미지 처리 여부
         if image_url:
-            DISCORD_CLIENT.SIMSIM_CHATS.append(
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": f"{target_message}",
-                        },
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": image_url,
-                            },
-                        },
-                    ],
-                },
-            )
+            response = image_analysis(messages, image_url=image_url, temperature=0.8)
         else:
-            DISCORD_CLIENT.SIMSIM_CHATS.append(
-                {
-                    "role": "user",
-                    "content": f"{target_message}",
-                },
-            )
-
-        try:
-            response = general_purpose_model(
-                DISCORD_CLIENT.SIMSIM_CHATS, model="gpt-4o-mini", temperature=0.8
-            )
-        except Exception as e:
-            response = f"Error: {e}"
+            response = general_purpose_model(messages, temperature=0.7)
 
         # 봇 응답 기록
         DISCORD_CLIENT.SIMSIM_CHATS.append({"role": "assistant", "content": response})
-        print(DISCORD_CLIENT.SIMSIM_CHATS)
         await message.channel.send(f"{response}")
     else:
         return
