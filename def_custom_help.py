@@ -5,7 +5,7 @@ import random
 import discord
 from discord.ext import commands, tasks
 
-from requests_gpt import image_analysis, send_to_chatgpt
+from requests_gpt import image_analysis, general_purpose_model
 from requests_riot import get_rank_data
 
 
