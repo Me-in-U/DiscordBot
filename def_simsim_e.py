@@ -1,4 +1,4 @@
-from requests_gpt import image_analysis, send_to_chatgpt
+from requests_gpt import image_analysis, general_purpose_model
 
 
 async def simsim_chatbot(DISCORD_CLIENT, message):
@@ -59,7 +59,7 @@ async def simsim_chatbot(DISCORD_CLIENT, message):
         if image_url:
             response = image_analysis(messages, image_url=image_url, temperature=0.8)
         else:
-            response = send_to_chatgpt(messages, temperature=0.7)
+            response = general_purpose_model(messages, temperature=0.7)
 
         # 봇 응답 기록
         DISCORD_CLIENT.SIMSIM_CHATS.append({"role": "assistant", "content": response})

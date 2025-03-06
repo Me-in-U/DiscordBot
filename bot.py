@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 
 from def_simsim_e import simsim_chatbot
 from def_youtube_summary import check_youtube_link
-from requests_gpt import image_analysis, send_to_chatgpt
+from requests_gpt import image_analysis, general_purpose_model
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 

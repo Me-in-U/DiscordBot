@@ -9,7 +9,7 @@ from yt_dlp import YoutubeDL
 
 # request_gpt.py 에 정의된 함수들 임포트
 # send_to_chatgpt, image_analysis 등을 필요에 맞게 사용 가능
-from requests_gpt import send_to_chatgpt
+from requests_gpt import general_purpose_model
 from googleapiclient.discovery import build
 from dotenv import load_dotenv
 
@@ -77,7 +77,7 @@ async def summarize_comments_with_gpt(comments: list) -> str:
             "content": comments_text,
         },
     ]
-    response_text = send_to_chatgpt(
+    response_text = general_purpose_model(
         messages,
         model="gpt-4o-mini",
         temperature=0.4,
@@ -332,7 +332,7 @@ async def summarize_text_with_gpt(text: str) -> str:
     ]
 
     # request_gpt.py의 send_to_chatgpt 함수 호출
-    response_text = send_to_chatgpt(
+    response_text = general_purpose_model(
         messages,
         model="gpt-4o-mini",  # 필요에 맞게 수정
         temperature=0.4,

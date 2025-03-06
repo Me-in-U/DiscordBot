@@ -3,7 +3,7 @@ from datetime import datetime, time, timedelta, timezone
 
 from discord.ext import commands, tasks
 
-from requests_gpt import image_analysis, send_to_chatgpt
+from requests_gpt import image_analysis, reasoning_model, general_purpose_model
 from requests_riot import get_rank_data
 
 
@@ -70,7 +70,7 @@ class QuestionCommands(commands.Cog):
                     messages, model="gpt-4o-mini", image_url=image_url, temperature=0.4
                 )
             else:
-                response = send_to_chatgpt(
+                response = general_purpose_model(
                     messages, model="gpt-4o-mini", temperature=0.4
                 )
         except Exception as e:
@@ -133,7 +133,7 @@ class QuestionCommands(commands.Cog):
                     messages, model="gpt-4o-mini", image_url=image_url, temperature=0.7
                 )
             else:
-                response = send_to_chatgpt(
+                response = general_purpose_model(
                     messages, model="gpt-4o-mini", temperature=0.7
                 )
         except Exception as e:
@@ -147,7 +147,7 @@ class QuestionCommands(commands.Cog):
     )
     async def summary(self, ctx, *, text: str = None):
         """
-        커맨드 요약 처리리
+        커맨드 요약 처리
         오늘의 메시지 전체 요약
         """
         # 저장된 모든 대화 기록 확인
@@ -185,7 +185,9 @@ class QuestionCommands(commands.Cog):
 
         # ChatGPT에 메시지 전달
         try:
-            response = send_to_chatgpt(messages, model="gpt-4o-mini", temperature=0.6)
+            response = general_purpose_model(
+                messages, model="gpt-4o-mini", temperature=0.6
+            )
         except Exception as e:
             response = f"Error: {e}"
 
@@ -243,9 +245,7 @@ class QuestionCommands(commands.Cog):
                     messages, model="gpt-4o-mini", image_url=image_url, temperature=0.5
                 )
             else:
-                translated_message = send_to_chatgpt(
-                    messages, model="gpt-4o-mini", temperature=0.5
-                )
+                reasoning_model(messages)
         except Exception as e:
             translated_message = f"Error: {e}"
 
@@ -305,9 +305,7 @@ class QuestionCommands(commands.Cog):
                     messages, model="gpt-4o-mini", image_url=image_url, temperature=0.6
                 )
             else:
-                interpreted = send_to_chatgpt(
-                    messages, model="gpt-4o-mini", temperature=0.6
-                )
+                interpreted = reasoning_model(messages)
         except Exception as e:
             interpreted = f"Error: {e}"
 
