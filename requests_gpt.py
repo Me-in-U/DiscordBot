@@ -2,6 +2,7 @@ import os
 
 from dotenv import load_dotenv
 from openai import OpenAI
+from pydantic import BaseModel
 
 # 환경 변수를 .env 파일에서 로딩
 load_dotenv()
@@ -65,3 +66,24 @@ def reasoning_model(messages, model="o3-mini", reasoning_effort="medium"):
     )
     message = response.choices[0].message.content
     return message.strip()
+
+
+class Exist1557(BaseModel):
+    exist: bool
+
+
+def structured_response(messages, model="gpt-4o-mini", rf=Exist1557):
+    try:
+        # clientGPT가 올바르게 정의되어 있는지 확인하세요.
+        completion = clientGPT.beta.chat.completions.parse(
+            model=model,
+            messages=messages,
+            response_format=rf,
+        )
+        # print("GPT 응답 전체:", completion)
+        parsed = completion.choices[0].message.parsed
+        # print("파싱된 응답:", parsed)
+        return parsed
+    except Exception as e:
+        print("structured_response 호출 중 에러 발생:", e)
+        raise

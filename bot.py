@@ -6,6 +6,7 @@ import discord
 from discord.ext import commands
 from dotenv import load_dotenv
 
+from def_find1557 import find1557
 from def_simsim_e import simsim_chatbot
 from def_youtube_summary import check_youtube_link
 from requests_gpt import image_analysis, general_purpose_model
@@ -130,6 +131,7 @@ async def on_message(message):
 
     # !심심이
     await simsim_chatbot(DISCORD_CLIENT, message)
+    await find1557(message)
 
     # !명령어 처리 루틴 호출
     await DISCORD_CLIENT.process_commands(message)
