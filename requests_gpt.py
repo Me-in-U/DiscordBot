@@ -70,6 +70,8 @@ def reasoning_model(messages, model="o3-mini", reasoning_effort="medium"):
 
 class Exist1557(BaseModel):
     exist: bool
+    imageToText: str
+    reason: str
 
 
 def structured_response(messages, model="gpt-4o-mini", rf=Exist1557):
