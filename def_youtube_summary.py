@@ -69,7 +69,7 @@ async def summarize_comments_with_gpt(comments: list) -> str:
             "content": (
                 "당신은 전문 요약가입니다. "
                 "다음은 유튜브 영상의 댓글입니다. "
-                "주요 의견과 감정을 1로 압축 요약해주세요."
+                "주요 내용을 40자 이내로 압축 요약해주세요."
             ),
         },
         {
@@ -105,6 +105,8 @@ async def check_youtube_link(message):
             # 요약 결과 전송
             await message.channel.send(f"**[영상 3줄 요약]**\n{summary_result}")
         except Exception as e:
+            # 대기 메시지 삭제
+            await waiting_message.delete()
             await message.channel.send(f"오류가 발생했습니다: {e}")
 
 
@@ -322,7 +324,7 @@ async def summarize_text_with_gpt(text: str) -> str:
                 "다음은 유튜브 내용을 텍스트로 바꾼것입니다. "
                 "주요 내용에 대해서 요약해주세요. "
                 "중요 대화 맥락이 누락되지 않도록 유의하세요. "
-                "내용을 간단한 문장으로 3줄 요약하세요. 1.~ 2.~ 3.~"
+                "내용을 40자 이내로 3줄 압축 요약하세요. 1.~ 2.~ 3.~"
             ),
         },
         {
