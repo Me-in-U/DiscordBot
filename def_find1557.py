@@ -25,9 +25,11 @@ async def find1557(message):
     if message.attachments:
         image_url = message.attachments[0].url
     else:
-        if check_1557_condition(message.content):
-            await message.channel.send("1557")
-            return
+        # if check_1557_condition(message.content):
+        #     await message.channel.send("1557")
+        #     return
+        # 텍스트만 있는 경우 아무 처리도 하지 않음
+        return
 
     messages = [
         {
