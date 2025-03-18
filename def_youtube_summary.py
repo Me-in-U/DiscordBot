@@ -69,7 +69,7 @@ async def summarize_comments_with_gpt(comments: list) -> str:
             "content": (
                 "당신은 전문 요약가입니다. "
                 "다음은 유튜브 영상의 댓글입니다. "
-                "주요 내용을 40자 이내로 압축 요약해주세요."
+                "주요 내용을 70자 이내로 압축 요약해주세요."
             ),
         },
         {
@@ -107,7 +107,7 @@ async def check_youtube_link(message):
         except Exception as e:
             # 대기 메시지 삭제
             await waiting_message.delete()
-            await message.channel.send(f"오류가 발생했습니다: {e}")
+            await message.channel.send(f"오류가 발생했습니다: {e}", delete_after=5)
 
 
 def is_youtube_link(text: str) -> bool:
@@ -301,7 +301,9 @@ async def speech_to_text(audio_path: str) -> str:
 
     # 파일 존재 여부 확인
     if not os.path.exists(full_path):
-        raise FileNotFoundError(f"{full_path} 파일을 찾을 수 없습니다.")
+        raise FileNotFoundError(
+            f"whisper로 stt를 위한 '{full_path}' 파일을 찾을 수 없습니다."
+        )
 
     print("경로", full_path)
     model = whisper.load_model("tiny").to("cpu")
@@ -324,7 +326,7 @@ async def summarize_text_with_gpt(text: str) -> str:
                 "다음은 유튜브 내용을 텍스트로 바꾼것입니다. "
                 "주요 내용에 대해서 요약해주세요. "
                 "중요 대화 맥락이 누락되지 않도록 유의하세요. "
-                "내용을 40자 이내로 3줄 압축 요약하세요. 1.~ 2.~ 3.~"
+                "내용을 50자 이내로 3줄 압축 요약하세요. 1. 2. 3."
             ),
         },
         {
@@ -367,17 +369,13 @@ async def process_youtube_link(url: str) -> str:
             print("자막이 없습니다. STT를 진행합니다.")
             # 오디오 다운로드 및 STT 처리
             await youtube_to_mp3(url)
-
-            if not os.path.exists(mp3_path):
-                raise FileNotFoundError(f"{mp3_path} 파일을 찾을 수 없습니다.")
-
             stt_text = await speech_to_text(mp3_path)
             summary_text = await summarize_text_with_gpt(stt_text)
 
         # !댓글 가져오기 및 요약 추가
         video_id = extract_video_id(url)
         if video_id:
-            comments = fetch_youtube_comments(video_id, max_comments=30)
+            comments = fetch_youtube_comments(video_id, max_comments=40)
             if comments:
                 comments_summary = await summarize_comments_with_gpt(comments)
                 summary_text += "\n\n**[댓글 요약]**\n" + comments_summary
