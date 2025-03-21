@@ -12,6 +12,7 @@ from pytube.exceptions import VideoUnavailable
 from yt_dlp import YoutubeDL
 
 # request_gpt.py 에 정의된 함수들 임포트
+# send_to_chatgpt, image_analysis 등을 필요에 맞게 사용 가능
 from api.chatGPT import general_purpose_model
 
 load_dotenv()
