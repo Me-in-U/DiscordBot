@@ -1,8 +1,10 @@
 # def_youtube_summary.py
+import asyncio
 import glob
 import os
 import re
 
+import discord
 import whisper
 from pytube.exceptions import VideoUnavailable
 from yt_dlp import YoutubeDL
@@ -20,16 +22,33 @@ if not GOOGLE_API_KEY:
     raise EnvironmentError("GOOGLE_API_KEY 환경 변수가 설정되지 않았습니다.")
 # 유튜브 링크 정규식 (간단 예시)
 YOUTUBE_PATTERN = re.compile(
-    r"(https?://)?(www\.)?(youtube\.com|youtu\.be)/(watch\?v=)?[\w\-\_]+"
+    r"(https?://)?(www\.)?(youtube\.com|youtu\.be)/(watch\?v=|live/)?[\w\-\_]+"
 )
 
 
 # --- 영상 ID 추출 함수 추가 ---
 def extract_video_id(url: str) -> str:
-    match = re.search(r"(?:v=|youtu\.be/)([\w\-]+)", url)
+    match = re.search(r"(?:v=|youtu\.be/|live/)([\w\-]+)", url)
     if match:
         return match.group(1)
     return ""
+
+
+# --- 라이브 영상 여부 확인 함수 추가 ---
+def is_live_video(video_id: str) -> bool:
+    """
+    YouTube Data API를 사용해 영상이 라이브 또는 예정인지 확인합니다.
+    liveBroadcastContent 값이 "live" 또는 "upcoming"이면 True를 반환합니다.
+    """
+    youtube = build("youtube", "v3", developerKey=GOOGLE_API_KEY)
+    response = youtube.videos().list(part="snippet", id=video_id).execute()
+
+    items = response.get("items", [])
+    if not items:
+        return False  # 정보가 없으면 False 처리
+
+    live_broadcast_content = items[0]["snippet"].get("liveBroadcastContent", "none")
+    return live_broadcast_content in ["live", "upcoming"]
 
 
 # --- YouTube Data API를 활용하여 댓글을 가져오는 함수 추가 ---
@@ -85,29 +104,79 @@ async def summarize_comments_with_gpt(comments: list) -> str:
     return response_text
 
 
-async def check_youtube_link(message):
-    youtube_url = None
-    if is_youtube_link(message.content):
-        youtube_url = extract_youtube_link(message.content)
-    if youtube_url:
+# --- Discord UI: 요약 진행 여부 확인용 View ---
+class YouTubeSummaryView(discord.ui.View):
+    def __init__(self, youtube_url: str):
+        super().__init__(timeout=300)
+        self.youtube_url = youtube_url
+        self.original_message: discord.Message = None  # 나중에 할당됨
+
+    @discord.ui.button(label="요약하기", style=discord.ButtonStyle.primary)
+    async def yes_button(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ):
+        # 1) 상호작용 실패 방지를 위해 즉시 defer (ephemeral=True면 "개인 메시지"로 처리)
+        await interaction.response.defer(ephemeral=True, thinking=True)
+
+        # 2) 버튼 상태를 "진행 중"으로 갱신 → 원본 메시지 수정
+        button.disabled = True
+        button.label = "요약 진행중"
+        button.style = discord.ButtonStyle.success
+        await self.original_message.edit(view=self)
+
         try:
-            # 대기 메시지 전송
-            waiting_message = await message.channel.send(
-                "유튜브 영상 음성 분석 및 요약 중입니다. 잠시만 기다려주세요..."
+            # 3) 오래 걸리는 작업 수행 (다운로드, STT, GPT 요약 등)
+            summary_result = await process_youtube_link(self.youtube_url)
+
+            # 4) 원본 메시지를 최종 결과로 교체
+            await self.original_message.edit(
+                content=f"**[영상 3줄 요약]**\n{summary_result}", view=None  # 버튼 제거
             )
 
-            # mp3 변환 -> STT -> GPT 요약
-            summary_result = await process_youtube_link(youtube_url)
-
-            # 대기 메시지 삭제
-            await waiting_message.delete()
-
-            # 요약 결과 전송
-            await message.channel.send(f"**[영상 3줄 요약]**\n{summary_result}")
         except Exception as e:
-            # 대기 메시지 삭제
-            await waiting_message.delete()
-            await message.channel.send(f"오류가 발생했습니다: {e}", delete_after=5)
+            # 에러 시 메시지 갱신
+            button.disabled = True
+            button.label = "오류!"
+            button.style = discord.ButtonStyle.danger
+            await self.original_message.edit(
+                content=f"오류가 발생했습니다: {e}", view=self
+            )
+
+        self.stop()
+
+    async def on_timeout(self):
+        # 시간이 초과되면 버튼을 비활성화
+        for child in self.children:
+            if isinstance(child, discord.ui.Button):
+                child.disabled = True
+                child.label = "기간만료!"
+                child.style = discord.ButtonStyle.danger
+        if self.original_message:
+            # 만료 표시로 메시지를 갱신
+            await self.original_message.edit(
+                content="요약 기능은 5분이내만 가능", view=self
+            )
+
+            # 1분 대기 후 메시지 삭제
+            await asyncio.sleep(60)
+            try:
+                await self.original_message.delete()
+            except discord.NotFound:
+                # 이미 다른 곳에서 삭제되었을 수도 있으므로 무시
+                pass
+
+
+async def check_youtube_link(message):
+    if is_youtube_link(message.content):
+        youtube_url = extract_youtube_link(message.content)
+        if youtube_url:
+            view = YouTubeSummaryView(youtube_url)
+            # "유튜브 영상 요약을 진행하시겠습니까?" 메시지를 채널에 1개만 보냄
+            sent_msg = await message.reply(
+                content="유튜브 영상 요약을 진행하시겠습니까?", view=view
+            )
+            # View 내부에서 원본 메시지를 수정하기 위해 메시지 객체를 저장
+            view.original_message = sent_msg
 
 
 def is_youtube_link(text: str) -> bool:
@@ -351,6 +420,14 @@ async def process_youtube_link(url: str) -> str:
     mp3_path = "youtube_audio.mp3"
     summary_text = ""
     try:
+        video_id = extract_video_id(url)
+        if not video_id:
+            raise ValueError("영상 ID를 추출하지 못했습니다.")
+
+        # 라이브 영상이면 요약 진행하지 않음
+        if is_live_video(video_id):
+            raise ValueError("라이브(또는 예정) 방송은 요약을 진행할 수 없습니다.")
+
         # ! 자막 다운로드 시도 (한글 -> 영어)
         subtitle_path = download_youtube_subtitles(
             url, primary_lang="ko", fallback_lang="en"
