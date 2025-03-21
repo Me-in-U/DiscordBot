@@ -1,9 +1,8 @@
 import json
-from datetime import datetime, time, timedelta, timezone
 
-from discord.ext import commands, tasks
+from discord.ext import commands
 
-from requests_riot import get_rank_data
+from api.riot import get_rank_data
 
 
 class RankCommands(commands.Cog):
@@ -18,7 +17,7 @@ class RankCommands(commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         """봇이 준비되었을 때 호출됩니다."""
-        print("DISCORD_CLIENT on_ready() -> RankCommands Cog : on ready!")
+        print("DISCORD_CLIENT -> RankCommands Cog : on ready!")
 
     def load_settings(self):
         """JSON 파일에서 초기 설정을 로드합니다."""
