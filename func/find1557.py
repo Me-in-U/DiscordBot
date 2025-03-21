@@ -1,5 +1,4 @@
-import json
-from requests_gpt import structured_response
+from api.chatGPT import structured_response
 
 
 def check_1557_condition(ocr_text: str) -> bool:
