@@ -22,12 +22,12 @@ def start_launch_bat():
 
 # 실행 중인 프로세스를 종료하는 함수
 def kill_process(proc):
-    if proc.poll() is None:  # 프로세스가 아직 종료되지 않았다면
-        proc.terminate()  # 정상 종료 요청
-        try:
-            proc.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            proc.kill()  # 강제 종료
+    # taskkill 명령어를 사용하여 프로세스 트리 전체를 강제 종료
+    subprocess.run(
+        ["taskkill", "/PID", str(proc.pid), "/F", "/T"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
 
 
 def main():
@@ -36,7 +36,7 @@ def main():
     print(f"launch.bat started, PID: {process.pid}")
 
     # 일정 시간 간격 (예: 5분 = 300초)으로 git pull 실행
-    check_interval = 10
+    check_interval = 300
 
     while True:
         output = git_pull()
