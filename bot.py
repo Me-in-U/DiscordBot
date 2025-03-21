@@ -6,10 +6,9 @@ import discord
 from discord.ext import commands
 from dotenv import load_dotenv
 
-from def_find1557 import find1557
-from def_simsim_e import simsim_chatbot
-from def_youtube_summary import check_youtube_link
-from requests_gpt import image_analysis, general_purpose_model
+from func.find1557 import find1557
+from func.simsim_e import simsim_chatbot
+from func.youtube_summary import check_youtube_link
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -41,11 +40,10 @@ SEOUL_TZ = timezone(timedelta(hours=9))  # 서울 시간대 설정 (UTC+9)
 async def load_cogs():
     """Cog를 로드하고 초기 설정값을 전달합니다."""
     print("-------------------Cog 로드 시작-------------------")
-    await DISCORD_CLIENT.load_extension("def_custom_help")
-    await DISCORD_CLIENT.load_extension("def_loop")
-    await DISCORD_CLIENT.load_extension("def_party")
-    await DISCORD_CLIENT.load_extension("def_questions")
-    await DISCORD_CLIENT.load_extension("def_rank")
+    for filename in os.listdir("cogs"):
+        if filename.endswith(".py"):
+            extension = "cogs." + filename[:-3]
+            await DISCORD_CLIENT.load_extension(extension)
     print("-------------------Cog 로드 완료-------------------\n")
 
 
