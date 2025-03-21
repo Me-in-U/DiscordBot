@@ -6,14 +6,14 @@ import re
 
 import discord
 import whisper
+from dotenv import load_dotenv
+from googleapiclient.discovery import build
 from pytube.exceptions import VideoUnavailable
 from yt_dlp import YoutubeDL
 
 # request_gpt.py 에 정의된 함수들 임포트
 # send_to_chatgpt, image_analysis 등을 필요에 맞게 사용 가능
-from requests_gpt import general_purpose_model
-from googleapiclient.discovery import build
-from dotenv import load_dotenv
+from api.chatGPT import general_purpose_model
 
 load_dotenv()
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
@@ -116,7 +116,7 @@ class YouTubeSummaryView(discord.ui.View):
         self, interaction: discord.Interaction, button: discord.ui.Button
     ):
         # 1) 상호작용 실패 방지를 위해 즉시 defer (ephemeral=True면 "개인 메시지"로 처리)
-        await interaction.response.defer(ephemeral=True, thinking=True)
+        await interaction.response.defer(ephemeral=True, thinking=False)
 
         # 2) 버튼 상태를 "진행 중"으로 갱신 → 원본 메시지 수정
         button.disabled = True
@@ -153,9 +153,7 @@ class YouTubeSummaryView(discord.ui.View):
                 child.style = discord.ButtonStyle.danger
         if self.original_message:
             # 만료 표시로 메시지를 갱신
-            await self.original_message.edit(
-                content="요약 기능은 5분이내만 가능", view=self
-            )
+            await self.original_message.edit(content="5분이내만 가능", view=self)
 
             # 1분 대기 후 메시지 삭제
             await asyncio.sleep(60)

@@ -1,4 +1,4 @@
-from requests_gpt import image_analysis, general_purpose_model
+from api.chatGPT import general_purpose_model, image_analysis
 
 
 async def simsim_chatbot(DISCORD_CLIENT, message):

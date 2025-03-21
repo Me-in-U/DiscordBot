@@ -5,8 +5,8 @@ import discord
 import holidays
 from discord.ext import commands, tasks
 
+from api.riot import get_rank_data
 from bot import CHANNEL_ID, SEOUL_TZ
-from requests_riot import get_rank_data
 
 SPECIAL_DAYS_FILE = "special_days.json"
 
@@ -22,7 +22,7 @@ class LoopTasks(commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         """봇이 준비되었을 때 호출됩니다."""
-        print("DISCORD_CLIENT on_ready() -> LoopTasks Cog : on ready!")
+        print("DISCORD_CLIENT -> LoopTasks Cog : on ready!")
 
     @tasks.loop(seconds=10)
     async def presence_update_task(self):
