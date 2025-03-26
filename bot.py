@@ -139,7 +139,11 @@ async def on_message(message):
         and message.content.strip() == "1557"
         and not message.attachments
     ):
-        deleted_recent_message = False
+        try:
+            await message.delete()
+        except discord.Forbidden:
+            print("메시지 삭제 권한이 없습니다.")
+
         # 최근 limit개의 메시지를 확인
         async for recent_msg in message.channel.history(limit=10):
             if (
@@ -148,9 +152,6 @@ async def on_message(message):
             ):
                 try:
                     await recent_msg.delete()
-                    if not deleted_recent_message:
-                        deleted_recent_message = True
-                        message.delete()
                 except discord.Forbidden:
                     print("메시지 삭제 권한이 없습니다.")
 
