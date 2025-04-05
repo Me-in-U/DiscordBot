@@ -44,21 +44,24 @@ class SummarizeCommands(commands.Cog):
                     "대화에 참여하지 않은 유저는 알려주지마"
                 ),
             },
-            {"role": "developer", "content": f"추가 요청 사항 : {request_message}"},
             {
                 "role": "developer",
-                "content": f"다음은 유저가 말했던 기록이다. 채팅 내용을 요약해 주세요:\n{self.bot.USER_MESSAGES}\n",
+                "content": (
+                    "다음은 유저가 말했던 기록이다. 채팅 내용을 요약해라."
+                    f"전체 대화 내용: {self.bot.USER_MESSAGES}\n\n"
+                    f"닉네임 정보:{self.bot.NICKNAMES}\n"
+                ),
             },
             {
                 "role": "developer",
-                "content": f"아래는 닉네임 정보:\n{self.bot.NICKNAMES}\n",
+                "content": f"요약 추가 요청 사항 : {request_message}",
             },
         ]
 
         # ChatGPT에 메시지 전달
         try:
             response = general_purpose_model(
-                messages, model="gpt-4o-mini", temperature=0.6
+                messages, model="gpt-4o-mini", temperature=0.4
             )
         except Exception as e:
             response = f"Error: {e}"
