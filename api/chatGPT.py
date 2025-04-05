@@ -33,33 +33,6 @@ def general_purpose_model(messages, model="gpt-4o-mini", temperature=0.5):
     return message.strip()
 
 
-def image_analysis(messages, model="gpt-4o-mini", image_url="", temperature=0.5):
-    messages.append(
-        {
-            "role": "user",
-            "content": [
-                {
-                    "type": "text",
-                    "text": "이미지를 보고 설명하세요.",
-                },
-                {
-                    "type": "image_url",
-                    "image_url": {
-                        "url": image_url,
-                    },
-                },
-            ],
-        },
-    )
-    response = clientGPT.chat.completions.create(
-        model=model,
-        messages=messages,
-        temperature=temperature,
-    )
-    message = response.choices[0].message.content
-    return message.strip()
-
-
 def reasoning_model(messages, model="o3-mini", reasoning_effort="medium"):
     response = clientGPT.chat.completions.create(
         model=model, messages=messages, reasoning_effort=reasoning_effort
