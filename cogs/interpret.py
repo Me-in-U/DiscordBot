@@ -3,7 +3,7 @@ import asyncio
 import discord
 from discord.ext import commands
 
-from api.chatGPT import image_analysis, reasoning_model
+from api.chatGPT import general_purpose_model, reasoning_model
 
 
 class InterpretSelect(discord.ui.Select):
@@ -123,12 +123,36 @@ class InterpretCommands(commands.Cog):
                     "content": f"해석할 내용:\n{target_message}",
                 },
             ]
+            if image_url:
+                messages.append(
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": f"{ctx.author.name}의 질문 : {target_message}",
+                            },
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": image_url,
+                                },
+                            },
+                        ],
+                    },
+                )
+            else:
+                messages.append(
+                    {
+                        "role": "user",
+                        "content": f"{ctx.author.name}의 질문 : {target_message}",
+                    },
+                )
             try:
                 if image_url:
-                    interpreted = image_analysis(
+                    interpreted = general_purpose_model(
                         messages,
                         model="gpt-4o-mini",
-                        image_url=image_url,
                         temperature=0.6,
                     )
                 else:

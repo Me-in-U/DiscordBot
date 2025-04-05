@@ -1,6 +1,6 @@
 from discord.ext import commands
 
-from api.chatGPT import general_purpose_model, image_analysis
+from api.chatGPT import general_purpose_model
 
 
 class QuestionCommands(commands.Cog):
@@ -44,31 +44,40 @@ class QuestionCommands(commands.Cog):
             {
                 "role": "developer",
                 "content": (
-                    "전체 대화 내용이 필요한 질문이면 밑에서 참고해라"
-                    "다음은 유저가 말했던 기록이다. \n"
-                    f"전체 대화 내용 : {self.bot.USER_MESSAGES}"
+                    "채팅 내용에 관한 질문을 한다면 아래 내용을 참고해라"
+                    "다음은 모든 유저가 말했던 기록과 닉네임 정보이다.\n"
+                    f"전체 대화 내용: {self.bot.USER_MESSAGES}\n\n"
+                    f"닉네임 정보:{self.bot.NICKNAMES}\n"
                 ),
             },
-            {
-                "role": "user",
-                "content": f"{ctx.author.name}의 질문 : {target_message}",
-            },
-            {
-                "role": "developer",
-                "content": f"아래는 닉네임 정보:\n{self.bot.NICKNAMES}\n",
-            },
         ]
-
-        # 이미지 처리 여부
+        if image_url:
+            messages.append(
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": f"{ctx.author.name}의 질문 : {target_message}",
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": image_url,
+                            },
+                        },
+                    ],
+                },
+            )
+        else:
+            messages.append(
+                {
+                    "role": "user",
+                    "content": f"{ctx.author.name}의 질문 : {target_message}",
+                },
+            )
         try:
-            if image_url:
-                response = image_analysis(
-                    messages, model="gpt-4o-mini", image_url=image_url, temperature=0.4
-                )
-            else:
-                response = general_purpose_model(
-                    messages, model="gpt-4o-mini", temperature=0.4
-                )
+            response = general_purpose_model(messages, model="gpt-4o", temperature=0.4)
         except Exception as e:
             response = f"Error: {e}"
 
@@ -107,31 +116,41 @@ class QuestionCommands(commands.Cog):
             {
                 "role": "developer",
                 "content": (
-                    "전체 대화 내용이 필요한 질문이면 밑에서 참고해라"
-                    "다음은 유저가 말했던 기록이다. \n"
-                    f"전체 대화 내용 : {self.bot.USER_MESSAGES}"
+                    "채팅 내용에 관한 질문을 한다면 아래 내용을 참고해라"
+                    "다음은 모든 유저가 말했던 기록과 닉네임 정보이다.\n"
+                    f"전체 대화 내용: {self.bot.USER_MESSAGES}\n\n"
+                    f"닉네임 정보:{self.bot.NICKNAMES}\n"
                 ),
             },
-            {
-                "role": "user",
-                "content": f"{ctx.author.name}의 질문 : {target_message}",
-            },
-            {
-                "role": "developer",
-                "content": f"아래는 닉네임 정보:\n{self.bot.NICKNAMES}\n",
-            },
         ]
+        if image_url:
+            messages.append(
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": f"{ctx.author.name}의 질문 : {target_message}",
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": image_url,
+                            },
+                        },
+                    ],
+                },
+            )
+        else:
+            messages.append(
+                {
+                    "role": "user",
+                    "content": f"{ctx.author.name}의 질문 : {target_message}",
+                },
+            )
 
-        # 이미지 처리 여부
         try:
-            if image_url:
-                response = image_analysis(
-                    messages, model="gpt-4o-mini", image_url=image_url, temperature=0.7
-                )
-            else:
-                response = general_purpose_model(
-                    messages, model="gpt-4o-mini", temperature=0.7
-                )
+            response = general_purpose_model(messages, model="gpt-4o", temperature=0.4)
         except Exception as e:
             response = f"Error: {e}"
 
