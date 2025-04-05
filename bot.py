@@ -82,7 +82,7 @@ async def on_ready():
     봇 실행 준비.
     """
     await load_variable()
-    await init_simsim_chats()
+    await init_simsim_chats(DISCORD_CLIENT)
     print(f"Logged on as {DISCORD_CLIENT.user}!")
 
 

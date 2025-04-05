@@ -1,5 +1,4 @@
 from api.chatGPT import general_purpose_model
-from bot import DISCORD_CLIENT
 
 
 async def simsim_chatbot(DISCORD_CLIENT, message):
@@ -12,7 +11,7 @@ async def simsim_chatbot(DISCORD_CLIENT, message):
 
     # !심심이 모드에서 "초기화" 명령 처리
     if DISCORD_CLIENT.SIMSIM_MODE and message.content == "초기화":
-        init_simsim_chats()
+        init_simsim_chats(DISCORD_CLIENT)
         await message.channel.send("모든 대화 기록이 초기화되었습니다.")
         return  # 초기화 후 다른 처리는 하지 않음
 
@@ -65,7 +64,7 @@ async def simsim_chatbot(DISCORD_CLIENT, message):
         return
 
 
-async def init_simsim_chats():
+async def init_simsim_chats(DISCORD_CLIENT):
     DISCORD_CLIENT.SIMSIM_CHATS.clear()
     DISCORD_CLIENT.SIMSIM_CHATS.append(
         {
