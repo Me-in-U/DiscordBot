@@ -7,7 +7,7 @@ from discord.ext import commands
 from dotenv import load_dotenv
 
 from func.find1557 import find1557
-from func.simsim_e import init_simsim_chats, simsim_chatbot
+from func.simsim_e import simsim_chatbot
 from func.youtube_summary import check_youtube_link
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -24,7 +24,7 @@ DISCORD_CLIENT.SETTING_DATA = os.path.join(
     BASE_DIR, "settingData.json"
 )  # settingData 파일 이름
 DISCORD_CLIENT.SIMSIM_MODE = False
-DISCORD_CLIENT.SIMSIM_CHATS = []
+DISCORD_CLIENT.SIMSIM_CHATS = None
 DISCORD_CLIENT.PARTY_LIST = {}
 
 # 환경 변수를 .env 파일에서 로딩
@@ -82,7 +82,6 @@ async def on_ready():
     봇 실행 준비.
     """
     await load_variable()
-    await init_simsim_chats(DISCORD_CLIENT)
     print(f"Logged on as {DISCORD_CLIENT.user}!")
 
 
