@@ -11,7 +11,7 @@ async def simsim_chatbot(DISCORD_CLIENT, message):
 
     # !심심이 모드에서 "초기화" 명령 처리
     if DISCORD_CLIENT.SIMSIM_MODE and message.content == "초기화":
-        init_simsim_chats(DISCORD_CLIENT)
+        await init_simsim_chats(DISCORD_CLIENT)
         await message.channel.send("모든 대화 기록이 초기화되었습니다.")
         return  # 초기화 후 다른 처리는 하지 않음
 
@@ -23,7 +23,6 @@ async def simsim_chatbot(DISCORD_CLIENT, message):
         if message.attachments:
             image_url = message.attachments[0].url
 
-        DISCORD_CLIENT.SIMSIM_CHATS.append({"role": "user", "content": target_message})
         if image_url:
             DISCORD_CLIENT.SIMSIM_CHATS.append(
                 {
@@ -66,6 +65,7 @@ async def simsim_chatbot(DISCORD_CLIENT, message):
 
 
 async def init_simsim_chats(DISCORD_CLIENT):
+    print("심심이 초기화")
     DISCORD_CLIENT.SIMSIM_CHATS.clear()
     DISCORD_CLIENT.SIMSIM_CHATS.append(
         {
@@ -97,3 +97,4 @@ async def init_simsim_chats(DISCORD_CLIENT):
             "content": "이후 내용은 전체 채팅 내역이다.",
         },
     )
+    print("심심이 초기화 완료")
