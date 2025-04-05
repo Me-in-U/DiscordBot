@@ -59,6 +59,7 @@ async def simsim_chatbot(DISCORD_CLIENT, message):
 
         # 봇 응답 기록
         DISCORD_CLIENT.SIMSIM_CHATS.append({"role": "assistant", "content": response})
+        print(DISCORD_CLIENT.SIMSIM_CHATS)
         await message.channel.send(f"{response}")
     else:
         return
