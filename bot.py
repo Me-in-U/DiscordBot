@@ -7,7 +7,7 @@ from discord.ext import commands
 from dotenv import load_dotenv
 
 from func.find1557 import find1557
-from func.simsim_e import simsim_chatbot
+from func.simsim_e import init_simsim_chats, simsim_chatbot
 from func.youtube_summary import check_youtube_link
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -82,6 +82,7 @@ async def on_ready():
     봇 실행 준비.
     """
     await load_variable()
+    await init_simsim_chats()
     print(f"Logged on as {DISCORD_CLIENT.user}!")
 
 

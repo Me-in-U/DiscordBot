@@ -3,7 +3,7 @@ import asyncio
 import discord
 from discord.ext import commands
 
-from api.chatGPT import image_analysis, reasoning_model
+from api.chatGPT import general_purpose_model, reasoning_model
 
 
 class TranslationSelect(discord.ui.Select):
@@ -64,15 +64,37 @@ class TranslationSelectView(discord.ui.View):
                     "번역된 문장 이외에 추가적인 설명은 필요 없습니다."
                 ),
             },
-            {
-                "role": "developer",
-                "content": f"아래는 번역할 대화 내용입니다:\n{target_message}",
-            },
         ]
+        if image_url:
+            messages.append(
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": f'번역할 내용: "{target_message}"',
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": image_url,
+                            },
+                        },
+                    ],
+                },
+            )
+        else:
+            messages.append(
+                {
+                    "role": "user",
+                    "content": f'번역할 내용: "{target_message}"',
+                },
+            )
+
         try:
             if image_url:
-                translated_message = image_analysis(
-                    messages, model="gpt-4o-mini", image_url=image_url, temperature=0.5
+                translated_message = general_purpose_model(
+                    messages, model="gpt-4o", temperature=0.5
                 )
             else:
                 translated_message = reasoning_model(messages)
@@ -133,18 +155,36 @@ class TranslationCommands(commands.Cog):
                         "번역된 문장 이외에 추가적인 설명은 필요 없습니다."
                     ),
                 },
-                {
-                    "role": "developer",
-                    "content": f"아래는 번역할 대화 내용입니다:\n{target_message}",
-                },
             ]
+            if image_url:
+                messages.append(
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": f'번역할 내용: "{target_message}"',
+                            },
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": image_url,
+                                },
+                            },
+                        ],
+                    },
+                )
+            else:
+                messages.append(
+                    {
+                        "role": "user",
+                        "content": f'번역할 내용: "{target_message}"',
+                    },
+                )
             try:
                 if image_url:
-                    translated_message = image_analysis(
-                        messages,
-                        model="gpt-4o-mini",
-                        image_url=image_url,
-                        temperature=0.5,
+                    translated_message = general_purpose_model(
+                        messages, model="gpt-4o", temperature=0.5
                     )
                 else:
                     translated_message = reasoning_model(messages)
