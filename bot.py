@@ -99,7 +99,10 @@ async def on_message(message):
         image_url = message.attachments[0].url
 
     #! 일반 채팅 저장
-    print(f"일반 => {message.author.name}: {message.content} {image_url}")
+    if image_url:
+        print(f"{timestamp} {message.author.name}: {message.content} {image_url}")
+    else:
+        print(f"{timestamp} {message.author.name}: {message.content}")
 
     if message.author.name not in DISCORD_CLIENT.USER_MESSAGES:
         DISCORD_CLIENT.USER_MESSAGES[message.author.name] = []
