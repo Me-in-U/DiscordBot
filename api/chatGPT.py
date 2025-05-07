@@ -1,3 +1,4 @@
+# https://github.com/openai/openai-python
 import os
 
 from dotenv import load_dotenv
