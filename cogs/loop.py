@@ -7,6 +7,7 @@ from discord.ext import commands, tasks
 
 from api.riot import get_rank_data
 from bot import CHANNEL_ID, SEOUL_TZ
+from func.find1557 import clearCount
 
 SPECIAL_DAYS_FILE = "special_days.json"
 
@@ -34,8 +35,8 @@ class LoopTasks(commands.Cog):
         formatted_total_messages = f"{total_messages:,}"
         # discord.Activity를 명시적으로 사용
         activity = discord.Activity(
-            type=discord.ActivityType.watching,
-            name=f"!도움 | {formatted_total_messages}개의 채팅 메시지",
+            type=discord.ActivityType.Playing,
+            name=f"!도움 | {formatted_total_messages}개의 채팅 메시지 보관",
         )
         await self.bot.change_presence(activity=activity)
 
@@ -126,12 +127,12 @@ class LoopTasks(commands.Cog):
                     f"❌ 랭킹 정보를 업데이트하는 중 오류가 발생했습니다: {e}"
                 )
 
-    @tasks.loop(time=time(hour=1, minute=15, tzinfo=SEOUL_TZ))  # 매일 자정 실행
+    @tasks.loop(time=time(hour=0, minute=0, tzinfo=SEOUL_TZ))  # 매일 자정 실행
     async def weekly_1557_report(self):
         """매주 월요일 00:00에 1557Counter.json의 사용자별 카운트를 출력."""
         now = datetime.now(SEOUL_TZ)
-        # if now.weekday() != 0:  # 0=월요일
-        #     return
+        if now.weekday() != 0:  # 0=월요일
+            return
 
         target_channel = self.bot.get_channel(CHANNEL_ID)
         if not target_channel:
@@ -158,10 +159,16 @@ class LoopTasks(commands.Cog):
         if not data:
             report = "📊 이번 주 1557 카운트 기록된 사용자가 없습니다."
         else:
-            lines = [f"<@{user_id}>: {count}" for user_id, count in data.items()]
-            report = "📊 주간 1557 카운트 보고:\n" + "\n".join(lines)
+            # count 내림차순으로 정렬
+            sorted_items = sorted(data.items(), key=lambda x: x[1], reverse=True)
+            lines = [f"<@{user_id}>: {count}번" for user_id, count in sorted_items]
+            report = "# 📊 주간 1557 카운트 보고\n" + "\n".join(lines)
 
         await target_channel.send(report)
+        print(f"[{now}] 주간 1557 카운트 보고 완료.")
+
+        # 카운트 초기화
+        clearCount()
 
 
 async def setup(bot):

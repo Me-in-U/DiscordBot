@@ -147,18 +147,45 @@
 		"세계 고양이 구조의 날 (World Stray Animals Day)"
 	],
 	"05-18": ["세계 박물관의 날 (International Museum Day)"],
-	"05-20": ["세계 피자 파티의 날 (World Pizza Party Day)", "세계 벌의 날 (World Bee Day)"],
+	"05-20": [
+		"세계 꿀벌의 날 (World Bee Day)",
+		"세계인의 날(Together Day)",
+		"세계 측정의 날(World Metrology Day)",
+		"2004년 대한민국의 대통령 노무현이 열린우리당 입당한 날",
+		"1991년 대한민국, KBS 1TV 아침마당과 6시 내고향이 첫 방송을 시작한 날"
+	],
 	"05-21": [
 		"부부의 날 (Married Couples Day)",
 		"과일과 야채를 더 먹는 날 (Eat More Fruits and Vegetables Day)",
 		"국제 차의 날 (International Tea Day)",
-		"대화와 발전을 위한 세계 문화 다양성의 날 (World Day for Cultural Diversity for Dialogue and Development)"
+		"대화와 발전을 위한 세계 문화 다양성의 날 (World Day for Cultural Diversity for Dialogue and Development)",
+		"사회복지관의 날"
 	],
-	"05-22": ["국제 생물 다양성의 날 (International Day for Biological Diversity)"],
-	"05-23": ["국제 산과적 누공 퇴치의 날 (International Day to End Obstetric Fistula)"],
-	"05-25": ["전국 노래자랑의 날 (National Singing Contest Day)", "수건의 날 (Towel Day)", "스타워즈 광팬의 날 (Geek Pride Day)"],
+	"05-22": [
+		"국제 생물 다양성의 날 (International Day for Biological Diversity)",
+		"1990년 마이크로소프트 윈도우 3.0 출시한 날",
+		"마르티니크 노예제 폐지의 날(Abolition Day)",
+		"예멘 통일 기념일(Unity Day or National Day)",
+		"캘리포니아주 하비 밀크 데이(Harvey Bernard Milk Day)",
+		"캐나다 애국자의 날"
+	],
+	"05-23": [
+		"국제 산과적 누공 퇴치의 날 (International Day to End Obstetric Fistula)",
+		"1592년 임진왜란 발발",
+		"1995년 객체 지향 프로그래밍 언어인 자바가 발표",
+		"2009년 대한민국의 제16대 대통령 노무현이 사망",
+		"세계 거북이의 날(World Turtle Day)",
+		"일본 키스데이"
+	],
+	"05-24": ["2016년 블리자드 엔터테인먼트의 비디오 게임 오버워치 출시"],
+	"05-25": ["전국 노래자랑의 날 (National Singing Contest Day)", "수건의 날 (Towel Day)", "스타워즈 광팬의 날 (Geek Pride Day)", "방재의 날", "괴짜의 날(Geek Pride Day)", "오레오 데이(Oreo Day)"],
 	"05-27": ["세계 우유의 날 (World Milk Day)"],
-	"05-28": ["햄버거 데이(International Burger Day)", "세계 월경의 날 (Menstrual Hygiene Day)"],
+	"05-28": [
+		"햄버거 데이(International Burger Day)",
+		"세계 월경의 날 (Menstrual Hygiene Day)",
+		"1592년 임진왜란 동래성 전투 발발",
+		"1952년 대한민국의 임시수도 부산에서 정치 파행이 일어났고, 전라남도와 전라북도에 계엄령 발효"
+	],
 	"05-29": ["유엔평화유지군의 날 (International Day of UN Peacekeepers)"],
 	"05-30": ["세계 종교의 날 (World Religious Day)"],
 	"05-31": ["세계 금연의 날 (World No Tobacco Day)"],
