@@ -135,28 +135,9 @@ async def on_message(message):
 
     # !심심이
     await simsim_chatbot(DISCORD_CLIENT, message)
-    await find1557(message)
-    # 사용자가 텍스트만으로 "1557" 메시지를 보냈는지 확인 (첨부파일 없이)
-    if (
-        message.author != DISCORD_CLIENT.user
-        and message.content.strip() == "1557"
-        and not message.attachments
-    ):
-        try:
-            await message.delete()
-        except discord.Forbidden:
-            print("메시지 삭제 권한이 없습니다.")
 
-        # 최근 limit개의 메시지를 확인
-        async for recent_msg in message.channel.history(limit=10):
-            if (
-                recent_msg.author == DISCORD_CLIENT.user
-                and recent_msg.content.strip() == "1557"
-            ):
-                try:
-                    await recent_msg.delete()
-                except discord.Forbidden:
-                    print("메시지 삭제 권한이 없습니다.")
+    # !1557 처리
+    await find1557(message)
 
 
 #! client.command
