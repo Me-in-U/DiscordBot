@@ -17,6 +17,7 @@ class LoopTasks(commands.Cog):
         self.presence_update_task.start()
         self.new_day_clear.start()
         self.update_rank_data.start()
+        self.weekly_1557_report.start()
         print("LoopTasks Cog : init 완료!")
 
     @commands.Cog.listener()
@@ -124,6 +125,33 @@ class LoopTasks(commands.Cog):
                 await target_channel.send(
                     f"❌ 랭킹 정보를 업데이트하는 중 오류가 발생했습니다: {e}"
                 )
+
+    @tasks.loop(time=time(hour=1, minute=7, tzinfo=SEOUL_TZ))  # 매일 자정 실행
+    async def weekly_1557_report(self):
+        """매주 월요일 00:00에 1557Counter.json의 사용자별 카운트를 출력."""
+        now = datetime.now(SEOUL_TZ)
+        # if now.weekday() != 0:  # 0=월요일
+        #     return
+
+        target_channel = self.bot.get_channel(CHANNEL_ID)
+        if not target_channel:
+            print("대상 채널을 찾을 수 없습니다.")
+            return
+
+        try:
+            with open("1557Counter.json", "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception as e:
+            print(f"1557Counter.json 로드 중 오류: {e}")
+            return
+
+        if not data:
+            report = "📊 이번 주 1557 카운트 기록된 사용자가 없습니다."
+        else:
+            lines = [f"<@{user_id}>: {count}" for user_id, count in data.items()]
+            report = "📊 주간 1557 카운트 보고:\n" + "\n".join(lines)
+
+        await target_channel.send(report)
 
 
 async def setup(bot):

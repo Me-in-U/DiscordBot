@@ -1,9 +1,25 @@
 from api.chatGPT import structured_response
+import json
+import os
+
+COUNTER_FILE = "1557Counter.json"
 
 
-def check_1557_condition(ocr_text: str) -> bool:
+def _load_counts():
+    if not os.path.isfile(COUNTER_FILE):
+        return {}
+    with open(COUNTER_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def _save_counts(data):
+    with open(COUNTER_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+def check1557(ocr_text: str) -> bool:
     """
-    OCR 문자열(ocr_text)에서 '1', '5', '7'이 조건에 맞게 존재하는지 확인한다.
+    OCR 문자열에서 '1', '5', '7'이 조건에 맞게 존재하는지 확인한다.
     조건 1: '1' >= 1개
     조건 2: '5' >= 2개
     조건 3: '7' >= 1개
@@ -11,10 +27,26 @@ def check_1557_condition(ocr_text: str) -> bool:
     count_1 = ocr_text.count("1")
     count_5 = ocr_text.count("5")
     count_7 = ocr_text.count("7")
-    # print("1개수 : ", count_1)
-    # print("5개수 : ", count_5)
-    # print("7개수 : ", count_7)
     return (count_1 >= 1) and (count_5 >= 2) and (count_7 >= 1)
+
+
+def userCount(author):
+    """
+    OCR 또는 이미지에서 1557이 검출된 작성자의 weeklyCount를 1 증가시킵니다.
+    author.id (또는 author.name) 를 키로 사용합니다.
+    """
+    counts = _load_counts()
+    key = str(author.id)  # 또는 author.name
+    counts.setdefault(key, 0)
+    counts[key] += 1
+    _save_counts(counts)
+
+
+def clearCount():
+    """
+    모든 사용자의 카운트를 0으로 초기화합니다.
+    """
+    _save_counts({})
 
 
 async def find1557(message):
@@ -24,12 +56,11 @@ async def find1557(message):
     if message.attachments:
         image_url = message.attachments[0].url
     else:
-        # if check_1557_condition(message.content):
-        #     await message.channel.send("1557")
-        #     return
-        # 텍스트만 있는 경우 아무 처리도 하지 않음
-        return
+        if check1557(message.content):
+            userCount(message.author)
+            return
 
+    # ! 프롬프트 생성
     messages = [
         {
             "role": "developer",
@@ -66,7 +97,7 @@ async def find1557(message):
             ],
         },
     ]
-    # image_url이 존재할 때에만 이미지 관련 메시지 추가
+    # !image_url이 존재할 때에만 이미지 관련 메시지 추가
     if image_url is not None:
         try:
             response = structured_response(messages)
@@ -77,6 +108,7 @@ async def find1557(message):
 
         print("구조화된 응답:", response)
         # 만약 true라면
-        if response.exist or check_1557_condition(response.imageToText):
+        if response.exist or check1557(response.imageToText):
             await message.channel.send("1557")
+            userCount(message.author)
             return
