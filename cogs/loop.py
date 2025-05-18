@@ -138,12 +138,22 @@ class LoopTasks(commands.Cog):
             print("대상 채널을 찾을 수 없습니다.")
             return
 
+        # JSON 파일 로드, 비어 있거나 손상된 경우 빈 dict로
         try:
             with open("1557Counter.json", "r", encoding="utf-8") as f:
-                data = json.load(f)
+                content = f.read().strip()
+                data = json.loads(content) if content else {}
+        except json.JSONDecodeError:
+            print(
+                "1557Counter.json이 비어 있거나 손상되었습니다. 빈 데이터로 초기화합니다."
+            )
+            data = {}
+        except FileNotFoundError:
+            print("1557Counter.json을 찾을 수 없습니다. 새로 생성합니다.")
+            data = {}
         except Exception as e:
-            print(f"1557Counter.json 로드 중 오류: {e}")
-            return
+            print(f"1557Counter.json 로드 중 알 수 없는 오류: {e}")
+            data = {}
 
         if not data:
             report = "📊 이번 주 1557 카운트 기록된 사용자가 없습니다."
