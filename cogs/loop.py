@@ -126,7 +126,7 @@ class LoopTasks(commands.Cog):
                     f"❌ 랭킹 정보를 업데이트하는 중 오류가 발생했습니다: {e}"
                 )
 
-    @tasks.loop(time=time(hour=1, minute=10, tzinfo=SEOUL_TZ))  # 매일 자정 실행
+    @tasks.loop(time=time(hour=1, minute=15, tzinfo=SEOUL_TZ))  # 매일 자정 실행
     async def weekly_1557_report(self):
         """매주 월요일 00:00에 1557Counter.json의 사용자별 카운트를 출력."""
         now = datetime.now(SEOUL_TZ)
