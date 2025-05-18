@@ -1,6 +1,7 @@
-from api.chatGPT import structured_response
 import json
 import os
+
+from api.chatGPT import structured_response
 
 COUNTER_FILE = "1557Counter.json"
 
