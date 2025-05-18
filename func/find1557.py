@@ -58,6 +58,7 @@ async def find1557(message):
     else:
         if check1557(message.content):
             userCount(message.author)
+            print("1557 발견")
             return
 
     # ! 프롬프트 생성
@@ -111,4 +112,5 @@ async def find1557(message):
         if response.exist or check1557(response.imageToText):
             await message.channel.send("1557")
             userCount(message.author)
+            print("1557 발견")
             return
