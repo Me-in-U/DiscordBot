@@ -134,7 +134,7 @@ class LoopTasks(commands.Cog):
         weekday = ["월", "화", "수", "목", "금", "토", "일"]
         if r != 0:  # 0=월요일
             return
-        await target_channel.send(f"Debug {weekday[r]}요일")
+        print(f"Debug {weekday[r]}요일")
 
         target_channel = self.bot.get_channel(CHANNEL_ID)
         if not target_channel:
