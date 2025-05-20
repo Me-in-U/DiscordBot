@@ -83,6 +83,10 @@ async def on_ready():
     """
     await load_variable()
     print(f"Logged on as {DISCORD_CLIENT.user}!")
+    r = datetime.now(SEOUL_TZ).weekday()
+    weekday = ["월", "화", "수", "목", "금", "토", "일"]
+    print(f"오늘은 {weekday[r]}요일입니다.")
+    print(f"현재 시간: {datetime.now(SEOUL_TZ).strftime('%Y-%m-%d %H:%M:%S')}")
 
 
 @DISCORD_CLIENT.event

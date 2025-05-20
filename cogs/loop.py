@@ -130,9 +130,11 @@ class LoopTasks(commands.Cog):
     @tasks.loop(time=time(hour=0, minute=0, tzinfo=SEOUL_TZ))  # 매일 자정 실행
     async def weekly_1557_report(self):
         """매주 월요일 00:00에 1557Counter.json의 사용자별 카운트를 출력."""
-        now = datetime.now(SEOUL_TZ)
-        if now.weekday() != 0:  # 0=월요일
+        r = datetime.now(SEOUL_TZ).weekday()
+        weekday = ["월", "화", "수", "목", "금", "토", "일"]
+        if r != 0:  # 0=월요일
             return
+        await target_channel.send(f"Debug {weekday[r]}요일")
 
         target_channel = self.bot.get_channel(CHANNEL_ID)
         if not target_channel:
