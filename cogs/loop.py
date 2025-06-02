@@ -6,7 +6,7 @@ import holidays
 from discord.ext import commands, tasks
 
 from api.riot import get_rank_data
-from bot import CHANNEL_ID, SEOUL_TZ
+from bot import CHANNEL_ID, SEOUL_TZ, load_recent_messages
 from func.find1557 import clearCount
 
 SPECIAL_DAYS_FILE = "special_days.json"
@@ -53,7 +53,6 @@ class LoopTasks(commands.Cog):
             print("대상 채널을 찾을 수 없습니다.")
             return
 
-        # self.bot.USER_MESSAGES = {}
         today = datetime.now().date()
         today_str = today.strftime("%m-%d")
 
@@ -80,6 +79,10 @@ class LoopTasks(commands.Cog):
 
         print(f"[{datetime.now()}] user_messages 초기화 완료.")
         await target_channel.send(message)
+
+        # 유저 메시지 초기화 및 리로드
+        self.bot.USER_MESSAGES = {}
+        await load_recent_messages()
 
     @tasks.loop(time=time(hour=0, minute=0, tzinfo=SEOUL_TZ))  # 매일 자정
     async def update_rank_data(self):
