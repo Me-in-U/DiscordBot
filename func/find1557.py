@@ -18,7 +18,7 @@ def _save_counts(data):
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
-def check1557(ocr_text: str) -> bool:
+def count1557(ocr_text: str) -> int:
     """
     OCR 문자열에서 '1', '5', '7'이 조건에 맞게 존재하는지 확인한다.
     조건 1: '1' >= 1개
@@ -26,12 +26,14 @@ def check1557(ocr_text: str) -> bool:
     조건 3: '7' >= 1개
     """
     count_1 = ocr_text.count("1")
-    count_5 = ocr_text.count("5")
+    count_5 = ocr_text.count("5") // 2
     count_7 = ocr_text.count("7")
-    return (count_1 >= 1) and (count_5 >= 2) and (count_7 >= 1)
+    if count_1 > 0 and count_5 > 0 and count_7 > 0:
+        return min(count_1, count_5, count_7)
+    return 0
 
 
-def userCount(author):
+def userCount(author, count):
     """
     OCR 또는 이미지에서 1557이 검출된 작성자의 weeklyCount를 1 증가시킵니다.
     author.id (또는 author.name) 를 키로 사용합니다.
@@ -39,7 +41,7 @@ def userCount(author):
     counts = _load_counts()
     key = str(author.id)  # 또는 author.name
     counts.setdefault(key, 0)
-    counts[key] += 1
+    counts[key] += count
     _save_counts(counts)
 
 
@@ -57,9 +59,10 @@ async def find1557(message):
     if message.attachments:
         image_url = message.attachments[0].url
     else:
-        if check1557(message.content):
-            userCount(message.author)
-            print("1557 발견")
+        count = count1557(message.content)
+        if count:
+            userCount(message.author, count)
+            print(f"1557 발견{count}개")
             return
 
     # ! 프롬프트 생성
@@ -110,7 +113,7 @@ async def find1557(message):
 
         print("구조화된 응답:", response)
         # 만약 true라면
-        if response.exist or check1557(response.imageToText):
+        if response.exist or count1557(response.imageToText):
             await message.channel.send("1557")
             userCount(message.author)
             print("1557 발견")
