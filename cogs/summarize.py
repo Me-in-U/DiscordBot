@@ -1,3 +1,5 @@
+import discord
+from discord import app_commands
 from discord.ext import commands
 
 from api.chatGPT import general_purpose_model
@@ -13,23 +15,27 @@ class SummarizeCommands(commands.Cog):
         """봇이 준비되었을 때 호출됩니다."""
         print("DISCORD_CLIENT -> SummarizeCommands Cog : on ready!")
 
-    @commands.command(
-        aliases=["요약"],
-        help="채팅 내용을 요약합니다다. '!요약",
+    @app_commands.command(name="요약", description="채팅 내용을 요약합니다.")
+    @app_commands.describe(
+        추가_요청="추가로 원하는 요약 사항이 있으면 입력하세요. (선택)"
     )
-    async def summary(self, ctx, *, text: str = None):
+    async def summary(
+        self, interaction: discord.Interaction, 추가_요청: str | None = None
+    ):
         """
         커맨드 요약 처리
         오늘의 메시지 전체 요약
         """
         # 저장된 모든 대화 기록 확인
         if not self.bot.USER_MESSAGES:
-            await ctx.reply("**요약할 대화 내용이 없습니다.**")
+            await interaction.response.send_message("**요약할 대화 내용이 없습니다.**")
             return
 
-        request_message = text if text else ""
+        # 최초 응답: "요약 중..." 메시지를 보냅니다.
+        await interaction.response.send_message("요약 중...", ephemeral=False)
 
         # 요약 요청 메시지 생성
+        request_message = 추가_요청 or ""
         messages = [
             {
                 "role": "developer",
@@ -67,7 +73,8 @@ class SummarizeCommands(commands.Cog):
             response = f"Error: {e}"
 
         # 응답 출력
-        await ctx.reply(f"{response}")
+        sent_msg = await interaction.original_response()
+        await sent_msg.edit(content=response)
 
 
 async def setup(bot):

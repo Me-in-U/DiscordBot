@@ -36,7 +36,7 @@ class LoopTasks(commands.Cog):
         # discord.Activity를 명시적으로 사용
         activity = discord.Activity(
             type=discord.ActivityType.playing,
-            name=f"!도움 | {formatted_total_messages}개의 채팅 메시지 보관",
+            name=f"/도움 | {formatted_total_messages}개의 채팅 메시지 보관",
         )
         await self.bot.change_presence(activity=activity)
 

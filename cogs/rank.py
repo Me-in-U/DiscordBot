@@ -1,5 +1,7 @@
 import json
 
+import discord
+from discord import app_commands
 from discord.ext import commands
 
 from api.riot import get_rank_data
@@ -37,82 +39,106 @@ class RankCommands(commands.Cog):
         with open(self.bot.SETTING_DATA, "w", encoding="utf-8") as file:
             json.dump(settings, file, ensure_ascii=False, indent=4)
 
-    @commands.command(
-        aliases=["솔랭"], help="입력한 닉네임#태그의 솔로 랭크 정보를 출력합니다."
+    @app_commands.command(
+        name="솔랭",
+        description="게임 닉네임과 태그를 입력하여 솔로 랭크 정보를 출력합니다.",
     )
-    async def print_solo_rank(self, ctx, *, text: str = None):
+    @app_commands.describe(
+        game_name="라이엇 게임 닉네임(예: RiotUser)", tag_line="태그라인(예: 1234)"
+    )
+    async def print_solo_rank(
+        self, interaction: discord.Interaction, game_name: str, tag_line: str
+    ):
         """솔로 랭크 정보를 출력합니다."""
         try:
-            game_name, tag_line = text.strip().split("#")
             rank_data = get_rank_data(game_name, tag_line, "solo")
-            await ctx.reply(self.print_rank_data(rank_data))
+            await interaction.response.send_message(self.print_rank_data(rank_data))
         except ValueError:
-            await ctx.reply("올바른 형식으로 입력해주세요. 예: !솔랭 닉네임#태그")
+            await interaction.response.send_message(
+                "올바른 형식으로 입력해주세요. 예: !솔랭 닉네임#태그"
+            )
 
-    @commands.command(
-        aliases=["자랭"], help="입력한 닉네임#태그의 자유 랭크 정보를 출력합니다."
+    @app_commands.command(
+        name="자랭",
+        description="게임 닉네임과 태그를 입력하여 자유 랭크 정보를 출력합니다.",
     )
-    async def print_flex_rank(self, ctx, *, text: str = None):
+    @app_commands.describe(
+        game_name="라이엇 게임 닉네임(예: RiotUser)", tag_line="태그라인(예: 1234)"
+    )
+    async def print_flex_rank(
+        self, interaction: discord.Interaction, game_name: str, tag_line: str
+    ):
         """자유 랭크 정보를 출력합니다."""
         try:
-            game_name, tag_line = text.strip().split("#")
             rank_data = get_rank_data(game_name, tag_line, "flex")
-            await ctx.reply(self.print_rank_data(rank_data))
+            await interaction.response.send_message(self.print_rank_data(rank_data))
         except ValueError:
-            await ctx.reply("올바른 형식으로 입력해주세요. 예: !자랭 닉네임#태그")
+            await interaction.response.send_message(
+                "올바른 형식으로 입력해주세요. 예: !자랭 닉네임#태그"
+            )
 
-    @commands.command(
-        aliases=["일일랭크"], help="현재 설정된 자정 솔랭 정보를 출력합니다."
+    @app_commands.command(
+        name="일일랭크", description="현재 설정된 자정 솔랭 정보를 출력합니다."
     )
-    async def daily_rank(self, ctx):
+    async def daily_rank(self, interaction: discord.Interaction):
         """현재 설정된 자정 솔랭 정보를 출력합니다."""
         if self.game_name and self.tag_line:
-            await ctx.reply(
+            await interaction.response.send_message(
                 f"✅ **현재 일일솔로랭크 출력 예정 정보**\n- 닉네임: {self.game_name}\n- 태그: {self.tag_line}"
             )
         else:
-            await ctx.reply("❌ 설정된 일일 랭크 정보가 없습니다.")
+            await interaction.response.send_message(
+                "❌ 설정된 일일 랭크 정보가 없습니다."
+            )
 
-    @commands.command(
-        aliases=["일일랭크변경"], help="자정 솔랭 닉네임#태그를 변경합니다."
+    @app_commands.command(
+        name="일일랭크변경", description="자정 솔랭 닉네임#태그를 변경합니다."
     )
-    async def update_daily_rank(self, ctx, *, text: str = None):
+    @app_commands.describe(
+        text="닉네임#태그 형식으로 입력해주세요. 예: 라이엇유저#1234"
+    )
+    async def update_daily_rank(self, interaction: discord.Interaction, text: str):
         """자정 솔랭 닉네임#태그를 업데이트합니다."""
         try:
             game_name, tag_line = text.strip().split("#")
             self.game_name = game_name
             self.tag_line = tag_line
             self.save_settings()
-            await ctx.reply(
+            await interaction.response.send_message(
                 f"✅ **성공적으로 업데이트되었습니다.**\n새 값:\n- 닉네임: {self.game_name}\n- 태그: {self.tag_line}"
             )
         except ValueError:
-            await ctx.reply(
+            await interaction.response.send_message(
                 "올바른 형식으로 입력해주세요. 예: !일일랭크변경 닉네임#태그"
             )
         except Exception as e:
-            await ctx.reply(f"⚠️ **업데이트 중 오류가 발생했습니다.**\n{str(e)}")
+            await interaction.response.send_message(
+                f"⚠️ **업데이트 중 오류가 발생했습니다.**\n{str(e)}"
+            )
 
-    @commands.command(
-        aliases=["일일랭크루프"],
-        help="자정 루프 상태를 변경합니다. 예: !일일랭크루프 true/false",
+    @app_commands.command(
+        name="일일랭크루프",
+        description="자정 루프 상태를 변경합니다. 예: /일일랭크루프 true/false",
     )
-    async def toggle_daily_loop(self, ctx, *, status: str = None):
+    @app_commands.describe(status="true 또는 false로 입력하세요.")
+    async def toggle_daily_loop(self, interaction: discord.Interaction, status: str):
         """자정 루프 상태를 변경합니다."""
         try:
             if status.lower() not in ["true", "false"]:
                 raise ValueError
             self.daily_rank_loop = status.lower() == "true"
             self.save_settings()
-            await ctx.reply(
+            await interaction.response.send_message(
                 f"✅ **루프 상태가 {'활성화' if self.daily_rank_loop else '비활성화'}로 변경되었습니다.**"
             )
         except ValueError:
-            await ctx.reply(
+            await interaction.response.send_message(
                 "올바른 형식으로 입력해주세요. 예: !일일랭크루프 true/false"
             )
         except Exception as e:
-            await ctx.reply(f"⚠️ **루프 상태 변경 중 오류가 발생했습니다.**\n{str(e)}")
+            await interaction.response.send_message(
+                f"⚠️ **루프 상태 변경 중 오류가 발생했습니다.**\n{str(e)}"
+            )
 
     def print_rank_data(self, data, yesterday_data=None):
         """랭킹 데이터를 출력합니다."""
