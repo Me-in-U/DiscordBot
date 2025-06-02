@@ -198,8 +198,17 @@
 	"05-30": ["세계 종교의 날 (World Religious Day)"],
 	"05-31": ["세계 금연의 날 (World No Tobacco Day)"],
 	"06-01": ["🌍 세계 우유의 날 (World Milk Day)", "세계 어버이의 날 (Global Day of Parents)", "국제 어린이의 날 (International Children's Day)"],
-	"06-02": ["유기농데이 (Organic Day)", "세계 자전거의 날 (World Bicycle Day),","이탈리아 공화국의 날(Festa della Repubblica)", "북한 어린이날(North Korea Children's Day)", "캐나다 현충일(Canada Decoration Day)","1999년 네이버 설립", "2022년 터키(Turkey)에서 튀르키예(Turkiye)로 국호 변경"],
-	"06-03": ["세계 러닝의 날 (Global Running Day)", "세계 자전거의 날 (World Bicycle Day)"],
+	"06-02": [
+		"유기농데이 (Organic Day)",
+		"세계 자전거의 날 (World Bicycle Day),",
+		"이탈리아 공화국의 날(Festa della Repubblica)",
+		"북한 어린이날(North Korea Children's Day)",
+		"캐나다 현충일(Canada Decoration Day)",
+		"1999년 네이버 설립",
+		"2022년 터키(Turkey)에서 튀르키예(Turkiye)로 국호 변경"
+	],
+	"06-03": ["세계 러닝의 날 (Global Running Day)",
+	 "세계 자전거의 날 (World Bicycle Day)", "대한민국 제21대 대통령 선거", "호주 마보 데이(Mabo Day)", "타이완 아편 진압 운동의 날(Opium Suppression Movement Day)", "아르헨티나 경제학자의 날(Economist day)", "세계 자전거의 날(World Bicycle Day)"],
 	"06-04": [
 		"육포데이 (Jerky Day)",
 		"국제 침략 희생 어린이의 날 (International Day of Innocent Children Victims of Aggression)",
