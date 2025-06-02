@@ -26,7 +26,7 @@ class LoopTasks(commands.Cog):
         """봇이 준비되었을 때 호출됩니다."""
         print("DISCORD_CLIENT -> LoopTasks Cog : on ready!")
 
-    @tasks.loop(seconds=10)
+    @tasks.loop(seconds=60)
     async def presence_update_task(self):
         """1분마다 Discord 봇 상태(Presence)를 갱신합니다."""
         total_messages = sum(
@@ -130,11 +130,11 @@ class LoopTasks(commands.Cog):
     @tasks.loop(time=time(hour=0, minute=0, tzinfo=SEOUL_TZ))  # 매일 자정 실행
     async def weekly_1557_report(self):
         """매주 월요일 00:00에 1557Counter.json의 사용자별 카운트를 출력."""
-        r = datetime.now(SEOUL_TZ).weekday()
-        weekday = ["월", "화", "수", "목", "금", "토", "일"]
+        now = datetime.now(SEOUL_TZ)
+        r = now.weekday()
         if r != 0:  # 0=월요일
             return
-        print(f"Debug {weekday[r]}요일")
+        print(f"Debug {['월','화','수','목','금','토','일'][r]}요일")
 
         target_channel = self.bot.get_channel(CHANNEL_ID)
         if not target_channel:
