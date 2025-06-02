@@ -16,7 +16,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
-DISCORD_CLIENT = commands.Bot(command_prefix="!", intents=intents)
+DISCORD_CLIENT = commands.Bot(command_prefix="/", intents=intents)
 DISCORD_CLIENT.remove_command("help")
 DISCORD_CLIENT.USER_MESSAGES = {}  # 유저별 채팅팅 저장용 딕셔너리
 DISCORD_CLIENT.NICKNAMES = {}  # 유저 닉네임 저장
@@ -31,6 +31,7 @@ DISCORD_CLIENT.PARTY_LIST = {}
 load_dotenv()
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 CHANNEL_ID = int(os.getenv("MY_CHANNEL_ID"))
+GUILD_ID = int(os.getenv("GUILD_ID"))  # 손팬노
 
 # 기타 변수
 SEOUL_TZ = timezone(timedelta(hours=9))  # 서울 시간대 설정 (UTC+9)
@@ -87,6 +88,14 @@ async def on_ready():
     weekday = ["월", "화", "수", "목", "금", "토", "일"]
     print(f"오늘은 {weekday[r]}요일입니다.")
     print(f"현재 시간: {datetime.now(SEOUL_TZ).strftime('%Y-%m-%d %H:%M:%S')}")
+    # 슬래시 커맨드 등록(동기화)
+    try:
+        # test_guild = discord.Object(id=GUILD_ID)
+        # synced = await DISCORD_CLIENT.tree.sync(guild=test_guild)
+        synced = await DISCORD_CLIENT.tree.sync()
+        print(f"[슬래시] {len(synced)}개 커맨드 동기화 완료.")
+    except Exception as e:
+        print(f"슬래시 커맨드 동기화 실패: {e}")
 
 
 @DISCORD_CLIENT.event

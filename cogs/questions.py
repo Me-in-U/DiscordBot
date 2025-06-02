@@ -1,3 +1,5 @@
+import discord
+from discord import app_commands
 from discord.ext import commands
 
 from api.chatGPT import general_purpose_model
@@ -13,22 +15,28 @@ class QuestionCommands(commands.Cog):
         """봇이 준비되었을 때 호출됩니다."""
         print("DISCORD_CLIENT -> QuestionCommands Cog : on ready!")
 
-    @commands.command(
-        aliases=["질문"],
-        help="ChatGPT에게 질문합니다. '!질문 [질문 내용]' 형식으로 사용하세요.",
+    @app_commands.command(
+        name="질문",
+        description="ChatGPT에게 질문합니다. 텍스트 매개변수로 질문 내용을 입력하세요.",
     )
-    async def question(self, ctx):
+    @app_commands.describe(text="질문할 내용을 입력하세요.")
+    async def question(
+        self,
+        interaction: discord.Interaction,
+        text: str,
+        image: discord.Attachment = None,
+    ):
         """
         커맨드 질문 처리
         ChatGPT
         """
-
-        target_message = ctx.message.content
-        image_url = None
+        # 호출된 슬래시 커맨드 응답을 잠시 대기 상태로 둡니다.
+        await interaction.response.defer(thinking=True)
 
         # 이미지 첨부 확인
-        if ctx.message.attachments:
-            image_url = ctx.message.attachments[0].url
+        image_url = None
+        if image:
+            image_url = image.url
 
         # ChatGPT에 메시지 전달
         messages = [
@@ -58,7 +66,7 @@ class QuestionCommands(commands.Cog):
                     "content": [
                         {
                             "type": "text",
-                            "text": f"{ctx.author.name}의 질문 : {target_message}",
+                            "text": f"{interaction.user.name}의 질문 : {text}",
                         },
                         {
                             "type": "image_url",
@@ -73,7 +81,7 @@ class QuestionCommands(commands.Cog):
             messages.append(
                 {
                     "role": "user",
-                    "content": f"{ctx.author.name}의 질문 : {target_message}",
+                    "content": f"{interaction.user.name}의 질문 : {text}",
                 },
             )
         try:
@@ -81,24 +89,30 @@ class QuestionCommands(commands.Cog):
         except Exception as e:
             response = f"Error: {e}"
 
-        await ctx.reply(f"{response}")
+        await interaction.followup.send(f"{response}")
 
-    @commands.command(
-        aliases=["신이시여", "신이여", "창섭님", "창섭아"],
-        help="정상화의 신에게 질문합니다. '!신이시여 [질문 내용]' 형식으로 사용하세요.",
+    @app_commands.command(
+        name="신이시여",
+        description="정상화의 신에게 질문합니다. 질문 내용과 이미지를 함께 입력할 수 있습니다.",
     )
-    async def to_god(self, ctx):
+    @app_commands.describe(
+        text="질문할 내용을 입력하세요.", image="(선택) 질문과 함께 보낼 이미지 첨부"
+    )
+    async def to_god(
+        self,
+        interaction: discord.Interaction,
+        text: str,
+        image: discord.Attachment = None,
+    ):
         """
         커맨드 질문 처리
         ChatGPT
         """
 
-        target_message = ctx.message.content
-        image_url = None
-
         # 이미지 첨부 확인
-        if ctx.message.attachments:
-            image_url = ctx.message.attachments[0].url
+        image_url = None
+        if image:
+            image_url = image.url
 
         # ChatGPT에 메시지 전달
         messages = [
@@ -130,7 +144,7 @@ class QuestionCommands(commands.Cog):
                     "content": [
                         {
                             "type": "text",
-                            "text": f"{ctx.author.name}의 질문 : {target_message}",
+                            "text": f"{interaction.user.name}의 질문 : {text}",
                         },
                         {
                             "type": "image_url",
@@ -145,7 +159,7 @@ class QuestionCommands(commands.Cog):
             messages.append(
                 {
                     "role": "user",
-                    "content": f"{ctx.author.name}의 질문 : {target_message}",
+                    "content": f"{interaction.user.name}의 질문 : {text}",
                 },
             )
 
@@ -154,7 +168,7 @@ class QuestionCommands(commands.Cog):
         except Exception as e:
             response = f"Error: {e}"
 
-        await ctx.reply(f"{response}")
+        await interaction.followup.send(f"{response}")
 
 
 async def setup(bot):
