@@ -205,7 +205,7 @@ class TranslationCommands(commands.Cog):
                         if message.attachments:
                             option["image_url"] = message.attachments[0].url
                         messages_options.append(option)
-                        if len(messages_options) >= 10:
+                        if len(messages_options) >= 20:
                             break
             if not messages_options:
                 try:

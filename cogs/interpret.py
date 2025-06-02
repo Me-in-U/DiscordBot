@@ -175,7 +175,7 @@ class InterpretCommands(commands.Cog):
                     messages_options.append(
                         {"content": message.content, "id": message.id}
                     )
-                    if len(messages_options) >= 10:
+                    if len(messages_options) >= 20:
                         break
             if not messages_options:
                 try:
