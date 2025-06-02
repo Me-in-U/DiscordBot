@@ -4,15 +4,43 @@ import time
 from datetime import datetime
 
 
+# 로컬 변경사항이 있는지 확인(unstaged/uncommitted)
+def has_local_changes():
+    result = subprocess.run(
+        ["git", "status", "--porcelain"], capture_output=True, text=True
+    )
+    return bool(result.stdout.strip())
+
+
 # git pull을 실행하여 결과를 반환하는 함수
-def git_pull():
-    result = subprocess.run(["git", "pull"], capture_output=True, text=True)
-    return result.stdout.strip()
+# git stash 후 git pull을 실행하여 결과를 반환하는 함수
+def git_stash_and_pull():
+    # 1) 로컬 변경사항이 있으면 stash
+    if has_local_changes():
+        print(
+            f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} Local changes detected. Stashing..."
+        )
+        stash_res = subprocess.run(
+            ["git", "stash", "push", "-u", "-m", "auto-stash_before_pull"],
+            capture_output=True,
+            text=True,
+        )
+        print(
+            f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} git stash output: {stash_res.stdout.strip()}"
+        )
+
+    # 2) git pull 실행
+    pull_res = subprocess.run(["git", "pull"], capture_output=True, text=True)
+    pull_output = pull_res.stdout.strip()
+    print(
+        f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} git pull output: {pull_output}"
+    )
+
+    return pull_output
 
 
 # launch.bat을 실행하는 함수 (새 콘솔 창에서 실행)
 def start_launch_bat():
-    # launch.bat이 현재 스크립트와 같은 디렉토리에 있다고 가정합니다.
     bat_path = os.path.join(os.getcwd(), "_launchBot.bat")
     proc = subprocess.Popen(
         ["cmd", "/c", bat_path], creationflags=subprocess.CREATE_NEW_CONSOLE
@@ -41,7 +69,7 @@ def main():
     check_interval = 300
 
     while True:
-        output = git_pull()
+        output = git_stash_and_pull()
         print(
             f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} git pull output: {output}"
         )
