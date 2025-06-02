@@ -1,7 +1,7 @@
+import os
 import subprocess
 import time
-import os
-import signal
+from datetime import datetime
 
 
 # git pull을 실행하여 결과를 반환하는 함수
@@ -33,24 +33,38 @@ def kill_process(proc):
 def main():
     # launch.bat 프로세스 시작
     process = start_launch_bat()
-    print(f"launch.bat started, PID: {process.pid}")
+    print(
+        f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} launch.bat started, PID: {process.pid}"
+    )
 
     # 일정 시간 간격 (예: 5분 = 300초)으로 git pull 실행
     check_interval = 300
 
     while True:
         output = git_pull()
-        print("git pull output:", output)
+        print(
+            f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} git pull output: {output}"
+        )
+
         # "Already up to date" 메시지가 없으면 변경사항이 발생한 것으로 간주
         if "Already up to date" not in output:
-            print("Changes detected. Restarting launch.bat process...")
+            print(
+                f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} Changes detected. Restarting launch.bat process..."
+            )
+
             kill_process(process)
             # 변경사항 감지 후 잠깐 대기 (옵션)
             time.sleep(5)
             process = start_launch_bat()
-            print(f"launch.bat restarted, PID: {process.pid}")
+            print(
+                f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} launch.bat restarted, PID: {process.pid}"
+            )
+
         else:
-            print("No changes detected.")
+            print(
+                f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} No changes detected."
+            )
+
         time.sleep(check_interval)
 
 
