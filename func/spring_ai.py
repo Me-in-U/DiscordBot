@@ -3,7 +3,7 @@ import aiohttp
 
 async def spring_ai(DISCORD_CLIENT, message):
     # ! AI 모드 토글
-    if message == "AI":
+    if message.content == "AI":
         if DISCORD_CLIENT.SPRING_AI_MODE:
             # AI 모드가 활성화되어 있으면 비활성화
             DISCORD_CLIENT.SPRING_AI_MODE = False
