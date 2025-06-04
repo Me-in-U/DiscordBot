@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 
 from func.find1557 import find1557
 from func.simsim_e import simsim_chatbot
+from func.spring_ai import spring_ai
 from func.youtube_summary import check_youtube_link
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -26,6 +27,9 @@ DISCORD_CLIENT.SETTING_DATA = os.path.join(
 DISCORD_CLIENT.SIMSIM_MODE = False
 DISCORD_CLIENT.SIMSIM_CHATS = None
 DISCORD_CLIENT.PARTY_LIST = {}
+
+# Spring AI
+DISCORD_CLIENT.CONV_ID = None
 
 # 환경 변수를 .env 파일에서 로딩
 load_dotenv()
@@ -148,6 +152,9 @@ async def on_message(message):
 
     # !심심이
     await simsim_chatbot(DISCORD_CLIENT, message)
+
+    # !스프링 AI
+    await spring_ai(DISCORD_CLIENT, message)
 
     # !1557 처리
     await find1557(message)
