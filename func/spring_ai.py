@@ -2,6 +2,22 @@ import aiohttp
 
 
 async def spring_ai(DISCORD_CLIENT, message):
+    # ! AI 모드 토글
+    if message == "AI":
+        if DISCORD_CLIENT.SPRING_AI_MODE:
+            # AI 모드가 활성화되어 있으면 비활성화
+            DISCORD_CLIENT.SPRING_AI_MODE = False
+            await message.channel.send("AI 모드가 비활성화되었습니다.")
+            return
+        else:
+            # AI 모드가 비활성화되어 있으면 활성화
+            DISCORD_CLIENT.SPRING_AI_MODE = True
+            await message.channel.send("AI 모드가 활성화되었습니다.")
+
+    # ! AI모드가 활성화되어 있고, 봇이 보낸 메시지가 아니면 처리
+    if not DISCORD_CLIENT.SPRING_AI_MODE or message.author == DISCORD_CLIENT.user:
+        return
+
     url = "https://api.sonpanno.com/api/v1/discord/chat"
     payload = {
         "message": message.content,
