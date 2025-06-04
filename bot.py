@@ -30,6 +30,7 @@ DISCORD_CLIENT.PARTY_LIST = {}
 
 # Spring AI
 DISCORD_CLIENT.CONV_ID = None
+DISCORD_CLIENT.SPRING_AI_MODE = False
 
 # 환경 변수를 .env 파일에서 로딩
 load_dotenv()
