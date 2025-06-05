@@ -113,8 +113,9 @@ async def find1557(message):
 
         print("구조화된 응답:", response)
         # 만약 true라면
-        if response.exist or count1557(response.imageToText):
+        count = count1557(message.content)
+        if response.exist or count:
             await message.channel.send("1557")
-            userCount(message.author)
+            userCount(message.author, count)
             print("1557 발견")
             return
