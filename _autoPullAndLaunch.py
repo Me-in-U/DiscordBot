@@ -95,15 +95,15 @@ def main():
         # "Already up to date" 메시지가 없으면 변경사항이 발생한 것으로 간주
         if "Already up to date" not in output:
             print(
-                f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} Changes detected. Restarting launch.bat process..."
+                f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} Changes detected. Restarting launch.ps1 process..."
             )
 
             kill_process(process)
             # 변경사항 감지 후 잠깐 대기 (옵션)
-            time.sleep(5)
+            time.sleep(10)
             process = start_launch_ps1()
             print(
-                f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} launch.bat restarted, PID: {process.pid}"
+                f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} launch.ps1 restarted, PID: {process.pid}"
             )
 
         else:
