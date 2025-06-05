@@ -40,10 +40,28 @@ def git_stash_and_pull():
 
 
 # launch.bat을 실행하는 함수 (새 콘솔 창에서 실행)
-def start_launch_bat():
-    bat_path = os.path.join(os.getcwd(), "_launchBot.bat")
+# def start_launch_bat():
+#     bat_path = os.path.join(os.getcwd(), "_launchBot.bat")
+#     proc = subprocess.Popen(
+#         ["cmd", "/c", bat_path], creationflags=subprocess.CREATE_NEW_CONSOLE
+#     )
+#     return proc
+
+
+def start_launch_ps1():
+    # 현재 작업 디렉토리에서 실행할 PS1 경로 지정
+    ps1_path = os.path.join(os.getcwd(), "_launchBot.ps1")
+
     proc = subprocess.Popen(
-        ["cmd", "/c", bat_path], creationflags=subprocess.CREATE_NEW_CONSOLE
+        [
+            "powershell.exe",
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            ps1_path,
+        ],
+        creationflags=subprocess.CREATE_NEW_CONSOLE,
     )
     return proc
 
@@ -59,10 +77,10 @@ def kill_process(proc):
 
 
 def main():
-    # launch.bat 프로세스 시작
-    process = start_launch_bat()
+    # launch.ps1 프로세스 시작
+    process = start_launch_ps1()
     print(
-        f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} launch.bat started, PID: {process.pid}"
+        f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} launch.ps1 started, PID: {process.pid}"
     )
 
     # 일정 시간 간격 (예: 5분 = 300초)으로 git pull 실행
