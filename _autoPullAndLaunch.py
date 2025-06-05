@@ -101,7 +101,7 @@ def main():
             kill_process(process)
             # 변경사항 감지 후 잠깐 대기 (옵션)
             time.sleep(5)
-            process = start_launch_bat()
+            process = start_launch_ps1()
             print(
                 f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} launch.bat restarted, PID: {process.pid}"
             )
