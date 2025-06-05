@@ -21,10 +21,10 @@ messages = [
 
 # Query the model
 try:
-    response = client.chat.completions.create(model="o3-mini", messages=messages)
+    response = client.chat.completions.create(model="o4-mini", messages=messages)
 
     # Print the response
-    print("\nResponse from o3-mini:")
+    print("\nResponse from o4-mini:")
     print(response.choices[0].message.content)
 
 except openai.OpenAIError as e:

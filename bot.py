@@ -7,7 +7,6 @@ from discord.ext import commands
 from dotenv import load_dotenv
 
 from func.find1557 import find1557
-from func.simsim_e import simsim_chatbot
 from func.spring_ai import spring_ai
 from func.youtube_summary import check_youtube_link
 
@@ -24,13 +23,14 @@ DISCORD_CLIENT.NICKNAMES = {}  # 유저 닉네임 저장
 DISCORD_CLIENT.SETTING_DATA = os.path.join(
     BASE_DIR, "settingData.json"
 )  # settingData 파일 이름
-DISCORD_CLIENT.SIMSIM_MODE = False
-DISCORD_CLIENT.SIMSIM_CHATS = None
 DISCORD_CLIENT.PARTY_LIST = {}
 
 # Spring AI
+DISCORD_CLIENT.CONV_ID_AGGRESSIVE = None
+DISCORD_CLIENT.CONV_ID_FRIENDLY = None
 DISCORD_CLIENT.CONV_ID = None
 DISCORD_CLIENT.SPRING_AI_MODE = False
+DISCORD_CLIENT.SPRING_AI_STYLE = "공격적"
 
 # 환경 변수를 .env 파일에서 로딩
 load_dotenv()
@@ -98,7 +98,7 @@ async def on_ready():
         # test_guild = discord.Object(id=GUILD_ID)
         # synced = await DISCORD_CLIENT.tree.sync(guild=test_guild)
         synced = await DISCORD_CLIENT.tree.sync()
-        print(f"[슬래시] {len(synced)}개 커맨드 동기화 완료.")
+        print(f"[커맨드] {len(synced)}개 슬래시 커맨드 동기화 완료.")
     except Exception as e:
         print(f"슬래시 커맨드 동기화 실패: {e}")
 
@@ -151,14 +151,11 @@ async def on_message(message):
     # !명령어 처리 루틴 호출
     await DISCORD_CLIENT.process_commands(message)
 
-    # !심심이
-    await simsim_chatbot(DISCORD_CLIENT, message)
+    # !1557 처리
+    await find1557(message)
 
     # !스프링 AI
     await spring_ai(DISCORD_CLIENT, message)
-
-    # !1557 처리
-    await find1557(message)
 
 
 #! client.command
@@ -194,7 +191,7 @@ async def load_recent_messages():
     print(f"채널 '{target_channel.name}'에서 오늘의 메시지를 불러옵니다...")
     today = datetime.now(SEOUL_TZ).date()  # UTC 기준 오늘 날짜
     DISCORD_CLIENT.USER_MESSAGES["神᲼"] = []
-    async for message in target_channel.history(limit=1000):  # 최대 1000개 로드
+    async for message in target_channel.history(limit=1557):  # 최대 1557개 로드
         # print(message)
         message_timestamp = message.created_at.astimezone(SEOUL_TZ).strftime(
             "%Y-%m-%d %H:%M:%S"

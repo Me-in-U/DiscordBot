@@ -22,37 +22,27 @@ REQUEST_HEADERS = {
 def get_rank_data(game_name, tag_line, rank_type="solo"):
     try:
         # Riot ID로 PUUID 조회
-        player_data = requests.get(
+        response = requests.get(
             f"https://asia.api.riotgames.com/riot/account/v1/accounts/by-riot-id/{game_name}/{tag_line}",
             headers=REQUEST_HEADERS,
         ).json()
-        print(player_data)
+        print(response)
 
-        # PUUID로 소환사 정보 조회
-        puuid = player_data["puuid"]
-        print(puuid)
-        player = requests.get(
-            f"https://kr.api.riotgames.com/lol/summoner/v4/summoners/by-puuid/{puuid}",
+        # PUUID로 랭크 정보 조회회
+        encryptedPUUID = response["puuid"]
+
+        response = requests.get(
+            f"https://kr.api.riotgames.com/lol/league/v4/entries/by-puuid/{encryptedPUUID}",
             headers=REQUEST_HEADERS,
         ).json()
-
-        if "id" not in player:
-            return f"{game_name}#{tag_line}의 소환사 정보를 찾을 수 없습니다."
-
-        # 소환사 ID로 랭크 데이터 조회
-        encrypted_summoner_id = player["id"]
-        player_info = requests.get(
-            f"https://kr.api.riotgames.com/lol/league/v4/entries/by-summoner/{encrypted_summoner_id}",
-            headers=REQUEST_HEADERS,
-        ).json()
-        print(player_info)
+        print(response)
 
         # 랭크 정보 추출
-        first_is_solo = player_info[0]["queueType"] == "RANKED_SOLO_5x5"
+        first_is_solo = response[0]["queueType"] == "RANKED_SOLO_5x5"
         index = 0 if rank_type == "solo" else 1
         index = 1 - index if not first_is_solo else index
 
-        rank_data = player_info[index]
+        rank_data = response[index]
         # 반환 메시지
         return {
             "game_name": game_name,
@@ -72,5 +62,5 @@ def get_rank_data(game_name, tag_line, rank_type="solo"):
 
 
 # game_name = "손성락"
-# tag_line = "KR2"
+# tag_line = "손성락"
 # print(get_rank_data(game_name, tag_line))

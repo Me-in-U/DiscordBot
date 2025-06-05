@@ -14,7 +14,7 @@ class Party(commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         """봇이 준비되었을 때 호출됩니다."""
-        print("DISCORD_CLIENT on_ready() -> Party Cog : on ready!")
+        print("DISCORD_CLIENT -> Party Cog : on ready!")
 
     @app_commands.command(
         name="파티", description="현재 생성되어있는 파티 리스트를 출력합니다."
