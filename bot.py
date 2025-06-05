@@ -19,7 +19,6 @@ intents.members = True
 DISCORD_CLIENT = commands.Bot(command_prefix="/", intents=intents)
 DISCORD_CLIENT.remove_command("help")
 DISCORD_CLIENT.USER_MESSAGES = {}  # 유저별 채팅팅 저장용 딕셔너리
-DISCORD_CLIENT.NICKNAMES = {}  # 유저 닉네임 저장
 DISCORD_CLIENT.SETTING_DATA = os.path.join(
     BASE_DIR, "settingData.json"
 )  # settingData 파일 이름
@@ -76,9 +75,8 @@ async def load_variable():
     await asyncio.sleep(1)
     print()
     await load_recent_messages()
-    await load_all_nicknames()
     await load_party_list()
-    print("[최근 메시지, 닉네임, 파티] 로드 완료\n")
+    print("[최근 메시지, 파티] 로드 완료\n")
 
 
 #! client.event
@@ -115,19 +113,20 @@ async def on_message(message):
     # 이미지 첨부 확인
     if message.attachments:
         image_url = message.attachments[0].url
-
+    # 유저 닉네임 혹은 글로벌 이름 가져오기
+    user = message.author.nick if message.author.nick else message.author.global_name
     #! 일반 채팅 저장
     if image_url:
-        print(f"{timestamp} {message.author.name}: {message.content} {image_url}")
+        print(f"{timestamp} {user}: {message.content} [이미지 첨부]")
     else:
-        print(f"{timestamp} {message.author.name}: {message.content}")
+        print(f"{timestamp} {user}: {message.content}")
 
-    if message.author.name not in DISCORD_CLIENT.USER_MESSAGES:
-        DISCORD_CLIENT.USER_MESSAGES[message.author.name] = []
+    if user not in DISCORD_CLIENT.USER_MESSAGES:
+        DISCORD_CLIENT.USER_MESSAGES[user] = []
 
     #! 봇 메시지는 이하 명령 무시
     if message.author == DISCORD_CLIENT.user:
-        DISCORD_CLIENT.USER_MESSAGES[message.author.name].append(
+        DISCORD_CLIENT.USER_MESSAGES[user].append(
             {
                 "role": "assistant",
                 "content": message.content,
@@ -137,11 +136,11 @@ async def on_message(message):
         return  # client 스스로가 보낸 메세지는 무시
     else:
         if image_url:
-            DISCORD_CLIENT.USER_MESSAGES[message.author.name].append(
+            DISCORD_CLIENT.USER_MESSAGES[user].append(
                 {"content": message.content, "image_url": image_url, "time": timestamp}
             )
         else:
-            DISCORD_CLIENT.USER_MESSAGES[message.author.name].append(
+            DISCORD_CLIENT.USER_MESSAGES[user].append(
                 {"content": message.content, "time": timestamp}
             )
 
@@ -228,22 +227,6 @@ async def load_recent_messages():
             reversed(DISCORD_CLIENT.USER_MESSAGES[user])
         )
     # print(DISCORD_CLIENT.USER_MESSAGES)
-
-
-async def load_all_nicknames():
-    """
-    연결된 모든 서버 멤버의 닉네임을 저장합니다.
-    """
-    # 봇이 참여한 모든 길드(서버) 확인
-    print("------------------- 닉네임 로드 -------------------")
-    for guild in DISCORD_CLIENT.guilds:
-        print(f"서버 '{guild.name}'에서 멤버 목록을 불러옵니다...")
-        for member in guild.members:
-            DISCORD_CLIENT.NICKNAMES[member.name] = (
-                member.display_name if member.display_name else None
-            )
-    # print(DISCORD_CLIENT.NICKNAMES)
-    print("---------------------------------------------------\n")
 
 
 async def main():

@@ -44,7 +44,7 @@ class SummarizeCommands(commands.Cog):
                     "주어진 대화 내용을 요약해주세요. "
                     "전체적인 내용을 3줄 이내로 요약. "
                     "그 이후 각 유저가 한 말을 따로 요약한걸 추가해줘. "
-                    "닉네임 : 요약 형식으로. "
+                    "유저이름 : 요약 형식으로. "
                     "자연스러운 말투로 말해줘. "
                     "추가 요청 사항이 있다면 위 내용보다 우선 처리 해줘줘"
                     "대화에 참여하지 않은 유저는 알려주지마"
@@ -55,7 +55,6 @@ class SummarizeCommands(commands.Cog):
                 "content": (
                     "다음은 유저가 말했던 기록이다. 채팅 내용을 요약해라."
                     f"전체 대화 내용: {self.bot.USER_MESSAGES}\n\n"
-                    f"닉네임 정보:{self.bot.NICKNAMES}\n"
                 ),
             },
             {

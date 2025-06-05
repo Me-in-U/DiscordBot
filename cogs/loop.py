@@ -92,7 +92,7 @@ class LoopTasks(commands.Cog):
             print("대상 채널을 찾을 수 없습니다.")
             return
 
-        if self.daily_rank_loop:
+        if self.daily_rank_loop_enabled:
             try:
                 await target_channel.send(
                     "📢 새로운 하루가 시작됩니다. 일일 솔랭 정보 출력"
@@ -110,7 +110,7 @@ class LoopTasks(commands.Cog):
                     yesterday_data["game_name"] != today_rank_data["game_name"]
                     or yesterday_data["tag_line"] != today_rank_data["tag_line"]
                 ):
-                    await target_channel.send("🆕 새로운 유저가 감지되었습니다!")
+                    await target_channel.send("새로운 유저가 감지되었습니다!")
                     settings["dailySoloRank"]["yesterdayData"] = today_rank_data
                     rank_update_message = self.print_rank_data(today_rank_data)
                 else:

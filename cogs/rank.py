@@ -12,7 +12,7 @@ class RankCommands(commands.Cog):
         self.bot = bot
         self.game_name = None  # 게임 닉네임
         self.tag_line = None  # 게임 태그
-        self.daily_rank_loop = True  # 일일 랭크 루프 상태
+        self.daily_rank_loop_enabled = False  # 일일 랭크 루프 상태
         self.load_settings()  # 초기 설정 로드
         print("Rank Cog : init 로드 완료!")
 
@@ -27,7 +27,7 @@ class RankCommands(commands.Cog):
             settings = json.load(file)
         self.game_name = settings["dailySoloRank"]["userData"].get("game_name", "")
         self.tag_line = settings["dailySoloRank"]["userData"].get("tag_line", "")
-        self.daily_rank_loop = settings["dailySoloRank"].get("loop", True)
+        self.daily_rank_loop_enabled = settings["dailySoloRank"].get("loop", False)
 
     def save_settings(self):
         """현재 설정을 JSON 파일에 저장합니다."""
@@ -35,7 +35,7 @@ class RankCommands(commands.Cog):
             settings = json.load(file)
         settings["dailySoloRank"]["userData"]["game_name"] = self.game_name
         settings["dailySoloRank"]["userData"]["tag_line"] = self.tag_line
-        settings["dailySoloRank"]["loop"] = self.daily_rank_loop
+        settings["dailySoloRank"]["loop"] = self.daily_rank_loop_enabled
         with open(self.bot.SETTING_DATA, "w", encoding="utf-8") as file:
             json.dump(settings, file, ensure_ascii=False, indent=4)
 
@@ -126,10 +126,10 @@ class RankCommands(commands.Cog):
         try:
             if status.lower() not in ["true", "false"]:
                 raise ValueError
-            self.daily_rank_loop = status.lower() == "true"
+            self.daily_rank_loop_enabled = status.lower() == "true"
             self.save_settings()
             await interaction.response.send_message(
-                f"✅ **루프 상태가 {'활성화' if self.daily_rank_loop else '비활성화'}로 변경되었습니다.**"
+                f"✅ **루프 상태가 {'활성화' if self.daily_rank_loop_enabled else '비활성화'}로 변경되었습니다.**"
             )
         except ValueError:
             await interaction.response.send_message(

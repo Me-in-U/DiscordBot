@@ -53,9 +53,8 @@ class QuestionCommands(commands.Cog):
                 "role": "developer",
                 "content": (
                     "채팅 내용에 관한 질문을 한다면 아래 내용을 참고해라"
-                    "다음은 모든 유저가 말했던 기록과 닉네임 정보이다.\n"
+                    "다음은 모든 유저가 말했던 기록 정보이다.\n"
                     f"전체 대화 내용: {self.bot.USER_MESSAGES}\n\n"
-                    f"닉네임 정보:{self.bot.NICKNAMES}\n"
                 ),
             },
         ]
@@ -131,9 +130,8 @@ class QuestionCommands(commands.Cog):
                 "role": "developer",
                 "content": (
                     "채팅 내용에 관한 질문을 한다면 아래 내용을 참고해라"
-                    "다음은 모든 유저가 말했던 기록과 닉네임 정보이다.\n"
+                    "다음은 모든 유저가 말했던 기록 이다.\n"
                     f"전체 대화 내용: {self.bot.USER_MESSAGES}\n\n"
-                    f"닉네임 정보:{self.bot.NICKNAMES}\n"
                 ),
             },
         ]
