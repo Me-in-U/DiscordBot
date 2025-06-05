@@ -7,7 +7,7 @@ Set-Location $root
 & "$root\.venv\Scripts\Activate.ps1"
 
 # 3) 봇 실행
-python bot.py
+python _autoPullAndLaunch.py
 
 # 4) 실행 결과 확인을 위해 일시 정지 (PowerShell에서는 Read-Host 사용)
 Read-Host "`nPress Enter to exit..."
