@@ -77,12 +77,12 @@ class LoopTasks(commands.Cog):
         if holiday_list:
             message += "\n### 기념일\n- " + "\n- ".join(holiday_list)
 
-        print(f"[{datetime.now()}] user_messages 초기화 완료.")
         await target_channel.send(message)
 
         # 유저 메시지 초기화 및 리로드
         self.bot.USER_MESSAGES = {}
         await load_recent_messages()
+        print(f"[{datetime.now()}] user_messages 초기화 완료.")
 
     @tasks.loop(time=time(hour=0, minute=0, tzinfo=SEOUL_TZ))  # 매일 자정
     async def update_rank_data(self):

@@ -171,7 +171,7 @@ class InterpretCommands(commands.Cog):
                 if image_url:
                     interpreted = general_purpose_model(
                         messages,
-                        model="gpt-4o-mini",
+                        model="gpt-4.1-nano",
                         temperature=0.6,
                     )
                 else:

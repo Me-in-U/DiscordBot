@@ -2,29 +2,24 @@ import aiohttp
 
 
 async def spring_ai(DISCORD_CLIENT, message):
-    # ! AI 모드 토글
-    if message.content == "AI":
-        if DISCORD_CLIENT.SPRING_AI_MODE:
-            # AI 모드가 활성화되어 있으면 비활성화
-            DISCORD_CLIENT.SPRING_AI_MODE = False
-            await message.channel.send("AI 모드가 비활성화되었습니다.")
-            return
-        else:
-            # AI 모드가 비활성화되어 있으면 활성화
-            DISCORD_CLIENT.SPRING_AI_MODE = True
-            await message.channel.send("AI 모드가 활성화되었습니다.")
-
     # ! AI모드가 활성화되어 있고, 봇이 보낸 메시지가 아니면 처리
     if not DISCORD_CLIENT.SPRING_AI_MODE or message.author == DISCORD_CLIENT.user:
         return
+    if DISCORD_CLIENT.SPRING_AI_STYLE == "공격적":
+        endpoint = "aggressive"
+        conv_attr = "CONV_ID_AGGRESSIVE"
+    else:
+        endpoint = "friendly"
+        conv_attr = "CONV_ID_FRIENDLY"
 
-    url = "https://api.sonpanno.com/api/v1/discord/chat"
+    url = f"https://api.sonpanno.com/api/v1/discord/chat/{endpoint}"
+    url = f"http://localhost:8080/api/v1/discord/chat/{endpoint}"
+    currentConvId = getattr(DISCORD_CLIENT, conv_attr, None)
     payload = {
-        "message": message.content,
-        "convoId": DISCORD_CLIENT.CONV_ID,
+        "message": f"{message.content}",
+        "convoId": currentConvId,
     }
-    # SSL 검증을 끄는 컨텍터 생성 (False로 설정하면 인증서 오류 발생 시에도 요청 진행)
-    # connector = aiohttp.TCPConnector(ssl=False)
+
     try:
         async with aiohttp.ClientSession() as session:
             async with session.post(url, json=payload) as resp:
@@ -33,8 +28,13 @@ async def spring_ai(DISCORD_CLIENT, message):
         print("HTTP 요청 실패:", e)
         await message.channel.send(f"HTTP 요청 실패: {e}")
         return
+
     print("Spring AI 응답:", response_data)
+
     # DTO 전체 응답: showMessage가 True이면 메시지 출력
     if response_data.get("showMessage"):
         await message.channel.send(response_data.get("message"))
-        DISCORD_CLIENT.CONV_ID = response_data.get("convoId")
+        # 응답에 새로운 convoId가 있으면 업데이트
+        new_conv = response_data.get("convoId")
+        if new_conv:
+            setattr(DISCORD_CLIENT, conv_attr, new_conv)
