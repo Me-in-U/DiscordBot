@@ -13,7 +13,7 @@ async def spring_ai(DISCORD_CLIENT, message):
         conv_attr = "CONV_ID_FRIENDLY"
 
     url = f"https://api.sonpanno.com/api/v1/discord/chat/{endpoint}"
-    url = f"http://localhost:8080/api/v1/discord/chat/{endpoint}"
+    # url = f"http://localhost:8080/api/v1/discord/chat/{endpoint}"
     currentConvId = getattr(DISCORD_CLIENT, conv_attr, None)
     payload = {
         "message": f"{message.content}",
