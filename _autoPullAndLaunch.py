@@ -54,7 +54,7 @@ def start_launch_ps1():
 
     proc = subprocess.Popen(
         [
-            "powershell.exe",
+            r"C:\Program Files\PowerShell\7\pwsh.exe",
             "-NoProfile",
             "-ExecutionPolicy",
             "Bypass",
