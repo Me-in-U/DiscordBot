@@ -18,16 +18,14 @@ class SearchCommands(commands.Cog):
         name="검색",
         description="웹에서 최신 정보를 검색합니다. 텍스트 매개변수로 검색어를 입력하세요.",
     )
-    @app_commands.describe(query="검색할 내용을 입력하세요.")
-    async def search(self, interaction: discord.Interaction, query: str):
+    @app_commands.describe(내용="검색할 내용을 입력하세요.")
+    async def search(self, interaction: discord.Interaction, 내용: str):
         # 슬래시 커맨드 응답을 대기 상태로 둡니다.
         await interaction.response.defer(thinking=True)
 
         try:
             # 서울 지역을 기준으로 웹 검색 수행
-            response = web_search(
-                query=query, model="gpt-4o-mini-search-preview", temperature=0.3
-            )
+            response = web_search(query=내용, model="gpt-4o-mini-search-preview")
         except Exception as e:
             response = f"Error: {e}"
 
