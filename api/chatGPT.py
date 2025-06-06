@@ -65,10 +65,9 @@ def structured_response(messages, model="gpt-4.1-nano", rf=Exist1557):
         raise
 
 
-def web_search(query: str, model: str = "gpt-4o-mini-search-preview") -> str:
+def web_search(query: str, model: str = "gpt-4.1-mini") -> str:
     """
     :param query: 검색할 문자열
-    :param model: 사용할 모델 (웹 검색 가능 모델 "gpt-4o-mini-search-preview" 권장)
     :return: 웹 검색 결과를 포함한 모델 응답 텍스트
     """
     response = clientGPT.chat.completions.create(
