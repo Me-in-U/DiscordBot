@@ -115,7 +115,8 @@ async def find1557(message):
         # 만약 true라면
         count = count1557(message.content)
         if response.exist or count:
-            await message.channel.send("1557")
+            # 3초 뒤 사라짐
+            await message.channel.send("1557", delete_after=3)
             userCount(message.author, count)
             print("1557 발견")
             return
