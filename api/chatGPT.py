@@ -71,6 +71,19 @@ def web_search(input: str, model: str = "gpt-4.1-mini") -> str:
     :return: 웹 검색 결과를 포함한 모델 응답 텍스트
     """
     response = clientGPT.responses.create(
-        model=model, tools=[{"type": "web_search_preview"}], input=input
+        model=model,
+        tools=[
+            {
+                "type": "web_search_preview",
+                "user_location": {
+                    "type": "approximate",
+                    "country": "KR",
+                    "city": "Seoul",
+                    "region": "Seoul",
+                },
+                "search_context_size": "high",
+            }
+        ],
+        input=input,
     )
-    return response.choices[0].message.content.strip()
+    return response.output_text
