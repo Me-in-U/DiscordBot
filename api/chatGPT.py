@@ -65,20 +65,12 @@ def structured_response(messages, model="gpt-4.1-nano", rf=Exist1557):
         raise
 
 
-def web_search(query: str, model: str = "gpt-4.1-mini") -> str:
+def web_search(input: str, model: str = "gpt-4.1-mini") -> str:
     """
-    :param query: 검색할 문자열
+    :param input: 검색할 문자열
     :return: 웹 검색 결과를 포함한 모델 응답 텍스트
     """
-    response = clientGPT.chat.completions.create(
-        model=model,
-        web_search_options={
-            "user_location": {
-                "type": "approximate",
-                "approximate": {"country": "KR", "city": "Seoul", "region": "Seoul"},
-            },
-            "search_context_size": "medium",
-        },
-        messages=[{"role": "user", "content": query}],
+    response = clientGPT.responses.create(
+        model=model, tools=[{"type": "web_search_preview"}], input=input
     )
     return response.choices[0].message.content.strip()
