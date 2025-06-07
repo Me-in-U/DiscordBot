@@ -16,5 +16,9 @@
 			"win_rate": 52.19298245614035
 		},
 		"loop": false
+	},
+	"youtubeLiveChecker": {
+		"loop": false,
+		"youtubeChannelId": "UCU_hKD03cUTCvnOJpEmKvCg"
 	}
 }
