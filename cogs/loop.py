@@ -1,12 +1,15 @@
 import json
+import os
 from datetime import datetime, time
 
 import discord
 import holidays
 from discord.ext import commands, tasks
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 
 from api.riot import get_rank_data
-from bot import CHANNEL_ID, SEOUL_TZ, load_recent_messages
+from bot import CHANNEL_ID, TEST_CHANNEL_ID, SEOUL_TZ, load_recent_messages
 from func.find1557 import clearCount
 
 SPECIAL_DAYS_FILE = "special_days.json"
@@ -19,6 +22,7 @@ class LoopTasks(commands.Cog):
         self.new_day_clear.start()
         self.update_rank_data.start()
         self.weekly_1557_report.start()
+        self.youtube_live_check.start()
         print("LoopTasks Cog : init 완료!")
 
     @commands.Cog.listener()
@@ -174,6 +178,42 @@ class LoopTasks(commands.Cog):
 
         # 카운트 초기화
         clearCount()
+
+    @tasks.loop(seconds=60)
+    async def youtube_live_check(self):
+        """60초마다 특정 채널의 LIVE 시작 여부를 Discord에 알립니다."""
+        # 최초 한 번만 빌드
+        if not hasattr(self, "_youtube"):
+            api_key = os.getenv("GOOGLE_API_KEY")
+            self._youtube = build("youtube", "v3", developerKey=api_key)
+            self._last_live_id = None
+
+        channel_id = "UCU_hKD03cUTCvnOJpEmKvCg"  # 감시할 채널 ID
+        try:
+            req = self._youtube.search().list(
+                part="snippet",
+                channelId=channel_id,
+                eventType="live",
+                type="video",
+                maxResults=1,
+            )
+            res = req.execute()
+            items = res.get("items", [])
+            vid = items[0]["id"]["videoId"] if items else None
+        except HttpError as e:
+            print(f"Youtube API 에러: {e}")
+            return
+
+        target = self.bot.get_channel(CHANNEL_ID)
+        test_target = self.bot.get_channel(TEST_CHANNEL_ID)
+        if vid and vid != self._last_live_id:
+            await target.send(
+                f"📺 **메이플스토리 LIVE 시작!** ▶ https://youtu.be/{vid}"
+            )
+            self._last_live_id = vid
+        elif not vid:
+            await test_target.send("❌ 현재 LIVE 방송이 없습니다.")
+            self._last_live_id = None
 
 
 async def setup(bot):
