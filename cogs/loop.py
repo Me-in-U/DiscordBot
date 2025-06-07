@@ -182,7 +182,7 @@ class LoopTasks(commands.Cog):
         # 카운트 초기화
         clearCount()
 
-    @tasks.loop(seconds=60)
+    @tasks.loop(seconds=120)
     async def youtube_live_check(self):
         """60초마다 특정 채널의 LIVE 시작 여부를 Discord에 알립니다."""
         # 설정 파일에서 loop 활성화 여부 및 채널 ID 로드
@@ -218,15 +218,14 @@ class LoopTasks(commands.Cog):
                 f"📺 **메이플스토리 LIVE 시작!** ▶ https://youtu.be/{vid}"
             )
             self._last_live_id = vid
+            # 알림 후 loop 비활성화
+            cfg["loop"] = False
+            with open(self.bot.SETTING_DATA, "w", encoding="utf-8") as f:
+                json.dump(settings, f, ensure_ascii=False, indent=4)
+            self.youtube_live_check.stop()
         else:
             await test_target.send("❌ 현재 LIVE가 없습니다.")
             self._last_live_id = None
-
-        # 알림 후 loop 비활성화
-        cfg["loop"] = False
-        with open(self.bot.SETTING_DATA, "w", encoding="utf-8") as f:
-            json.dump(settings, f, ensure_ascii=False, indent=4)
-        self.youtube_live_check.stop()
 
     @youtube_live_check.before_loop
     async def before_youtube_live_check(self):

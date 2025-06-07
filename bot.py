@@ -115,7 +115,14 @@ async def on_message(message):
     if message.attachments:
         image_url = message.attachments[0].url
     # 유저 닉네임 혹은 글로벌 이름 가져오기
-    user = message.author.nick if message.author.nick else message.author.global_name
+    # 유저 이름 가져오기 (Member vs User 구분)
+    if isinstance(message.author, discord.Member):
+        # 서버 내 멤버라면 nick(별명) 우선, 없으면 username
+        user = message.author.nick or message.author.name
+    else:
+        # DM 또는 봇(Self) 메시지 등은 name
+        user = message.author.name
+
     #! 일반 채팅 저장
     if image_url:
         print(f"{timestamp} {user}: {message.content} [이미지 첨부]")
