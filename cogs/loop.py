@@ -22,6 +22,9 @@ class LoopTasks(commands.Cog):
         self.new_day_clear.start()
         self.update_rank_data.start()
         self.weekly_1557_report.start()
+        api_key = os.getenv("GOOGLE_API_KEY")
+        self._youtube = build("youtube", "v3", developerKey=api_key)
+        self._last_live_id = None
         self.youtube_live_check.start()
         print("LoopTasks Cog : init 완료!")
 
@@ -182,12 +185,6 @@ class LoopTasks(commands.Cog):
     @tasks.loop(seconds=60)
     async def youtube_live_check(self):
         """60초마다 특정 채널의 LIVE 시작 여부를 Discord에 알립니다."""
-        # 최초 한 번만 빌드
-        if not hasattr(self, "_youtube"):
-            api_key = os.getenv("GOOGLE_API_KEY")
-            self._youtube = build("youtube", "v3", developerKey=api_key)
-            self._last_live_id = None
-
         channel_id = "UCU_hKD03cUTCvnOJpEmKvCg"  # 감시할 채널 ID
         try:
             req = self._youtube.search().list(
@@ -214,6 +211,11 @@ class LoopTasks(commands.Cog):
         elif not vid:
             await test_target.send("❌ 현재 LIVE 방송이 없습니다.")
             self._last_live_id = None
+
+    @youtube_live_check.before_loop
+    async def before_youtube_live_check(self):
+        print("-------------YouTube 라이브 체크 대기중...---------------")
+        await self.bot.wait_until_ready()
 
 
 async def setup(bot):
