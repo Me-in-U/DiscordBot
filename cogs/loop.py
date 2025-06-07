@@ -182,51 +182,51 @@ class LoopTasks(commands.Cog):
         # 카운트 초기화
         clearCount()
 
-        @tasks.loop(seconds=60)
-        async def youtube_live_check(self):
-            """60초마다 특정 채널의 LIVE 시작 여부를 Discord에 알립니다."""
-            # 설정 파일에서 loop 활성화 여부 및 채널 ID 로드
-            with open(self.bot.SETTING_DATA, "r", encoding="utf-8") as f:
-                settings = json.load(f)
-            cfg = settings["youtubeLiveChecker"]
-            if not cfg.get("loop", False):
-                return  # loop 비활성화 상태면 동작 안 함
+    @tasks.loop(seconds=60)
+    async def youtube_live_check(self):
+        """60초마다 특정 채널의 LIVE 시작 여부를 Discord에 알립니다."""
+        # 설정 파일에서 loop 활성화 여부 및 채널 ID 로드
+        with open(self.bot.SETTING_DATA, "r", encoding="utf-8") as f:
+            settings = json.load(f)
+        cfg = settings["youtubeLiveChecker"]
+        if not cfg.get("loop", False):
+            return  # loop 비활성화 상태면 동작 안 함
 
-            channel_id = cfg.get("youtubeChannelId")
-            try:
-                res = (
-                    self._youtube.search()
-                    .list(
-                        part="snippet",
-                        channelId=channel_id,
-                        eventType="live",
-                        type="video",
-                        maxResults=1,
-                    )
-                    .execute()
+        channel_id = cfg.get("youtubeChannelId")
+        try:
+            res = (
+                self._youtube.search()
+                .list(
+                    part="snippet",
+                    channelId=channel_id,
+                    eventType="live",
+                    type="video",
+                    maxResults=1,
                 )
-                items = res.get("items", [])
-                vid = items[0]["id"]["videoId"] if items else None
-            except HttpError as e:
-                print(f"Youtube API 에러: {e}")
-                return
+                .execute()
+            )
+            items = res.get("items", [])
+            vid = items[0]["id"]["videoId"] if items else None
+        except HttpError as e:
+            print(f"Youtube API 에러: {e}")
+            return
 
-            target = self.bot.get_channel(CHANNEL_ID)
-            test_target = self.bot.get_channel(TEST_CHANNEL_ID)
-            if vid and vid != self._last_live_id:
-                await target.send(
-                    f"📺 **메이플스토리 LIVE 시작!** ▶ https://youtu.be/{vid}"
-                )
-                self._last_live_id = vid
-            else:
-                await test_target.send("❌ 현재 LIVE가 없습니다.")
-                self._last_live_id = None
+        target = self.bot.get_channel(CHANNEL_ID)
+        test_target = self.bot.get_channel(TEST_CHANNEL_ID)
+        if vid and vid != self._last_live_id:
+            await target.send(
+                f"📺 **메이플스토리 LIVE 시작!** ▶ https://youtu.be/{vid}"
+            )
+            self._last_live_id = vid
+        else:
+            await test_target.send("❌ 현재 LIVE가 없습니다.")
+            self._last_live_id = None
 
-            # 알림 후 loop 비활성화
-            cfg["loop"] = False
-            with open(self.bot.SETTING_DATA, "w", encoding="utf-8") as f:
-                json.dump(settings, f, ensure_ascii=False, indent=4)
-            self.youtube_live_check.stop()
+        # 알림 후 loop 비활성화
+        cfg["loop"] = False
+        with open(self.bot.SETTING_DATA, "w", encoding="utf-8") as f:
+            json.dump(settings, f, ensure_ascii=False, indent=4)
+        self.youtube_live_check.stop()
 
     @youtube_live_check.before_loop
     async def before_youtube_live_check(self):
