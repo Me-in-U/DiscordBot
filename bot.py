@@ -16,6 +16,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
+intents.voice_states = True
 DISCORD_CLIENT = commands.Bot(command_prefix="/", intents=intents)
 DISCORD_CLIENT.remove_command("help")
 DISCORD_CLIENT.USER_MESSAGES = {}  # 유저별 채팅팅 저장용 딕셔너리
@@ -75,7 +76,7 @@ async def load_party_list():
 async def load_variable():
     await asyncio.sleep(1)
     print()
-    await load_recent_messages()
+    # await load_recent_messages()
     await load_party_list()
     print("[최근 메시지, 파티] 로드 완료\n")
 
@@ -86,20 +87,30 @@ async def on_ready():
     """
     봇 실행 준비.
     """
+    # 파티 목록 등 기타 초기화
     await load_variable()
+
+    # 슬래시 커맨드 등록(동기화)
+    # 로드된 Cog 정보 출력
+    print("Loaded Cogs:", DISCORD_CLIENT.cogs.keys())
+    try:
+        # 테스트 서버(개발용)에 우선 동기화
+        TEST_GUILD = discord.Object(id=GUILD_ID)
+        synced_test = await DISCORD_CLIENT.tree.sync(guild=TEST_GUILD)
+        print(f"[TEST SYNC] {len(synced_test)}개 명령어 동기화 (길드 ID={GUILD_ID})")
+
+        # 글로벌 동기화
+        synced_global = await DISCORD_CLIENT.tree.sync()
+        print(f"[GLOBAL SYNC] {len(synced_global)}개 명령어 동기화")
+    except Exception as e:
+        print(f"슬래시 커맨드 동기화 실패: {e}")
+
+    # 로그인 완료 로그
     print(f"Logged on as {DISCORD_CLIENT.user}!")
     r = datetime.now(SEOUL_TZ).weekday()
     weekday = ["월", "화", "수", "목", "금", "토", "일"]
     print(f"오늘은 {weekday[r]}요일입니다.")
     print(f"현재 시간: {datetime.now(SEOUL_TZ).strftime('%Y-%m-%d %H:%M:%S')}")
-    # 슬래시 커맨드 등록(동기화)
-    try:
-        # test_guild = discord.Object(id=GUILD_ID)
-        # synced = await DISCORD_CLIENT.tree.sync(guild=test_guild)
-        synced = await DISCORD_CLIENT.tree.sync()
-        print(f"[커맨드] {len(synced)}개 슬래시 커맨드 동기화 완료.")
-    except Exception as e:
-        print(f"슬래시 커맨드 동기화 실패: {e}")
 
 
 @DISCORD_CLIENT.event

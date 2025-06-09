@@ -1,3 +1,4 @@
 {
-	"cSpell.words": ["audiofile", "pydantic"]
+	"cSpell.words": ["audiofile", "pydantic"],
+	"python.analysis.autoImportCompletions": false
 }
