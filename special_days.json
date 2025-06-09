@@ -250,7 +250,15 @@
 	],
 	"06-08": ["세계 해양의 날 (World Oceans Day)", "세계 최고의 친구의 날 (Best Friends Day)"],
 	"06-09": ["세계 아코디언의 날 (World Accordion Day)"],
-	"06-10": ["세계 아이스티의 날 (National Iced Tea Day)"],
+	"06-10": [
+		"세계 아이스티의 날 (National Iced Tea Day)",
+		"1987년 대한민국: 6월 민주 항쟁 시작, 6·10 민주항쟁 기념일",
+		"2010년 대한민국: 나로호가 발사되었으나 고도70km 지점에서 폭발한 날",
+		"프랑스령 기아나: 노예제 폐지의 날",
+		"포르투갈: 포르투갈 데이(Portugal Day)",
+		"포르투갈: 루이스 데 까모에스의 날(Luís de Camões)",
+		"콩고 공화국: 화해의 날(Reconciliation Day)"
+	],
 	"06-12": ["세계 아동 노동 반대의 날 (World Day Against Child Labour)"],
 	"06-13": ["국제 백색증 인식의 날 (International Albinism Awareness Day)"],
 	"06-14": ["세계 헌혈의 날 (World Blood Donor Day)"],
