@@ -20,7 +20,6 @@ class LoopTasks(commands.Cog):
         self.bot = bot
         self.presence_update_task.start()
         self.new_day_clear.start()
-        self.update_rank_data.start()
         self.weekly_1557_report.start()
         api_key = os.getenv("GOOGLE_API_KEY")
         self._youtube = build("youtube", "v3", developerKey=api_key)
@@ -90,52 +89,6 @@ class LoopTasks(commands.Cog):
         self.bot.USER_MESSAGES = {}
         await load_recent_messages()
         print(f"[{datetime.now()}] user_messages 초기화 완료.")
-
-    @tasks.loop(time=time(hour=0, minute=0, tzinfo=SEOUL_TZ))  # 매일 자정
-    async def update_rank_data(self):
-        """매일 자정에 랭킹 정보를 업데이트합니다."""
-        target_channel = self.bot.get_channel(CHANNEL_ID)
-        if not target_channel:
-            print("대상 채널을 찾을 수 없습니다.")
-            return
-
-        if self.daily_rank_loop_enabled:
-            try:
-                await target_channel.send(
-                    "📢 새로운 하루가 시작됩니다. 일일 솔랭 정보 출력"
-                )
-                today_rank_data = get_rank_data(self.game_name, self.tag_line, "solo")
-
-                # JSON 파일 로드 및 업데이트
-                with open(self.bot.SETTING_DATA, "r", encoding="utf-8") as file:
-                    settings = json.load(file)
-
-                yesterday_data = settings["dailySoloRank"]["yesterdayData"]
-
-                # 새로운 유저 확인
-                if (
-                    yesterday_data["game_name"] != today_rank_data["game_name"]
-                    or yesterday_data["tag_line"] != today_rank_data["tag_line"]
-                ):
-                    await target_channel.send("새로운 유저가 감지되었습니다!")
-                    settings["dailySoloRank"]["yesterdayData"] = today_rank_data
-                    rank_update_message = self.print_rank_data(today_rank_data)
-                else:
-                    # 어제 데이터를 업데이트
-                    settings["dailySoloRank"]["yesterdayData"] = today_rank_data
-                    rank_update_message = self.print_rank_data(
-                        today_rank_data, yesterday_data
-                    )
-                await target_channel.send(rank_update_message)
-
-                # JSON 파일 저장
-                with open(self.bot.SETTING_DATA, "w", encoding="utf-8") as file:
-                    json.dump(settings, file, ensure_ascii=False, indent=4)
-
-            except Exception as e:
-                await target_channel.send(
-                    f"❌ 랭킹 정보를 업데이트하는 중 오류가 발생했습니다: {e}"
-                )
 
     @tasks.loop(time=time(hour=0, minute=0, tzinfo=SEOUL_TZ))  # 매일 자정 실행
     async def weekly_1557_report(self):

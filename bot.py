@@ -95,9 +95,9 @@ async def on_ready():
     print("Loaded Cogs:", DISCORD_CLIENT.cogs.keys())
     try:
         # 테스트 서버(개발용)에 우선 동기화
-        TEST_GUILD = discord.Object(id=GUILD_ID)
-        synced_test = await DISCORD_CLIENT.tree.sync(guild=TEST_GUILD)
-        print(f"[TEST SYNC] {len(synced_test)}개 명령어 동기화 (길드 ID={GUILD_ID})")
+        # TEST_GUILD = discord.Object(id=GUILD_ID)
+        # synced_test = await DISCORD_CLIENT.tree.sync(guild=TEST_GUILD)
+        # print(f"[TEST SYNC] {len(synced_test)}개 명령어 동기화 (길드 ID={GUILD_ID})")
 
         # 글로벌 동기화
         synced_global = await DISCORD_CLIENT.tree.sync()
