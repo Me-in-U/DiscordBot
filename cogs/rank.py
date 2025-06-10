@@ -1,10 +1,12 @@
+from datetime import time
 import json
 
 import discord
 from discord import app_commands
-from discord.ext import commands
+from discord.ext import commands, tasks
 
 from api.riot import get_rank_data
+from bot import CHANNEL_ID, SEOUL_TZ
 
 
 class RankCommands(commands.Cog):
@@ -14,6 +16,8 @@ class RankCommands(commands.Cog):
         self.tag_line = None  # 게임 태그
         self.daily_rank_loop_enabled = False  # 일일 랭크 루프 상태
         self.load_settings()  # 초기 설정 로드
+        # *Loop
+        self.update_rank_data.start()
         print("Rank Cog : init 로드 완료!")
 
     @commands.Cog.listener()
@@ -38,6 +42,52 @@ class RankCommands(commands.Cog):
         settings["dailySoloRank"]["loop"] = self.daily_rank_loop_enabled
         with open(self.bot.SETTING_DATA, "w", encoding="utf-8") as file:
             json.dump(settings, file, ensure_ascii=False, indent=4)
+
+    @tasks.loop(time=time(hour=0, minute=0, tzinfo=SEOUL_TZ))  # 매일 자정
+    async def update_rank_data(self):
+        """매일 자정에 랭킹 정보를 업데이트합니다."""
+        target_channel = self.bot.get_channel(CHANNEL_ID)
+        if not target_channel:
+            print("대상 채널을 찾을 수 없습니다.")
+            return
+
+        if self.daily_rank_loop_enabled:
+            try:
+                await target_channel.send(
+                    "📢 새로운 하루가 시작됩니다. 일일 솔랭 정보 출력"
+                )
+                today_rank_data = get_rank_data(self.game_name, self.tag_line, "solo")
+
+                # JSON 파일 로드 및 업데이트
+                with open(self.bot.SETTING_DATA, "r", encoding="utf-8") as file:
+                    settings = json.load(file)
+
+                yesterday_data = settings["dailySoloRank"]["yesterdayData"]
+
+                # 새로운 유저 확인
+                if (
+                    yesterday_data["game_name"] != today_rank_data["game_name"]
+                    or yesterday_data["tag_line"] != today_rank_data["tag_line"]
+                ):
+                    await target_channel.send("새로운 유저가 감지되었습니다!")
+                    settings["dailySoloRank"]["yesterdayData"] = today_rank_data
+                    rank_update_message = self.print_rank_data(today_rank_data)
+                else:
+                    # 어제 데이터를 업데이트
+                    settings["dailySoloRank"]["yesterdayData"] = today_rank_data
+                    rank_update_message = self.print_rank_data(
+                        today_rank_data, yesterday_data
+                    )
+                await target_channel.send(rank_update_message)
+
+                # JSON 파일 저장
+                with open(self.bot.SETTING_DATA, "w", encoding="utf-8") as file:
+                    json.dump(settings, file, ensure_ascii=False, indent=4)
+
+            except Exception as e:
+                await target_channel.send(
+                    f"❌ 랭킹 정보를 업데이트하는 중 오류가 발생했습니다: {e}"
+                )
 
     @app_commands.command(
         name="솔랭",
