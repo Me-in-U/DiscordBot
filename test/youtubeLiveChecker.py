@@ -9,7 +9,7 @@ load_dotenv()
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 API_KEY = GOOGLE_API_KEY
-CHANNEL_ID = "UCb5NLtXAsTBrmaZVhyFa-Wg"  # 감시할 채널 ID
+YT_CHANNEL_ID = "UCb5NLtXAsTBrmaZVhyFa-Wg"  # 감시할 채널 ID
 POLL_INTERVAL = 60  # 초 단위 조회 간격
 
 
@@ -40,7 +40,7 @@ def main():
     last_live_id = None
 
     while True:
-        vid = is_channel_live(youtube, CHANNEL_ID)
+        vid = is_channel_live(youtube, YT_CHANNEL_ID)
         if vid and vid != last_live_id:
             print(
                 f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] 채널이 LIVE 시작! ▶ https://youtu.be/{vid}"

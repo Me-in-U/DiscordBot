@@ -1,53 +1,77 @@
 # cogs/music.py
 import asyncio
 import collections
-import concurrent.futures
-from datetime import datetime
+import json
 import os
+import re
 import time
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Deque, Optional, Tuple
 
+import aiohttp
 import discord
 import yt_dlp as youtube_dl
-from discord import Embed, Message, Object, TextChannel, app_commands
+from discord import Embed, Message, Object, SelectOption, TextChannel, app_commands
 from discord.ext import commands
-from discord.ui import Button, View, button
-from dotenv import load_dotenv
-import re
+from discord.ui import Button, Select, View, button
 from discord.utils import utcnow
-import subprocess
-from discord import AudioSource
+from dotenv import load_dotenv
 
 load_dotenv()
 GUILD_ID = int(os.getenv("GUILD_ID"))  # 손팬노 길드 ID
 TEST_GUILD = Object(id=GUILD_ID)
 H_BAR = "\u2015"
-youtube_dl.utils.bug_reports_message = lambda *args, **kwargs: ""
+
 ffmpeg_options = {
     "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
-    "options": "-vn -ac 2 -ar 48000 -acodec libopus -loglevel verbose",
+    "options": "-threads 2 -vn -ac 2 -ar 48000 -acodec libopus -loglevel verbose",
 }
-debug = False
 
+search_ytdl = youtube_dl.YoutubeDL(
+    {
+        "default_search": "auto",
+        "extract_flat": True,
+        "noplaylist": True,
+        "quiet": True,
+    }
+)
 
 ytdl = youtube_dl.YoutubeDL(
     {
         "format": "bestaudio/best",
-        "outtmpl": "%(extractor)s-%(id)s-%(title)s.%(ext)s",
-        "restrictfilenames": True,
         "noplaylist": True,
-        "nocheckcertificate": True,
-        "ignoreerrors": False,
-        "logtostderr": True,
-        "verbose": True,
-        "quiet": False,
+        "skip_download": True,
+        "simulate": True,
+        "quiet": True,
+        "verbose": False,
         "no_warnings": True,
-        "default_search": "auto",
-        # "listformats": True,
-        "source_address": "0.0.0.0",  # bind to ipv4 since ipv6 addresses cause issues sometimes
+        "logtostderr": False,
+        "ignoreerrors": True,
+        "nocheckcertificate": True,
+        "youtube_include_dash_manifest": False,
+        "youtube_include_hls_manifest": False,
     }
 )
+
+
+async def fetch_stream_url(page_url: str) -> str:
+    # ① YouTube 페이지 HTML 한 번만 가져오기
+    async with aiohttp.ClientSession() as session:
+        async with session.get(page_url) as resp:
+            text = await resp.text()
+
+    # ② ytInitialPlayerResponse JSON 추출
+    m = re.search(r"ytInitialPlayerResponse\s*=\s*(\{.+?\});", text)
+    data = json.loads(m.group(1))
+
+    # ③ adaptiveFormats 중 audio MIME만 필터
+    af = data["streamingData"]["adaptiveFormats"]
+    audio_formats = [f for f in af if f.get("mimeType", "").startswith("audio/")]
+
+    # ④ 비트레이트 최고 스트림 URL 선택
+    best = max(audio_formats, key=lambda f: f.get("averageBitrate", 0))
+    return best["url"]
 
 
 @dataclass
@@ -78,28 +102,100 @@ class YTDLSource:
         self.webpage_url = data.get("webpage_url")
 
     @classmethod
-    async def from_url(cls, url, *, loop=None, stream=False, start_time: int = 0):
+    async def from_url(cls, url, *, loop=None, start_time: int = 0):
         loop = loop or asyncio.get_event_loop()
+
+        # ! 검색어면 먼저 ID만 빠르게 가져오기(제거해도 됨)
+        if not re.match(r"^https?://", url):
+            search = f"ytsearch5:{url}"
+            info = await loop.run_in_executor(
+                None, lambda: ytdl.extract_info(search, download=False)
+            )
+            entry = info["entries"][0]
+            url = entry["url"]  # 비디오 ID
+
+        # ! 실제 메타·스트림 준비
         data = await loop.run_in_executor(
-            None, lambda: ytdl.extract_info(url, download=not stream)
+            None, lambda: ytdl.extract_info(url, download=False, process=False)
         )
+        # ! 단일 비디오인 경우
         if "entries" in data:
             data = data["entries"][0]
-        print("[from_url] data['title']:", data.get("title"))
-        print("[from_url] data['duration']:", data.get("duration"))
-        print(
-            "[from_url] data['formats']:",
-            [f["format_id"] for f in data.get("formats", [])],
-        )
-        audio_url = data["url"] if stream else ytdl.prepare_filename(data)
 
-        # ffmpeg 에 -ss(start_time) 옵션 추가
+        # ! 포맷 리스트 중 bestaudio 뽑기
+        formats = data.get("formats", [])
+        best = max(formats, key=lambda f: f.get("abr", 0) or 0)
+
+        # ! ffmpeg 에 -ss(start_time) 옵션 추가
+        audio_url = best["url"]
         opts = ffmpeg_options.copy()
         if start_time > 0:
             opts["options"] = f"-ss {start_time} " + opts["options"]
-        source = discord.FFmpegOpusAudio(audio_url, **opts)
+        source = discord.FFmpegOpusAudio(
+            audio_url, **opts, executable="bin\\ffmpeg.exe"
+        )
 
         return cls(source=source, data=data)
+
+
+# 검색 결과 뷰
+class SearchResultView(View):
+    def __init__(self, cog, videos: list[dict]):
+        # ephemeral select menus only live for 60s
+        super().__init__(timeout=None)
+        self.cog = cog
+
+        # build up to 10 options
+        options: list[SelectOption] = []
+        for i, v in enumerate(videos[:10], start=1):
+            title = v.get("title", "<제목 없음>")[:60]
+            uploader = v.get("uploader") or "알 수 없음"
+            dur = int(v.get("duration", 0) or 0)
+            m, s = divmod(dur, 60)
+            length = f"{m}:{s:02d}"
+            label = f"{i}. {title} – {uploader} | 길이: {length}"
+            label = label[:100]
+            # value must be the video URL, so we can hand it back to _play
+            options.append(SelectOption(label=label, value=v["url"]))
+        print("[SearchResultView] options:", options)
+
+        # 드롭다운 메뉴 추가(에러 방지를 위해 try/except)
+        if options:
+            try:
+                sel = Select(
+                    placeholder="▶ 재생할 곡을 선택하세요",
+                    custom_id="search_select",
+                    options=options,
+                )
+                # callback 연결
+                sel.callback = self.on_select
+                self.add_item(sel)
+            except Exception as e:
+                print(f"[WARN] SearchResultView.add_item 실패: {e}")
+                # 실패 시 fallback: disabled 버튼으로 안내
+                self.clear_items()
+                self.add_item(
+                    Button(
+                        label="❌ 선택지를 생성할 수 없습니다",
+                        style=discord.ButtonStyle.secondary,
+                        disabled=True,
+                    )
+                )
+        else:
+            # 결과가 하나도 없으면 disabled 버튼
+            self.add_item(
+                Button(
+                    label="❌ 검색 결과가 없습니다",
+                    style=discord.ButtonStyle.secondary,
+                    disabled=True,
+                )
+            )
+
+    async def on_select(self, interaction: discord.Interaction):
+        url = interaction.data["values"][0]
+        print("[Select 클릭]", url)
+        await interaction.response.defer(thinking=True, ephemeral=True)
+        await self.cog._play(interaction, url, skip_defer=True)
 
 
 # ! 기본 임베드에 붙을 뷰
@@ -236,29 +332,29 @@ class MusicCog(commands.Cog):
     # ?완
     # !메시지 수정(임베드, 뷰)
     async def _edit_msg(self, state, embed, view):
+        # ! 메시지 수정. 실패시 -> 채널 전체 클리어 + 새로 전송
         try:
             now = utcnow()
-            # ! 메시지 1시간 초과 → 새 메시지 전송 + 이전 메시지 삭제
             if (now - state.control_msg.created_at).total_seconds() > 3600:
                 new_msg = await state.control_channel.send(embed=embed, view=view)
                 try:
                     await state.control_msg.delete()
                 except discord.HTTPException as e:
-                    print(f"[WARN] 이전 메시지 삭제 실패: {e}")
+                    print(f"[WARN] 이전 메시지 삭제 실패: {e}\n-> 채널 전체 클리어 중")
+                    await state.control_channel.purge(limit=None)
                 state.control_msg = new_msg
                 return
             await state.control_msg.edit(embed=embed, view=view)
         except discord.HTTPException as e:
-            if getattr(e, "code", None) == 30046:
+            if getattr(e, "code", None) in (30046, 10008):
+                print(f"[WARN] 이전 메시지 삭제 실패: {e}\n-> 채널 전체 클리어 중")
+                await state.control_channel.purge(limit=None)
                 new_msg = await state.control_channel.send(embed=embed, view=view)
-                try:
-                    await state.control_msg.delete()
-                except discord.HTTPException as e:
-                    print(f"[WARN] 이전 메시지 삭제 실패: {e}")
                 state.control_msg = new_msg
             else:
                 raise
 
+    # ?완
     # ! 노래 재생 상황 업데이트 루프
     async def _updater_loop(self, guild_id: int):
         state = self._get_state(guild_id)
@@ -266,25 +362,33 @@ class MusicCog(commands.Cog):
             print("[_updater_loop] updater_task 루프 시작")
             while state.player:
                 voice_client = state.control_msg.guild.voice_client
+                # ! voice_client 연결 끊김
                 if not voice_client:
                     print("[_updater_loop] voice_client 연결 끊김")
                     return await self._on_song_end(guild_id)
+                # ! 봇만 남아있음 → 종료 호출
+                if voice_client and len(voice_client.channel.members) == 1:
+                    print("[_updater_loop] 봇만 남아있음 → 종료 호출")
+                    return await self._on_song_end(guild_id)
+                # ! 일시정지 대기
                 if voice_client.is_paused():
-                    print("[_updater_loop] paused()")
+                    print("[_updater_loop] 일시정지 대기")
                     await asyncio.sleep(1)
                     continue
+                # ! 재생시간 계산
                 elapsed = int(time.time() - state.start_ts)
                 total = state.player.data.get("duration", 0)
                 print("[_updater_loop] elapsed:", elapsed, "/ total:", total)
-
-                # !노래시간이 지났고 반복이 아니고 구간이동중이 아니면 종료 호출
+                # ! 노래시간이 지났고 반복이 아니고 구간이동중이 아니면 종료 호출
                 if (
                     total > 0
                     and elapsed >= total
                     and not state.is_loop
                     and not state.is_seeking
                 ):
-                    print("[_updater_loop] return _on_song_end")
+                    print(
+                        "[_updater_loop] 노래시간이 지났고 반복이 아니고 구간이동중이 아니면 종료 호출"
+                    )
                     return await self._on_song_end(guild_id)
 
                 # ! 메시지 수정(임베드, 뷰)
@@ -376,10 +480,8 @@ class MusicCog(commands.Cog):
     async def _get_or_create_panel(self, guild: discord.Guild):
         # ! 상태 기본값 설정
         state = self._get_state(guild.id)
-
         # ! 채널 확보
         control_channel = discord.utils.get(guild.text_channels, name="🎵ㆍ神-음악채널")
-
         # ! 채널 없으면 생성
         if control_channel is None:
             print("[채널 없음]->", end="")
@@ -392,7 +494,8 @@ class MusicCog(commands.Cog):
                 ),
             }
             control_channel = await guild.create_text_channel(
-                "🎵ㆍ神-음악채널", overwrites=overwrites
+                "🎵ㆍ神-음악채널",
+                overwrites=overwrites,
             )
             print("[채널 생성됨]")
 
@@ -423,11 +526,59 @@ class MusicCog(commands.Cog):
 
     # ?완
     # !노래 재생 or 대기열
-    async def _play(self, interaction, url: str):
+    async def _play(self, interaction, url: str, skip_defer: bool = False):
+        # ? 검색어 처리
+        if not re.match(r"^https?://", url):
+            # ytsearch로 상위 10개까지 뽑되
+            info = await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: search_ytdl.extract_info(f"ytsearch10:{url}", download=False),
+            )
+            raw = info.get("entries", []) or []
+            # 유효한 영상 URL만 필터
+            videos = [
+                e
+                for e in raw
+                if isinstance(e.get("url"), str) and "watch?v=" in e["url"]
+            ][:10]
+            if not videos:
+                return await interaction.response.send_message(
+                    "❌ 검색 결과가 없습니다.", ephemeral=True
+                )
+
+            print("[videos]: ", videos)
+
+            # Embed  View 생성
+            description = "\n".join(
+                f"{i+1}. {v.get('title','-')}" for i, v in enumerate(videos)
+            )
+            print("[description]: ", description)
+            embed = Embed(
+                title=f"🔍 `{url}` 검색 결과",
+                description=description,
+                color=0x1DB954,
+            )
+            view = SearchResultView(self, videos)
+            # ! 완료 메시지
+            try:
+                return await interaction.response.send_message(
+                    embed=embed, view=view, ephemeral=True
+                )
+            except Exception as e:
+                print("[ERROR] followup.send 실패:", type(e), e)
+
+        # ? URL 재생
+        if not skip_defer:
+            await interaction.response.defer(thinking=True, ephemeral=True)
+
         # ! 기본정보 로드
-        await interaction.response.defer(thinking=True, ephemeral=True)
         guild_id = interaction.guild.id
         voice_client = interaction.guild.voice_client
+        player = await YTDLSource.from_url(url, loop=self.bot.loop)
+        print(
+            "[_play] url:", url, "-> title:", getattr(player, "title", None), flush=True
+        )
+
         # ! 봇이 음성 채널에 없음
         if not voice_client:
             # ! 유저가 음성채널에 없음
@@ -437,15 +588,6 @@ class MusicCog(commands.Cog):
                 )
             # ! 봇을 채널 연결
             voice_client = await ch.connect()
-
-        # ! url인지 확인 & pre_src에 저장
-        player = await YTDLSource.from_url(url, loop=self.bot.loop, stream=True)
-        if not re.match(r"^https?://", url):
-            print("[_play] url아님:", url)
-            print("-> 변환된 url:", getattr(player, "webpage_url", None), flush=True)
-        else:
-            print("[_play] url:", url)
-        print("-> title:", getattr(player, "title", None), flush=True)
 
         # ! 이미 재생 중이면 큐에 추가
         state = self._get_state(interaction.guild.id)
@@ -469,9 +611,8 @@ class MusicCog(commands.Cog):
 
         # ! 임베드 및 진행 업데이터 시작
         embed = self._make_playing_embed(player, guild_id)
-        view = MusicControlView(self)
-        state.control_view = view
-        await self._edit_msg(state=state, embed=embed, view=view)
+        state.control_view = MusicControlView(self)
+        await self._edit_msg(state=state, embed=embed, view=state.control_view)
 
         # ! 메시지
         msg = await interaction.followup.send(
@@ -653,7 +794,6 @@ class MusicCog(commands.Cog):
         player = await YTDLSource.from_url(
             url=state.player.webpage_url,
             loop=self.bot.loop,
-            stream=True,
             start_time=seconds,
         )
 
@@ -743,7 +883,9 @@ class MusicCog(commands.Cog):
         if state.is_skipping or state.is_loop:
             print("[_on_song_end] loop/skip 재생")
             audio_url = state.player.data["url"]
-            new_source = discord.FFmpegOpusAudio(audio_url, **ffmpeg_options)
+            new_source = discord.FFmpegOpusAudio(
+                audio_url, **ffmpeg_options, executable="bin\\ffmpeg.exe"
+            )
             # ! 상태 업데이트
             state.player.source = new_source
             # ! play & updater 재시작

@@ -53,8 +53,8 @@ class SummarizeCommands(commands.Cog):
             {
                 "role": "developer",
                 "content": (
-                    "다음은 유저가 말했던 기록이다. 채팅 내용을 요약해라."
-                    f"전체 대화 내용: {self.bot.USER_MESSAGES}\n\n"
+                    "다음은 유저가 말했던 최근 150개의 기록이다. 채팅 내용을 요약해라."
+                    f"전체 대화 내용: {self.bot.USER_MESSAGES[-150:]}\n\n"
                 ),
             },
             {
