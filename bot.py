@@ -76,7 +76,7 @@ async def load_party_list():
 async def load_variable():
     await asyncio.sleep(1)
     print()
-    # await load_recent_messages()
+    await load_recent_messages()
     await load_party_list()
     print("[최근 메시지, 파티] 로드 완료\n")
 
@@ -209,17 +209,17 @@ async def load_recent_messages():
     print(f"채널 '{target_channel.name}'에서 오늘의 메시지를 불러옵니다...")
     today = datetime.now(SEOUL_TZ).date()  # UTC 기준 오늘 날짜
     DISCORD_CLIENT.USER_MESSAGES["神᲼"] = []
-    async for message in target_channel.history(limit=1557):  # 최대 1557개 로드
+    async for message in target_channel.history(limit=100):  # 최대 1557개 로드
         # print(message)
         message_timestamp = message.created_at.astimezone(SEOUL_TZ).strftime(
             "%Y-%m-%d %H:%M:%S"
         )
-        # message_date = message.created_at.astimezone(
-        #     SEOUL_TZ
-        # ).date()  # 메시지 날짜 확인
-        # if message_date != today:
-        #     # print("skip", message_date, message.author, message.content)
-        #     continue  # 오늘 날짜가 아니면 건너뛰기
+        message_date = message.created_at.astimezone(
+            SEOUL_TZ
+        ).date()  # 메시지 날짜 확인
+        if message_date != today:
+            # print("skip", message_date, message.author, message.content)
+            continue  # 오늘 날짜가 아니면 건너뛰기
 
         # print("added", message_date, message.author, message.content)
 

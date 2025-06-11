@@ -53,8 +53,8 @@ class QuestionCommands(commands.Cog):
                 "role": "developer",
                 "content": (
                     "채팅 내용에 관한 질문을 한다면 아래 내용을 참고해라"
-                    "다음은 모든 유저가 말했던 기록 정보이다.\n"
-                    f"전체 대화 내용: {self.bot.USER_MESSAGES}\n\n"
+                    "다음은 모든 유저가 말했던 최근 20개 기록 정보이다.\n"
+                    f"전체 대화 내용: {self.bot.USER_MESSAGES[-20:]}\n\n"
                 ),
             },
         ]
@@ -107,6 +107,8 @@ class QuestionCommands(commands.Cog):
         커맨드 질문 처리
         ChatGPT
         """
+        # 호출된 슬래시 커맨드 응답을 잠시 대기 상태로 둡니다.
+        await interaction.response.defer(thinking=True)
 
         # 이미지 첨부 확인
         image_url = None
@@ -130,8 +132,8 @@ class QuestionCommands(commands.Cog):
                 "role": "developer",
                 "content": (
                     "채팅 내용에 관한 질문을 한다면 아래 내용을 참고해라"
-                    "다음은 모든 유저가 말했던 기록 이다.\n"
-                    f"전체 대화 내용: {self.bot.USER_MESSAGES}\n\n"
+                    "다음은 모든 유저가 말했던 최근 20개 기록 정보이다.\n"
+                    f"전체 대화 내용: {self.bot.USER_MESSAGES[-20:]}\n\n"
                 ),
             },
         ]
