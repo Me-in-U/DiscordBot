@@ -90,7 +90,7 @@ class LoopTasks(commands.Cog):
         await load_recent_messages()
         print(f"[{datetime.now()}] user_messages 초기화 완료.")
 
-    @tasks.loop(time=time(hour=0, minute=0, tzinfo=SEOUL_TZ))  # 매일 자정 실행
+    @tasks.loop(time=time(hour=0, minute=1, tzinfo=SEOUL_TZ))  # 매일 자정 실행
     async def weekly_1557_report(self):
         """매주 월요일 00:00에 1557Counter.json의 사용자별 카운트를 출력."""
         now = datetime.now(SEOUL_TZ)
