@@ -415,10 +415,12 @@ class MusicCog(commands.Cog):
                 # ! voice_client 연결 끊김
                 if not voice_client:
                     print("[_updater_loop] voice_client 연결 끊김")
+                    await self._stop()
                     return await self._on_song_end(guild_id)
                 # ! 봇만 남아있음 → 종료 호출
                 if voice_client and len(voice_client.channel.members) == 1:
                     print("[_updater_loop] 봇만 남아있음 → 종료 호출")
+                    await self._stop()
                     return await self._on_song_end(guild_id)
                 # ! 일시정지 대기
                 if voice_client.is_paused():
@@ -778,7 +780,7 @@ class MusicCog(commands.Cog):
         await voice_client.disconnect()
 
         # ! reset panel
-        state.control_view = control_view = MusicHelperView(self)
+        state.control_view = MusicHelperView(self)
         embed = self._make_default_embed()
         await self._edit_msg(state, embed, state.control_view)
 
@@ -984,6 +986,7 @@ class MusicCog(commands.Cog):
             print("[_on_song_end] 다음곡 없음")
             # ! 메시지 수정(임베드, 뷰)
             embed = self._make_default_embed()
+            state.control_view = MusicHelperView(self)
             await self._edit_msg(state, embed, state.control_view)
             return
 
