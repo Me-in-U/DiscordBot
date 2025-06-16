@@ -197,6 +197,14 @@ async def echo(ctx, *, text: str = None):
     await ctx.send(f"{message}")
 
 
+@DISCORD_CLIENT.command(
+    aliases=["핑"],
+    help="봇 레이턴시 측정",
+)
+async def ping(ctx):
+    await ctx.respond(f"퐁! Latency is {DISCORD_CLIENT.latency}")
+
+
 async def load_recent_messages():
     target_channel = DISCORD_CLIENT.get_channel(CHANNEL_ID)
     print("------------------- 메시지 로드 -------------------")
