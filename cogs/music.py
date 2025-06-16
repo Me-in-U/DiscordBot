@@ -91,18 +91,18 @@ class GuildMusicState:
 
 class YTDLSource:
     def __init__(
-        self,
-        source: discord.FFmpegOpusAudio,
-        *,
-        data,
+        self, source: discord.FFmpegOpusAudio, *, data, requester: discord.User = None
     ):
         self.source = source
         self.data = data
         self.title = data.get("title")
         self.webpage_url = data.get("webpage_url")
+        self.requester = requester
 
     @classmethod
-    async def from_url(cls, url, *, loop=None, start_time: int = 0):
+    async def from_url(
+        cls, url, *, loop=None, start_time: int = 0, requester: discord.User = None
+    ):
         loop = loop or asyncio.get_event_loop()
 
         # ! 검색어면 먼저 ID만 빠르게 가져오기(제거해도 됨)
@@ -135,7 +135,7 @@ class YTDLSource:
             audio_url, **opts, executable="bin\\ffmpeg.exe"
         )
 
-        return cls(source=source, data=data)
+        return cls(source=source, data=data, requester=requester)
 
 
 # 검색 결과 뷰
@@ -163,7 +163,7 @@ class SearchResultView(View):
         if options:
             try:
                 sel = Select(
-                    placeholder="▶ 재생할 곡을 선택하세요",
+                    placeholder="▶️ 재생할 곡을 선택하세요",
                     custom_id="search_select",
                     options=options,
                 )
@@ -213,56 +213,106 @@ class MusicHelperView(View):
 
 # ! 음악 재생시 붙을 뷰
 class MusicControlView(View):
-    def __init__(self, cog: "MusicCog"):
+    def __init__(self, cog: "MusicCog", state: "GuildMusicState"):
         super().__init__(timeout=None)
         self.cog = cog
+        self.state = state
 
-    @button(
-        label="⏸️ 일시정지", style=discord.ButtonStyle.secondary, custom_id="music_pause"
-    )
-    async def pause_btn(self, interaction: discord.Interaction, button: Button):
+        # ▶️ 다시재생 또는 ⏸️ 일시정지 버튼
+        if state.paused_at:
+            self.resume_btn = Button(
+                label="▶️ 다시재생",
+                style=discord.ButtonStyle.primary,
+                custom_id="music_resume",
+                row=0,
+            )
+            self.resume_btn.callback = self._on_resume
+            self.add_item(self.resume_btn)
+        else:
+            self.pause_btn = Button(
+                label="⏸️ 일시정지",
+                style=discord.ButtonStyle.primary,
+                custom_id="music_pause",
+                row=0,
+            )
+            self.pause_btn.callback = self._on_pause
+            self.add_item(self.pause_btn)
+
+        # 나머지 버튼들
+        self.add_control_buttons()
+
+    def add_control_buttons(self):
+        skip_btn = Button(
+            label="⏭️ 스킵",
+            style=discord.ButtonStyle.success,
+            custom_id="music_skip",
+            row=0,
+        )
+        stop_btn = Button(
+            label="⏹️ 정지",
+            style=discord.ButtonStyle.danger,
+            custom_id="music_stop",
+            row=0,
+        )
+        queue_btn = Button(
+            label="🔀 대기열",
+            style=discord.ButtonStyle.secondary,
+            custom_id="music_queue",
+            row=1,
+        )
+        seek_btn = Button(
+            label="⏩ 구간이동",
+            style=discord.ButtonStyle.secondary,
+            custom_id="music_seek",
+            row=1,
+        )
+        loop_btn = Button(
+            label="🔁 반복",
+            style=discord.ButtonStyle.secondary,
+            custom_id="music_loop",
+            row=1,
+        )
+        search_btn = Button(
+            label="🔍 검색",
+            style=discord.ButtonStyle.primary,
+            custom_id="music_search_2",
+            row=2,
+        )
+
+        skip_btn.callback = self._on_skip
+        stop_btn.callback = self._on_stop
+        queue_btn.callback = self._on_queue
+        seek_btn.callback = self._on_seek
+        loop_btn.callback = self._on_loop
+        search_btn.callback = self._on_search
+
+        for b in [skip_btn, stop_btn, queue_btn, seek_btn, loop_btn, search_btn]:
+            self.add_item(b)
+
+    # === 콜백 함수들 ===
+    async def _on_pause(self, interaction: discord.Interaction):
         await self.cog._pause(interaction)
 
-    @button(
-        label="▶️ 다시재생",
-        style=discord.ButtonStyle.secondary,
-        custom_id="music_resume",
-    )
-    async def resume_btn(self, interaction: discord.Interaction, button: Button):
+    async def _on_resume(self, interaction: discord.Interaction):
         await self.cog._resume(interaction)
 
-    @button(label="⏭️ 스킵", style=discord.ButtonStyle.primary, custom_id="music_skip")
-    async def skip_btn(self, interaction: discord.Interaction, button: Button):
+    async def _on_skip(self, interaction: discord.Interaction):
         await self.cog._skip(interaction)
 
-    @button(
-        label="🔀 대기열", style=discord.ButtonStyle.secondary, custom_id="music_queue"
-    )
-    async def queue_btn(self, interaction: discord.Interaction, button: Button):
-        await self.cog._show_queue(interaction)
-
-    @button(
-        label="⏩ 구간이동", style=discord.ButtonStyle.secondary, custom_id="music_seek"
-    )
-    async def seek_btn(self, interaction: discord.Interaction, button: Button):
-        # 모달을 띄워서 몇 초(or mm:ss) 이동할지 입력받습니다.
-        await interaction.response.send_modal(SeekModal(self.cog))
-
-    @button(label="⏹️ 정지", style=discord.ButtonStyle.danger, custom_id="music_stop")
-    async def stop_btn(self, interaction: discord.Interaction, button: Button):
+    async def _on_stop(self, interaction: discord.Interaction):
         await self.cog._stop(interaction)
 
-    @button(
-        label="🔁 반복", style=discord.ButtonStyle.secondary, custom_id="music_loop"
-    )
-    async def loop_btn(self, interaction: discord.Interaction, button: Button):
+    async def _on_queue(self, interaction: discord.Interaction):
+        await self.cog._show_queue(interaction)
+
+    async def _on_seek(self, interaction: discord.Interaction):
+        await interaction.response.send_modal(self.cog.SeekModal(self.cog))
+
+    async def _on_loop(self, interaction: discord.Interaction):
         await self.cog._toggle_loop(interaction)
 
-    @button(
-        label="🔍 검색", style=discord.ButtonStyle.primary, custom_id="music_search"
-    )
-    async def search_btn(self, interaction: discord.Interaction, button: Button):
-        await interaction.response.send_modal(SearchModal(self.cog))
+    async def _on_search(self, interaction: discord.Interaction):
+        await interaction.response.send_modal(self.cog.SearchModal(self.cog))
 
 
 # ! 구간 탐색 모달
@@ -445,7 +495,6 @@ class MusicCog(commands.Cog):
             traceback.print_exc()
             raise
 
-    # TODO: 음악 신청자 정보 띄우기
     # ! 노래 재생시 임베드
     def _make_playing_embed(
         self, player: YTDLSource, guild_id: int, elapsed: int = 0
@@ -463,10 +512,16 @@ class MusicCog(commands.Cog):
             embed.add_field(name="진행", value=f"{timeline}\n`{bar}`", inline=False)
             # ! footer에 반복 상태
             state = self._get_state(guild_id)
+            requester = player.requester
+            requester_name = requester.display_name if requester else "알 수 없음"
+            requester_icon = (
+                requester.display_avatar.url if requester else self.bot.user.avatar.url
+            )
+
             embed.set_footer(
-                text=f"반복: {'켜짐' if state.is_loop else '꺼짐'}",
-                icon_url=self.bot.user.avatar.url,
-            )  # 봇 프로필 아이콘
+                text=f"신청자: {requester_name} | 반복: {'켜짐' if state.is_loop else '꺼짐'} | {'⏸️ 일시정지 상태' if state.paused_at else '▶️ 재생중...'}",
+                icon_url=requester_icon,
+            )
             return embed
         except Exception as e:
             print("!! _make_playing_embed 예외 발생:", e, flush=True)
@@ -556,16 +611,21 @@ class MusicCog(commands.Cog):
             embed = Embed(
                 title=f"🔍 `{url}` 검색 결과",
                 description=description,
-                color=0x1DB954,
+                color=0xFFC0CB,
             )
             view = SearchResultView(self, videos)
             # ! 완료 메시지
             try:
-                return await interaction.response.send_message(
-                    embed=embed, view=view, ephemeral=True
-                )
+                if not interaction.response.is_done():
+                    await interaction.response.send_message(
+                        embed=embed, view=view, ephemeral=True
+                    )
+                else:
+                    await interaction.followup.send(
+                        embed=embed, view=view, ephemeral=True
+                    )
             except Exception as e:
-                print("[ERROR] followup.send 실패:", type(e), e)
+                print("[ERROR] interaction 응답 실패:", type(e), e)
 
         # ? URL 재생
         if not skip_defer:
@@ -574,7 +634,9 @@ class MusicCog(commands.Cog):
         # ! 기본정보 로드
         guild_id = interaction.guild.id
         voice_client = interaction.guild.voice_client
-        player = await YTDLSource.from_url(url, loop=self.bot.loop)
+        player = await YTDLSource.from_url(
+            url, loop=self.bot.loop, requester=interaction.user
+        )
         print(
             "[_play] url:", url, "-> title:", getattr(player, "title", None), flush=True
         )
@@ -611,7 +673,7 @@ class MusicCog(commands.Cog):
 
         # ! 임베드 및 진행 업데이터 시작
         embed = self._make_playing_embed(player, guild_id)
-        state.control_view = MusicControlView(self)
+        state.control_view = MusicControlView(self, state)
         await self._edit_msg(state=state, embed=embed, view=state.control_view)
 
         # ! 메시지
@@ -624,7 +686,7 @@ class MusicCog(commands.Cog):
         # !기본정보 로드
         await interaction.response.defer(thinking=True, ephemeral=True)
         guild_id = interaction.guild.id
-        state = self.states.setdefault(guild_id, GuildMusicState())
+        state = self._get_state(guild_id)
         voice_client = interaction.guild.voice_client
         # !재생중 아님
         if not voice_client or not voice_client.is_playing():
@@ -636,6 +698,12 @@ class MusicCog(commands.Cog):
         voice_client.pause()
         # !상태설정
         state.paused_at = time.time()
+        # ! embed 업데이트
+        elapsed = int(time.time() - state.start_ts)
+        embed = self._make_playing_embed(state.player, guild_id, elapsed)
+        # ! view 재생성
+        state.control_view = MusicControlView(self, state)
+        await self._edit_msg(state, embed, state.control_view)
         # !메시지
         msg = await interaction.followup.send("⏸️ 일시정지했습니다.", ephemeral=True)
         return asyncio.create_task(self._auto_delete(msg, 5.0))
@@ -659,6 +727,12 @@ class MusicCog(commands.Cog):
             delta = time.time() - state.paused_at
             state.start_ts += delta
             state.paused_at = None
+        # ! embed 업데이트
+        elapsed = int(time.time() - state.start_ts)
+        embed = self._make_playing_embed(state.player, guild_id, elapsed)
+        # ! view 재생성
+        state.control_view = MusicControlView(self, state)
+        await self._edit_msg(state, embed, state.control_view)
         # !메시지
         msg = await interaction.followup.send("▶️ 다시 재생합니다.", ephemeral=True)
         return asyncio.create_task(self._auto_delete(msg, 5.0))
@@ -735,22 +809,34 @@ class MusicCog(commands.Cog):
             total = state.player.data.get("duration", 0)
             m, s = divmod(total, 60)
             uploader = state.player.data.get("uploader") or "알 수 없음"
+            user = (
+                f"<@{state.player.requester.id}>"
+                if state.player.requester
+                else "알 수 없음"
+            )
             desc_lines.append(
-                f"**재생 중.** \n"
-                f"[{state.player.title}]({state.player.webpage_url})"
-                f"({m:02}:{s:02}) - {uploader}"
+                f"**현재 재생 중.** \n"
+                f"[{state.player.title}]({state.player.webpage_url})({m:02}:{s:02})"
+                f"({uploader}) - 신청자: {user}"
             )
             desc_lines.append("")  # 구분선 역할
 
         # 대기열 리스트
         # ── 수정 후 _show_queue: None 처리 ──
         for i, player in enumerate(state.queue, start=1):
-            desc_lines.append(f"{i}. [{player.title}]({player.webpage_url})")
+            total = player.data.get("duration", 0)
+            m, s = divmod(total, 60)
+            uploader = player.data.get("uploader") or "알 수 없음"
+            user = f"<@{player.requester.id}>" if player.requester else "알 수 없음"
+            desc_lines.append(
+                f"{i}. [{player.title}]({player.webpage_url})({m:02}:{s:02})"
+                f"({uploader}) - 신청자: {user}"
+            )
 
         embed = Embed(
             title=f"대기열 - {n}개의 곡",
             description="\n".join(desc_lines),
-            color=0x99CCFF,
+            color=0xFFC0CB,
         )
 
         msg = await interaction.followup.send(embed=embed, ephemeral=True)
@@ -965,5 +1051,4 @@ async def setup(bot: commands.Bot):
     cog = MusicCog(bot)
     await bot.add_cog(cog)
     bot.add_view(MusicHelperView(cog))
-    bot.add_view(MusicControlView(cog))
     print("Music Cog : setup 완료!")
