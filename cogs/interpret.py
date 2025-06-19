@@ -13,7 +13,12 @@ class InterpretSelect(discord.ui.Select):
         options = []
         for msg in options_data:
             label = msg["content"][:50] + ("..." if len(msg["content"]) > 50 else "")
-            options.append(discord.SelectOption(label=label, value=str(msg["id"])))
+            desc = "📷 이미지 첨부됨" if msg.get("image_url") else None
+            options.append(
+                discord.SelectOption(
+                    label=label, value=str(msg["id"]), description=desc
+                )
+            )
         super().__init__(
             placeholder="최근 메시지 중 해석할 내용을 선택하세요",
             min_values=1,
@@ -22,17 +27,14 @@ class InterpretSelect(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
-        # 선택 시 defer 응답을 먼저 해야 상호작용 실패를 방지합니다.
-        # await interaction.response.defer(thinking=True)
-
-        # 선택 시 thinking 대기 없이 바로 메시지 수정
         selected_id = self.values[0]
         # view.option_mapping 에서 content(문자열)만 꺼냅니다.
         self.view.selected_message = self.view.option_mapping.get(selected_id, "")
 
-        # 해석 진행중…으로 메시지를 수정 (뷰 해제)
+        # 선택 즉시 "해석 진행중..."으로 메시지를 편집하며 뷰를 해제
+        preview = self.view.selected_message["content"][:50]
         await interaction.response.edit_message(
-            content=f"{self.view.selected_message}에 대한 해석 진행중...", view=None
+            content=f"{preview}에 대한 해석 진행중...", view=None
         )
         # 실제 해석 로직을 실행 interpret_callback 호출
         await self.view.interpret_callback(interaction)
@@ -41,23 +43,31 @@ class InterpretSelect(discord.ui.Select):
 class InterpretSelectView(discord.ui.View):
     def __init__(self, options_data):
         super().__init__(timeout=60)
-        self.selected_message = None
-        self.option_mapping = {str(msg["id"]): msg["content"] for msg in options_data}
+        self.selected_message = None  # 선택된 메시지 정보 (dict: content, image_url)
+        # options_data로부터 {id: {"content": ..., "image_url": ...}} 매핑 생성
+        self.option_mapping = {
+            str(msg["id"]): {
+                "content": msg["content"],
+                "image_url": msg.get("image_url"),
+            }
+            for msg in options_data
+        }
         self.add_item(InterpretSelect(options_data))
-        self.original_message: discord.Message | None = (
-            None  # 실제 discord.Message 객체를 저장
-        )
+        self.original_message: discord.Message | None = None
 
     async def interpret_callback(self, interaction: discord.Interaction):
+        # 이미 '해석 진행중...'으로 뷰가 해제된 상태이므로 interaction.response는 별도 사용하지 않음
+        # API 호출 후 원본 메시지를 다시 편집
         if not self.selected_message:
-            # 선택 없이 callback 되면 경고 메시지
             await interaction.followup.send(
                 "먼저 해석할 메시지를 선택해주세요.", ephemeral=True
             )
             return
 
         # 뷰가 달린 메시지를 수정
-        await self.original_message.edit(content="해석 진행중...", view=None)
+        target_message = self.selected_message.get("content", "")
+        image_url = self.selected_message.get("image_url")
+
         messages = [
             {
                 "role": "developer",
@@ -67,22 +77,55 @@ class InterpretSelectView(discord.ui.View):
                     "숨겨진 의미나 뜻이 없으면 굳이 언급하지 않아도 됩니다."
                 ),
             },
-            {
-                "role": "developer",
-                "content": f"해석할 내용:\n{self.selected_message}",
-            },
         ]
+
+        if image_url:
+            messages.append(
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": f'해석할 내용: "{target_message}"',
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": image_url,
+                            },
+                        },
+                    ],
+                },
+            )
+        else:
+            messages.append(
+                {
+                    "role": "user",
+                    "content": f'해석할 내용: "{target_message}"',
+                },
+            )
+
         try:
-            result = reasoning_model(messages)
+            if image_url:
+                result_message = general_purpose_model(
+                    messages, model="gpt-4.1-nano", temperature=0.5
+                )
+            else:
+                result_message = reasoning_model(messages)
         except Exception as e:
-            result = f"Error: {e}"
-        try:
-            await self.original_message.edit(content=result, view=None)
-        except Exception:
-            pass
+            result_message = f"Error: {e}"
+
+        # 원본 메시지를 번역 결과로 덮어쓰기
+        if isinstance(self.original_message, discord.Message):
+            try:
+                await self.original_message.edit(content=result_message, view=None)
+            except Exception:
+                pass
+
         self.stop()
 
     async def on_timeout(self):
+        # 타임아웃 시 모든 버튼 비활성화 + 취소 메시지로 교체
         for child in self.children:
             if isinstance(child, discord.ui.Button):
                 child.disabled = True
