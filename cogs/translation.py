@@ -13,7 +13,12 @@ class TranslationSelect(discord.ui.Select):
         options = []
         for msg in options_data:
             label = msg["content"][:50] + ("..." if len(msg["content"]) > 50 else "")
-            options.append(discord.SelectOption(label=label, value=str(msg["id"])))
+            desc = "📷 이미지 첨부됨" if msg.get("image_url") else None
+            options.append(
+                discord.SelectOption(
+                    label=label, value=str(msg["id"]), description=desc
+                )
+            )
         super().__init__(
             placeholder="최근 메시지 중 번역할 내용을 선택하세요",
             min_values=1,
@@ -29,7 +34,7 @@ class TranslationSelect(discord.ui.Select):
         # 선택 즉시 "번역 진행중..."으로 메시지를 편집하며 뷰를 해제
         preview = self.view.selected_message["content"][:50]
         await interaction.response.edit_message(
-            content=f'"{preview}" 번역 진행중...', view=None
+            content=f'"{preview}"에 대한  번역 진행중...', view=None
         )
 
         # 실제 번역 작업을 수행
@@ -49,7 +54,6 @@ class TranslationSelectView(discord.ui.View):
             for msg in options_data
         }
         self.add_item(TranslationSelect(options_data))
-        # 나중에 실제 채널에 올라간 discord.Message 객체를 저장할 용도
         self.original_message: discord.Message | None = None
 
     async def translate_callback(self, interaction: discord.Interaction):
@@ -104,18 +108,18 @@ class TranslationSelectView(discord.ui.View):
 
         try:
             if image_url:
-                translated_message = general_purpose_model(
+                result_message = general_purpose_model(
                     messages, model="gpt-4.1-nano", temperature=0.5
                 )
             else:
-                translated_message = reasoning_model(messages)
+                result_message = reasoning_model(messages)
         except Exception as e:
-            translated_message = f"Error: {e}"
+            result_message = f"Error: {e}"
 
         # 원본 메시지를 번역 결과로 덮어쓰기
         if isinstance(self.original_message, discord.Message):
             try:
-                await self.original_message.edit(content=translated_message, view=None)
+                await self.original_message.edit(content=result_message, view=None)
             except Exception:
                 pass
 
@@ -138,6 +142,7 @@ class TranslationSelectView(discord.ui.View):
                 pass
 
             await asyncio.sleep(30)
+            # original_message가 discord.Message인지 확인 후 삭제
             try:
                 await self.original_message.delete()
             except discord.NotFound:
