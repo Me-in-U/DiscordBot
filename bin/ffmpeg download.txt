@@ -1,0 +1,5 @@
+https://ffmpeg.org/download.html#build-windows
+
+Windows EXE Files
+
+Windows builds from gyan.dev
