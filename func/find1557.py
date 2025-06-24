@@ -106,10 +106,11 @@ async def find1557(message):
 
         print("구조화된 응답:", response)
         # 만약 true라면
-        count = count1557(message.content)
-        if response.exist and count > 0:
-            # 2초 뒤 사라짐
-            await message.channel.send(f"1557 {count}세트 발견", delete_after=2)
-            userCount(message.author, count)
-            print(f"1557 {count}세트 발견")
-            return
+        if response.exist:
+            count = count1557(response.imageToText)
+            if count:
+                # 2초 뒤 사라짐
+                await message.channel.send(f"1557 {count}세트 발견", delete_after=2)
+                userCount(message.author, count)
+                print(f"1557 {count}세트 발견")
+                return
