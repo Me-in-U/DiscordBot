@@ -60,8 +60,9 @@ async def find1557(message):
         image_url = message.attachments[0].url
     else:
         count = count1557(message.content)
-        if count:
+        if count > 0:
             userCount(message.author, count)
+            await message.channel.send(f"1557 {count}세트 발견", delete_after=2)
             print(f"1557 발견{count}개")
             return
 
@@ -75,15 +76,7 @@ async def find1557(message):
                 "조건 1: '1'이라는 숫자(문자)가 최소 1개 이상 존재\n"
                 "조건 2: '5'라는 숫자(문자)가 최소 2개 이상 존재\n"
                 "조건 3: '7'이라는 숫자(문자)가 최소 1개 이상 존재\n"
-            ),
-        },
-        {
-            "role": "developer",
-            "content": (
-                "조건 요약:\n"
-                "1. 최소 1개의 '1'\n"
-                "2. 최소 2개의 '5'\n"
-                "3. 최소 1개의 '7'\n"
+                "즉 입력 이미지의 문자로 1557을 구성할 수 있어야한다."
             ),
         },
         {
@@ -114,9 +107,9 @@ async def find1557(message):
         print("구조화된 응답:", response)
         # 만약 true라면
         count = count1557(message.content)
-        if response.exist or count:
-            # 3초 뒤 사라짐
-            await message.channel.send("1557", delete_after=3)
+        if response.exist and count > 0:
+            # 2초 뒤 사라짐
+            await message.channel.send(f"1557 {count}세트 발견", delete_after=2)
             userCount(message.author, count)
-            print("1557 발견")
+            print(f"1557 {count}세트 발견")
             return

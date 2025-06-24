@@ -109,7 +109,7 @@ class TranslationSelectView(discord.ui.View):
         try:
             if image_url:
                 result_message = general_purpose_model(
-                    messages, model="gpt-4.1-nano", temperature=0.5
+                    messages, model="gpt-4.1-mini", temperature=0.5
                 )
             else:
                 result_message = reasoning_model(messages)
@@ -213,7 +213,7 @@ class TranslationCommands(commands.Cog):
             try:
                 if image_url:
                     translated_message = general_purpose_model(
-                        messages, model="gpt-4.1-nano", temperature=0.5
+                        messages, model="gpt-4.1-mini", temperature=0.5
                     )
                 else:
                     translated_message = reasoning_model(messages)
