@@ -366,7 +366,14 @@
 	"08-17": ["민수 탄생일 ^3^", "검은 고양이 인식의 날 (Black Cat Appreciation Day)"],
 	"08-18": ["쌀의 날 (Rice Day)"],
 	"08-19": ["세계 인도주의의 날 (World Humanitarian Day)"],
-	"08-20": ["세계 모기의 날 (World Mosquito Day)"],
+	"08-20": [
+		"세계 모기의 날 (World Mosquito Day)",
+		"`660년` - 백제의 황산벌에서 백제군과 신라군 사이에 `황산벌 전투` 발발",
+		"`1977년` - 미국의 태양계 탐사선 `보이저 2호` 발사",
+		"`2007년` - 한나라당이 `이명박`을 한나라당 17대 대통령 선거의 후보로 선출",
+		"헝가리 건국기념일(Saint Stephen's Day)",
+		"모로코 식민통치 궐기기념일(Revolution Day, Ṯawrat lmalik wa ššaʿb)"
+	],
 	"08-21": ["국제 테러 피해자 추모와 헌사의 날 (International Day of Remembrance and Tribute to the Victims of Terrorism)"],
 	"08-22": ["국제 종교폭력 희생자의 날 (International Day Commemorating the Victims of Acts of Violence Based on Religion or Belief)"],
 	"08-23": ["국제 노예무역 철폐 기념의 날 (International Day for the Remembrance of the Slave Trade and Its Abolition)"],
