@@ -1,4 +1,66 @@
-# 준비
+# 🤖 Discord Bot Project
 
-- choco install ffmpeg
-- install discord python-dotenv holidays pytube google-api-python-client yt_dlp openai-whisper openai pydantic requests
+Discord 서버에서 다양한 기능을 제공하는 멀티 모듈 봇입니다.  
+`discord.py`의 **Cog 구조**를 기반으로 설계되어 유지보수성과 확장성이 뛰어납니다.
+
+---
+
+## 📌 주요 기능
+
+### 🔹 기본 기능
+- **도움말 시스템**  
+  카테고리별 명령어를 드롭다운 메뉴로 정리해 직관적인 도움말 제공
+- **이모지 확대**  
+  채팅창에 커스텀 이모지를 단독 입력하면 자동으로 큰 사이즈로 표시
+
+### 🔹 AI 기능
+- **ChatGPT 연동**  
+  채팅, 질문 응답, 검색 지원
+- **해석 & 번역**  
+  `/해석`, `/번역` 명령어 제공 (텍스트 + 이미지 번역 가능)
+- **요약(/요약)**  
+  최근 채팅 내용을 요약해 제공
+
+### 🔹 음악 기능
+- 유튜브 URL 기반 음악 재생
+- 볼륨 조절, 일시정지/다시재생 지원
+
+### 🔹 파티 시스템
+- `/파티생성`, `/파티초대`, `/파티참가` 등으로 서버 내 소규모 그룹 활동 지원
+
+### 🔹 랭크 조회
+- `/솔랭`, `/자랭`, `/일일랭크` 등으로 **리그 오브 레전드 랭크** 정보 확인
+
+### 🔹 자동 태스크 (Loop Tasks)
+- 매일 자정 **공휴일/기념일 알림**
+- **주간 통계 보고 (1557 카운트)**
+- **봇 상태(presence) 자동 업데이트**
+- **유튜브 라이브 알림** 자동 감지 및 전송
+- **유튜브 라이브 체커(/유투브라이브체커)**  
+  라이브 스트리밍 감지 루프 관리
+
+---
+
+## 🛠️ 기술 스택
+- **Python** (`discord.py`, `discord.ext.commands`, `discord.ui`)
+- **OpenAI GPT API** (Chat/번역/요약)
+- **Google API** (YouTube Data API)
+- **Riot API** (LoL 랭크 데이터 조회)
+- **기타**
+  - JSON 기반 설정 저장
+  - Loop Task, 캐싱 시스템
+
+---
+
+## 📷 스크린샷
+(추후 필요 시 추가 가능)
+
+---
+
+## 🚀 실행 방법
+```bash
+# 설치
+pip install -r requirements.txt
+
+# 실행
+python bot.py
