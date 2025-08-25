@@ -108,7 +108,7 @@ class InterpretSelectView(discord.ui.View):
         try:
             if image_url:
                 result_message = general_purpose_model(
-                    messages, model="gpt-4.1-mini", temperature=0.5
+                    messages, model="gpt-5", temperature=0.5
                 )
             else:
                 result_message = reasoning_model(messages)
@@ -214,7 +214,7 @@ class InterpretCommands(commands.Cog):
                 if image_url:
                     interpreted = general_purpose_model(
                         messages,
-                        model="gpt-4.1-mini",
+                        model="gpt-5",
                         temperature=0.6,
                     )
                 else:

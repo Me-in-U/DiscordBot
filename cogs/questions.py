@@ -84,7 +84,7 @@ class QuestionCommands(commands.Cog):
                 },
             )
         try:
-            response = general_purpose_model(messages, model="gpt-4o", temperature=0.4)
+            response = general_purpose_model(messages, model="gpt-5", temperature=0.4)
         except Exception as e:
             response = f"Error: {e}"
 
@@ -164,7 +164,7 @@ class QuestionCommands(commands.Cog):
             )
 
         try:
-            response = general_purpose_model(messages, model="gpt-4o", temperature=0.4)
+            response = general_purpose_model(messages, model="gpt-5", temperature=0.4)
         except Exception as e:
             response = f"Error: {e}"
 
