@@ -2,7 +2,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from api.chatGPT import general_purpose_model
+from api.chatGPT import custom_prompt_model, text_input
 
 
 class QuestionCommands(commands.Cog):
@@ -39,34 +39,12 @@ class QuestionCommands(commands.Cog):
             image_url = image.url
 
         # ChatGPT에 메시지 전달
-        messages = [
-            {
-                "role": "developer",
-                "content": (
-                    "질문에 대한 답을 해라. "
-                    "추가적인 질문요청, 궁금한점이 있는지 물어보지 마라. "
-                    "질문에만 답해라. "
-                    "누가 질문했는지는 언급하지마라."
-                ),
-            },
-            {
-                "role": "developer",
-                "content": (
-                    "채팅 내용에 관한 질문을 한다면 아래 내용을 참고해라"
-                    "다음은 모든 유저가 말했던 최근 20개 기록 정보이다.\n"
-                    f"전체 대화 내용: {self.bot.USER_MESSAGES[-20:]}\n\n"
-                ),
-            },
-        ]
+        messages = None
         if image_url:
-            messages.append(
+            messages = [
                 {
                     "role": "user",
                     "content": [
-                        {
-                            "type": "text",
-                            "text": f"{interaction.user.name}의 질문 : {text}",
-                        },
                         {
                             "type": "image_url",
                             "image_url": {
@@ -75,16 +53,21 @@ class QuestionCommands(commands.Cog):
                         },
                     ],
                 },
-            )
-        else:
-            messages.append(
-                {
-                    "role": "user",
-                    "content": f"{interaction.user.name}의 질문 : {text}",
+            ]
+
+        try:
+            response = custom_prompt_model(
+                messages=messages,
+                prompt={
+                    "id": "pmpt_68ac254fa8008190861e8f3f686556d50c6160cd272b9aca",
+                    "version": "1",
+                    "variables": {
+                        "user_messages": self.bot.USER_MESSAGES[-20:],
+                        "user_name": interaction.user.name,
+                        "question": text.strip(),
+                    },
                 },
             )
-        try:
-            response = general_purpose_model(messages, model="gpt-5", temperature=0.4)
         except Exception as e:
             response = f"Error: {e}"
 
@@ -164,7 +147,7 @@ class QuestionCommands(commands.Cog):
             )
 
         try:
-            response = general_purpose_model(messages, model="gpt-5", temperature=0.4)
+            response = text_input(messages, model="gpt-5", temperature=0.4)
         except Exception as e:
             response = f"Error: {e}"
 

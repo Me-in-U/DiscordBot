@@ -4,7 +4,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from api.chatGPT import general_purpose_model, reasoning_model
+from api.chatGPT import custom_prompt_model, text_input, reasoning
 
 
 class InterpretSelect(discord.ui.Select):
@@ -68,26 +68,13 @@ class InterpretSelectView(discord.ui.View):
         target_message = self.selected_message.get("content", "")
         image_url = self.selected_message.get("image_url")
 
-        messages = [
-            {
-                "role": "developer",
-                "content": (
-                    "당신은 문장 해석 전문가입니다. "
-                    "대화 내용의 의미나 숨겨진 뜻이 있을 경우 찾아서 해석해주세요. "
-                    "숨겨진 의미나 뜻이 없으면 굳이 언급하지 않아도 됩니다."
-                ),
-            },
-        ]
+        messages = None
 
         if image_url:
-            messages.append(
+            messages = [
                 {
                     "role": "user",
                     "content": [
-                        {
-                            "type": "text",
-                            "text": f'해석할 내용: "{target_message}"',
-                        },
                         {
                             "type": "image_url",
                             "image_url": {
@@ -96,22 +83,17 @@ class InterpretSelectView(discord.ui.View):
                         },
                     ],
                 },
-            )
-        else:
-            messages.append(
-                {
-                    "role": "user",
-                    "content": f'해석할 내용: "{target_message}"',
-                },
-            )
+            ]
 
         try:
-            if image_url:
-                result_message = general_purpose_model(
-                    messages, model="gpt-5", temperature=0.5
-                )
-            else:
-                result_message = reasoning_model(messages)
+            result_message = custom_prompt_model(
+                messages=messages,
+                prompt={
+                    "id": "pmpt_68abf98a25b481938994e409ffd1ecf20db1ff235be9e7ab",
+                    "version": "5",
+                    "variables": {"question": target_message},
+                },
+            )
         except Exception as e:
             result_message = f"Error: {e}"
 
@@ -171,29 +153,12 @@ class InterpretCommands(commands.Cog):
     ):
         if text:
             image_url = image.url if image else None
-            messages = [
-                {
-                    "role": "developer",
-                    "content": (
-                        "당신은 문장 해석 전문가입니다. "
-                        "대화 내용의 의미나 숨겨진 뜻이 있을 경우 찾아서 해석해주세요. "
-                        "숨겨진 의미나 뜻이 없으면 굳이 언급하지 않아도 됩니다."
-                    ),
-                },
-                {
-                    "role": "developer",
-                    "content": f"해석할 내용:\n{text.strip()}",
-                },
-            ]
+            messages = None
             if image_url:
-                messages.append(
+                messages = [
                     {
                         "role": "user",
                         "content": [
-                            {
-                                "type": "text",
-                                "text": f"{interaction.user.name}의 질문 : {text.strip()}",
-                            },
                             {
                                 "type": "image_url",
                                 "image_url": {
@@ -201,24 +166,17 @@ class InterpretCommands(commands.Cog):
                                 },
                             },
                         ],
-                    },
-                )
-            else:
-                messages.append(
-                    {
-                        "role": "user",
-                        "content": f"{interaction.user.name}의 질문 : {text.strip()}",
-                    },
-                )
+                    }
+                ]
             try:
-                if image_url:
-                    interpreted = general_purpose_model(
-                        messages,
-                        model="gpt-5",
-                        temperature=0.6,
-                    )
-                else:
-                    interpreted = reasoning_model(messages)
+                interpreted = custom_prompt_model(
+                    messages=messages,
+                    prompt={
+                        "id": "pmpt_68abf98a25b481938994e409ffd1ecf20db1ff235be9e7ab",
+                        "version": "6",
+                        "variables": {"question": text.strip()},
+                    },
+                )
             except Exception as e:
                 interpreted = f"Error: {e}"
             try:
