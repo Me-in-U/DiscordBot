@@ -4,7 +4,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from api.chatGPT import general_purpose_model, reasoning_model
+from api.chatGPT import custom_prompt_model, text_input, reasoning
 
 
 class TranslationSelect(discord.ui.Select):
@@ -70,25 +70,12 @@ class TranslationSelectView(discord.ui.View):
         image_url = self.selected_message.get("image_url")
 
         # ChatGPT 요청 메시지 구성
-        messages = [
-            {
-                "role": "developer",
-                "content": (
-                    "당신은 전문 번역가입니다. "
-                    "대화 내용을 직역보다는 자연스럽게 한국어로 번역해 주세요. "
-                    "번역된 문장 이외에 추가적인 설명은 필요 없습니다."
-                ),
-            },
-        ]
+        messages = None
         if image_url:
-            messages.append(
+            messages = [
                 {
                     "role": "user",
                     "content": [
-                        {
-                            "type": "text",
-                            "text": f'번역할 내용: "{target_message}"',
-                        },
                         {
                             "type": "image_url",
                             "image_url": {
@@ -97,22 +84,20 @@ class TranslationSelectView(discord.ui.View):
                         },
                     ],
                 },
-            )
-        else:
-            messages.append(
-                {
-                    "role": "user",
-                    "content": f'번역할 내용: "{target_message}"',
-                },
-            )
+            ]
 
         try:
             if image_url:
-                result_message = general_purpose_model(
-                    messages, model="gpt-5-mini", temperature=0.5
+                result_message = custom_prompt_model(
+                    messages=messages,
+                    prompt={
+                        "id": "pmpt_68ac23cf2e6c81969b355cc2d2ab11600ddeea74b62910b3",
+                        "version": "2",
+                        "variables": {"target_message": target_message},
+                    },
                 )
             else:
-                result_message = reasoning_model(messages)
+                result_message = reasoning(messages)
         except Exception as e:
             result_message = f"Error: {e}"
 
@@ -212,16 +197,15 @@ class TranslationCommands(commands.Cog):
                 )
             try:
                 if image_url:
-                    translated_message = general_purpose_model(
+                    translated_message = text_input(
                         messages, model="gpt-5-mini", temperature=0.5
                     )
                 else:
-                    translated_message = reasoning_model(messages)
+                    translated_message = reasoning(messages)
             except Exception as e:
                 translated_message = f"Error: {e}"
 
             await interaction.response.send_message(translated_message)
-            return
         else:
             messages_options = []
             async for msg in interaction.channel.history(limit=20):
