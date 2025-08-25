@@ -25,7 +25,7 @@ class SearchCommands(commands.Cog):
 
         try:
             # 서울 지역을 기준으로 웹 검색 수행
-            response = web_search(input=내용, model="gpt-4.1-mini")
+            response = web_search(input=내용, model="gpt-5-mini")
         except Exception as e:
             response = f"Error: {e}"
 

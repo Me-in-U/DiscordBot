@@ -97,7 +97,7 @@ async def summarize_comments_with_gpt(comments: list) -> str:
     ]
     response_text = general_purpose_model(
         messages,
-        model="gpt-4.1-mini",
+        model="gpt-5-mini",
         temperature=0.4,
     )
     return response_text
@@ -404,7 +404,7 @@ async def summarize_text_with_gpt(text: str) -> str:
     # request_gpt.py의 send_to_chatgpt 함수 호출
     response_text = general_purpose_model(
         messages,
-        model="gpt-4.1-mini",  # 필요에 맞게 수정
+        model="gpt-5-mini",  # 필요에 맞게 수정
         temperature=0.4,
     )
     return response_text
