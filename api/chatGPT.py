@@ -15,7 +15,7 @@ if not OPENAI_KEY:
 clientGPT = OpenAI(api_key=OPENAI_KEY)
 
 
-def general_purpose_model(messages, model="gpt-4.1-mini", temperature=0.5):
+def general_purpose_model(messages, model="gpt-5", temperature=0.5):
     """
     OpenAI ChatGPT API를 호출하여 응답을 반환합니다.
 
@@ -48,7 +48,7 @@ class Exist1557(BaseModel):
     reason: str
 
 
-def structured_response(messages, model="gpt-4.1-mini", rf=Exist1557):
+def structured_response(messages, model="gpt-5", rf=Exist1557):
     try:
         # clientGPT가 올바르게 정의되어 있는지 확인하세요.
         completion = clientGPT.beta.chat.completions.parse(
@@ -65,7 +65,7 @@ def structured_response(messages, model="gpt-4.1-mini", rf=Exist1557):
         raise
 
 
-def web_search(input: str, model: str = "gpt-4.1-mini") -> str:
+def web_search(input: str, model: str = "gpt-5") -> str:
     """
     :param input: 검색할 문자열
     :return: 웹 검색 결과를 포함한 모델 응답 텍스트

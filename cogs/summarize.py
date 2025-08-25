@@ -66,7 +66,7 @@ class SummarizeCommands(commands.Cog):
         # ChatGPT에 메시지 전달
         try:
             response = general_purpose_model(
-                messages, model="gpt-4o-mini", temperature=0.4
+                messages, model="gpt-5-mini", temperature=0.4
             )
         except Exception as e:
             response = f"Error: {e}"
