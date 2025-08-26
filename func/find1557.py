@@ -1,7 +1,7 @@
 import json
 import os
 
-from api.chatGPT import structured_response
+from api.chatGPT import custom_prompt_model, structured_response
 
 COUNTER_FILE = "1557Counter.json"
 
@@ -55,7 +55,7 @@ def clearCount():
 async def find1557(message):
     image_url = None
 
-    # 이미지 첨부 확인
+    # !이미지 첨부 확인
     if message.attachments:
         image_url = message.attachments[0].url
     else:
@@ -66,39 +66,29 @@ async def find1557(message):
             print(f"1557 발견{count}개")
             return
 
-    # ! 프롬프트 생성
-    messages = [
-        {
-            "role": "developer",
-            "content": (
-                "사용자 입력 이미지에 대해 다음 조건들이 모두 만족하면 exist에 true, "
-                "하나라도 미달이면 exist에 false를 반환해줘.\n\n"
-                "조건 1: '1'이라는 숫자(문자)가 최소 1개 이상 존재\n"
-                "조건 2: '5'라는 숫자(문자)가 최소 2개 이상 존재\n"
-                "조건 3: '7'이라는 숫자(문자)가 최소 1개 이상 존재\n"
-                "즉 입력 이미지의 문자로 1557을 구성할 수 있어야한다."
-            ),
-        },
-        {
-            "role": "developer",
-            "content": "이미지의 모든 문자를 imageToText에 넣어서 반환해라",
-        },
-        {
-            "role": "user",
-            "content": [
-                {
-                    "type": "image_url",
-                    "image_url": {
-                        "url": image_url,
-                    },
-                }
-            ],
-        },
-    ]
     # !image_url이 존재할 때에만 이미지 관련 메시지 추가
     if image_url is not None:
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": image_url,
+                        },
+                    }
+                ],
+            },
+        ]
         try:
-            response = structured_response(messages)
+            response = custom_prompt_model(
+                messages=messages,
+                prompt={
+                    "id": "pmpt_68ad1661f57c8190b18ab6adfaa69c4d0c4d98e2fa43e7fa",
+                    "version": "1",
+                },
+            )
         except Exception as e:
             print("GPT 호출 중 예외 발생:", e)
             # await message.channel.send("오류가 발생했습니다. 나중에 다시 시도해주세요.")
@@ -113,4 +103,3 @@ async def find1557(message):
                 await message.channel.send(f"1557 {count}세트 발견", delete_after=2)
                 userCount(message.author, count)
                 print(f"1557 {count}세트 발견")
-                return

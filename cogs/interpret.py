@@ -4,7 +4,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from api.chatGPT import custom_prompt_model, text_input, reasoning
+from api.chatGPT import custom_prompt_model
 
 
 class InterpretSelect(discord.ui.Select):
