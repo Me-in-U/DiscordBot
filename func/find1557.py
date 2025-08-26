@@ -103,3 +103,4 @@ async def find1557(message):
                 await message.channel.send(f"1557 {count}세트 발견", delete_after=2)
                 userCount(message.author, count)
                 print(f"1557 {count}세트 발견")
+                return
