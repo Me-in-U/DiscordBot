@@ -15,16 +15,6 @@ if not OPENAI_KEY:
 clientGPT = OpenAI(api_key=OPENAI_KEY)
 
 
-def text_input(messages, model="gpt-5", temperature=0.5):
-    response = clientGPT.responses.create(
-        model=model,
-        messages=messages,
-        temperature=temperature,
-    )
-    message = response.choices[0].message.content
-    return message.strip()
-
-
 def custom_prompt_model(prompt, messages=None):
     if messages:
         response = clientGPT.responses.create(
@@ -35,31 +25,17 @@ def custom_prompt_model(prompt, messages=None):
         response = clientGPT.responses.create(
             prompt=prompt,
         )
-    message = response.choices[0].message.content
-    return message.strip()
-
-
-class Exist1557(BaseModel):
-    exist: bool
-    imageToText: str
-    reason: str
-
-
-def structured_response(messages, model="gpt-5", rf=Exist1557):
+    print(response)
     try:
-        # clientGPT가 올바르게 정의되어 있는지 확인하세요.
-        completion = clientGPT.chat.completions.parse(
-            model=model,
-            messages=messages,
-            response_format=rf,
-        )
-        # print("GPT 응답 전체:", completion)
-        parsed = completion.choices[0].message.parsed
-        # print("파싱된 응답:", parsed)
-        return parsed
-    except Exception as e:
-        print("structured_response 호출 중 에러 발생:", e)
-        raise
+        message = response.output_text
+    except AttributeError:
+        message = ""
+        for item in response.output:
+            if getattr(item, "type", None) == "message":
+                for c in item.content:
+                    if getattr(c, "type", None) == "output_text":
+                        message += c.text
+    return message.strip()
 
 
 def web_search(input: str, model: str = "gpt-5") -> str:

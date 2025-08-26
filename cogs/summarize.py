@@ -2,7 +2,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from api.chatGPT import custom_prompt_model, text_input
+from api.chatGPT import custom_prompt_model
+from bot import get_recent_messages
 
 
 class SummarizeCommands(commands.Cog):
@@ -42,9 +43,9 @@ class SummarizeCommands(commands.Cog):
             response = custom_prompt_model(
                 prompt={
                     "id": "pmpt_68ac08b66784819785d89655eaaaa7470bc0cc5deddb37d9",
-                    "version": "1",
+                    "version": "3",
                     "variables": {
-                        "recent_messages": "\n".join(self.bot.USER_MESSAGES[-150:]),
+                        "recent_messages": get_recent_messages(limit=150),
                         "additional_requests": request_message,
                     },
                 }
