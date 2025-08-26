@@ -2,7 +2,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from api.chatGPT import general_purpose_model
+from api.chatGPT import custom_prompt_model
+from bot import get_recent_messages
 
 
 class SummarizeCommands(commands.Cog):
@@ -36,37 +37,18 @@ class SummarizeCommands(commands.Cog):
 
         # 요약 요청 메시지 생성
         request_message = 추가_요청 or ""
-        messages = [
-            {
-                "role": "developer",
-                "content": (
-                    "당신은 요약 전문가입니다. "
-                    "주어진 대화 내용을 요약해주세요. "
-                    "전체적인 내용을 3줄 이내로 요약. "
-                    "그 이후 각 유저가 한 말을 따로 요약한걸 추가해줘. "
-                    "유저이름 : 요약 형식으로. "
-                    "자연스러운 말투로 말해줘. "
-                    "추가 요청 사항이 있다면 위 내용보다 우선 처리 해줘줘"
-                    "대화에 참여하지 않은 유저는 알려주지마"
-                ),
-            },
-            {
-                "role": "developer",
-                "content": (
-                    "다음은 유저가 말했던 최근 150개의 기록이다. 채팅 내용을 요약해라."
-                    f"전체 대화 내용: {self.bot.USER_MESSAGES[-150:]}\n\n"
-                ),
-            },
-            {
-                "role": "developer",
-                "content": f"요약 추가 요청 사항 : {request_message}",
-            },
-        ]
 
         # ChatGPT에 메시지 전달
         try:
-            response = general_purpose_model(
-                messages, model="gpt-5-mini", temperature=0.4
+            response = custom_prompt_model(
+                prompt={
+                    "id": "pmpt_68ac08b66784819785d89655eaaaa7470bc0cc5deddb37d9",
+                    "version": "3",
+                    "variables": {
+                        "recent_messages": get_recent_messages(limit=150),
+                        "additional_requests": request_message,
+                    },
+                }
             )
         except Exception as e:
             response = f"Error: {e}"

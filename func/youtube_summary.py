@@ -11,8 +11,9 @@ from googleapiclient.discovery import build
 from pytube.exceptions import VideoUnavailable
 from yt_dlp import YoutubeDL
 
+
 # request_gpt.py 에 정의된 함수들 임포트
-from api.chatGPT import general_purpose_model
+from api.chatGPT import custom_prompt_model
 
 load_dotenv()
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
@@ -81,24 +82,12 @@ async def summarize_comments_with_gpt(comments: list) -> str:
     가져온 댓글들을 1줄로 요약합니다.
     """
     comments_text = "\n".join(comments)
-    messages = [
-        {
-            "role": "developer",
-            "content": (
-                "당신은 전문 요약가입니다. "
-                "다음은 유튜브 영상의 댓글입니다. "
-                "주요 내용을 70자 이내로 압축 요약해주세요."
-            ),
+    response_text = custom_prompt_model(
+        prompt={
+            "id": "pmpt_68abfada6cc8819392effc146b3a39730a3a8fd787c57011",
+            "version": "7",
+            "variables": {"comments_text": comments_text},
         },
-        {
-            "role": "user",
-            "content": comments_text,
-        },
-    ]
-    response_text = general_purpose_model(
-        messages,
-        model="gpt-5-mini",
-        temperature=0.4,
     )
     return response_text
 
@@ -379,33 +368,13 @@ async def speech_to_text(audio_path: str) -> str:
     return result["text"]
 
 
-async def summarize_text_with_gpt(text: str) -> str:
-    """
-    request_gpt.py의 send_to_chatgpt 함수를 사용하여 요약을 수행
-    """
-    # GPT에게 보낼 메시지
-    messages = [
-        {
-            "role": "developer",
-            "content": (
-                "당신은 전문 요약가입니다. "
-                "다음은 유튜브 내용을 텍스트로 바꾼것입니다. "
-                "주요 내용에 대해서 요약해주세요. "
-                "중요 대화 맥락이 누락되지 않도록 유의하세요. "
-                "내용을 50자 이내로 3줄 압축 요약하세요. 1. 2. 3."
-            ),
-        },
-        {
-            "role": "user",
-            "content": text,
-        },
-    ]
-
-    # request_gpt.py의 send_to_chatgpt 함수 호출
-    response_text = general_purpose_model(
-        messages,
-        model="gpt-5-mini",  # 필요에 맞게 수정
-        temperature=0.4,
+async def summarize_text_with_gpt(youtube_text: str) -> str:
+    response_text = custom_prompt_model(
+        prompt={
+            "id": "pmpt_68ac079c0d1081958393a758f0b6f4cc01c6576daa0b0eb7",
+            "version": "3",
+            "variables": {"youtube_text": youtube_text},
+        }
     )
     return response_text
 
