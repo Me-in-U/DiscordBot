@@ -73,6 +73,26 @@ async def load_party_list():
     print("---------------------------------------------------\n")
 
 
+def get_recent_messages(limit=20):
+    all_msgs = []
+    for msgs in DISCORD_CLIENT.USER_MESSAGES.values():
+        all_msgs.extend(msgs)
+
+    # 시간순 정렬 (최신순)
+    all_msgs.sort(key=lambda m: m["time"], reverse=True)
+
+    # 최근 N개만
+    recent = all_msgs[:limit]
+
+    # 문자열로 합치기
+    lines = []
+    for m in reversed(recent):  # 시간순으로 보려면 다시 뒤집기
+        role = m.get("role", "user")
+        content = m.get("content", "")
+        lines.append(f"[{m['time']}] {role}: {content}")
+    return "\n".join(lines)
+
+
 async def load_variable():
     await asyncio.sleep(1)
     print()
