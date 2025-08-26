@@ -1,7 +1,7 @@
 import json
 import os
 
-from api.chatGPT import custom_prompt_model, structured_response
+from api.chatGPT import custom_prompt_model
 
 COUNTER_FILE = "1557Counter.json"
 
