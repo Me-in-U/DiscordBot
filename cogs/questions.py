@@ -3,7 +3,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from api.chatGPT import custom_prompt_model
-from bot import get_recent_messages
+from util.get_recent_messages import get_recent_messages
 
 
 class QuestionCommands(commands.Cog):
@@ -61,7 +61,7 @@ class QuestionCommands(commands.Cog):
                     "id": "pmpt_68ac254fa8008190861e8f3f686556d50c6160cd272b9aca",
                     "version": "2",
                     "variables": {
-                        "recent_messages": get_recent_messages(limit=20),
+                        "recent_messages": recent_message(limit=20),
                         "user_name": interaction.user.name,
                         "question": text.strip(),
                     },
@@ -121,7 +121,9 @@ class QuestionCommands(commands.Cog):
                     "id": "pmpt_68ac254fa8008190861e8f3f686556d50c6160cd272b9aca",
                     "version": "2",
                     "variables": {
-                        "recent_messages": get_recent_messages(limit=20),
+                        "recent_messages": get_recent_messages(
+                            client=self.bot, limit=20
+                        ),
                         "user_name": interaction.user.name,
                         "question": text.strip(),
                     },

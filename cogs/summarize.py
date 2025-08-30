@@ -3,7 +3,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from api.chatGPT import custom_prompt_model
-from bot import DISCORD_CLIENT, get_recent_messages
+from util.get_recent_messages import get_recent_messages
 
 
 class SummarizeCommands(commands.Cog):
@@ -46,7 +46,7 @@ class SummarizeCommands(commands.Cog):
                     "version": "3",
                     "variables": {
                         "recent_messages": get_recent_messages(
-                            client=DISCORD_CLIENT, limit=150
+                            client=self.bot, limit=150
                         ),
                         "additional_requests": request_message,
                     },
