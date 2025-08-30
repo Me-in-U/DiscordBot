@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 from func.find1557 import find1557
 from func.spring_ai import spring_ai
 from func.youtube_summary import check_youtube_link
+from util.get_recent_messages import get_recent_messages
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -316,77 +317,6 @@ async def load_recent_messages():
     print("각 사용자별 메시지 정렬 완료!", DISCORD_CLIENT.USER_MESSAGES)
     text = get_recent_messages(client=DISCORD_CLIENT, limit=150)
     print("get_recent_messages(limit=150) 결과\n", text)
-
-
-def get_recent_messages(client, limit=20):
-    def _format_content(c):
-        if isinstance(c, str):
-            return c.strip()
-        if isinstance(c, list):
-            texts, images = [], []
-            for part in c:
-                if not isinstance(part, dict):
-                    continue
-                ptype = part.get("type")
-                if ptype == "input_text":
-                    txt = part.get("text", "")
-                    if isinstance(txt, str) and txt.strip():
-                        texts.append(txt.strip())
-                elif ptype == "input_image":
-                    url = part.get("image_url")
-                    if isinstance(url, str) and url.strip():
-                        images.append(url.strip())
-            text_part = " ".join(texts) if texts else ""
-            if images:
-                img_part = (
-                    f"(image: {images[0]})"
-                    if len(images) == 1
-                    else f"(images: {len(images)}개)"
-                )
-                return f"{text_part} {img_part}".strip()
-            return text_part
-        return str(c)
-
-    def _parse_time(m):
-        # "YYYY-MM-DD HH:MM:SS" → datetime, 실패 시 epoch
-        t = m.get("time", "")
-        try:
-            return datetime.strptime(t, "%Y-%m-%d %H:%M:%S")
-        except Exception:
-            return datetime(1970, 1, 1)
-
-    user_msgs_map = getattr(client, "USER_MESSAGES", {})
-    if not isinstance(user_msgs_map, dict):
-        print(
-            "get_recent_messages: USER_MESSAGES가 dict가 아님 ->", type(user_msgs_map)
-        )
-        return ""
-
-    # 평탄화
-    all_msgs = []
-    for author, msgs in user_msgs_map.items():
-        if isinstance(msgs, list):
-            for m in msgs:
-                all_msgs.append({**m, "_author": author})
-
-    print(f"get_recent_messages: 집계된 메시지 수 = {len(all_msgs)}")
-
-    if not all_msgs:
-        print("get_recent_messages: 메시지가 없습니다.")
-        return ""
-
-    all_msgs.sort(key=_parse_time, reverse=True)
-    recent = list(reversed(all_msgs[:limit]))
-
-    lines = []
-    for m in recent:
-        author = m.get("_author", "unknown")
-        content = _format_content(m.get("content", ""))
-        t = m.get("time", "")
-        lines.append(f"[{t}] {author}: {content}")  # ← 닉네임 출력
-
-    print("\n최근 메시지 데이터 요청됨", lines)
-    return "\n".join(lines)
 
 
 async def main():
