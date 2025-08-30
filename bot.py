@@ -309,16 +309,16 @@ async def load_recent_messages():
     print("---------------------------------------------------\n")
 
     # 각 사용자별로 오래된→최신 순서로 정렬(기존 로직 유지)
-    for user in list(DISCORD_CLIENT.USER_MESSAGES.keys()):
+    for user in DISCORD_CLIENT.USER_MESSAGES.keys():
         DISCORD_CLIENT.USER_MESSAGES[user] = list(
             reversed(DISCORD_CLIENT.USER_MESSAGES[user])
         )
     print("각 사용자별 메시지 정렬 완료!", DISCORD_CLIENT.USER_MESSAGES)
-    # text = get_recent_messages(limit=150)
-    # print("get_recent_messages(limit=150) 결과\n", text)
+    text = get_recent_messages(client=DISCORD_CLIENT, limit=150)
+    print("get_recent_messages(limit=150) 결과\n", text)
 
 
-def get_recent_messages(limit=20):
+def get_recent_messages(client, limit=20):
     def _format_content(c):
         if isinstance(c, str):
             return c.strip()
@@ -355,8 +355,7 @@ def get_recent_messages(limit=20):
         except Exception:
             return datetime(1970, 1, 1)
 
-    # ★ 동일 인스턴스 사용: client.USER_MESSAGES에서 직접 읽기
-    user_msgs_map = getattr(DISCORD_CLIENT, "USER_MESSAGES", {})
+    user_msgs_map = getattr(client, "USER_MESSAGES", {})
     if not isinstance(user_msgs_map, dict):
         print(
             "get_recent_messages: USER_MESSAGES가 dict가 아님 ->", type(user_msgs_map)
