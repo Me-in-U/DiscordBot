@@ -68,38 +68,35 @@ async def find1557(message):
 
     # !image_url이 존재할 때에만 이미지 관련 메시지 추가
     if image_url is not None:
-        messages = [
+        image_content = [
             {
                 "role": "user",
                 "content": [
                     {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": image_url,
-                        },
+                        "type": "input_image",
+                        "image_url": image_url,
                     }
                 ],
             },
         ]
         try:
             response = custom_prompt_model(
-                messages=messages,
+                image_content=image_content,
                 prompt={
                     "id": "pmpt_68ad1661f57c8190b18ab6adfaa69c4d0c4d98e2fa43e7fa",
-                    "version": "1",
+                    "version": "5",
                 },
             )
         except Exception as e:
             print("GPT 호출 중 예외 발생:", e)
             # await message.channel.send("오류가 발생했습니다. 나중에 다시 시도해주세요.")
             return
-
+        response = json.loads(response)
         print("구조화된 응답:", response)
         # 만약 true라면
-        if response.exist:
-            count = count1557(response.imageToText)
+        if response["exist"]:
+            count = count1557(response["imageToText"])
             if count:
-                # 2초 뒤 사라짐
                 await message.channel.send(f"1557 {count}세트 발견", delete_after=2)
                 userCount(message.author, count)
                 print(f"1557 {count}세트 발견")

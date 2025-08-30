@@ -40,30 +40,28 @@ class QuestionCommands(commands.Cog):
             image_url = image.url
 
         # ChatGPT에 메시지 전달
-        messages = None
+        image_content = None
         if image_url:
-            messages = [
+            image_content = [
                 {
                     "role": "user",
                     "content": [
                         {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": image_url,
-                            },
-                        },
+                            "type": "input_image",
+                            "image_url": image_url,
+                        }
                     ],
                 },
             ]
 
         try:
             response = custom_prompt_model(
-                messages=messages,
+                image_content=image_content,
                 prompt={
                     "id": "pmpt_68ac254fa8008190861e8f3f686556d50c6160cd272b9aca",
-                    "version": "1",
+                    "version": "2",
                     "variables": {
-                        "user_messages": get_recent_messages(limit=20),
+                        "recent_messages": get_recent_messages(limit=20),
                         "user_name": interaction.user.name,
                         "question": text.strip(),
                     },
@@ -100,9 +98,9 @@ class QuestionCommands(commands.Cog):
             image_url = image.url
 
         # ChatGPT에 메시지 전달
-        messages = None
+        image_content = None
         if image_url:
-            messages = [
+            image_content = [
                 {
                     "role": "user",
                     "content": [
@@ -118,12 +116,12 @@ class QuestionCommands(commands.Cog):
 
         try:
             response = custom_prompt_model(
-                messages=messages,
+                image_content=image_content,
                 prompt={
-                    "id": "pmpt_68acfa93ac6481959537fcb1853c883307d25e6bf62ef36c",
-                    "version": "1",
+                    "id": "pmpt_68ac254fa8008190861e8f3f686556d50c6160cd272b9aca",
+                    "version": "2",
                     "variables": {
-                        "user_messages": get_recent_messages(limit=20),
+                        "recent_messages": get_recent_messages(limit=20),
                         "user_name": interaction.user.name,
                         "question": text.strip(),
                     },

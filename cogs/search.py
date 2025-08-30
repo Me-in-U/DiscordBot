@@ -2,7 +2,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from api.chatGPT import web_search
+from api.chatGPT import custom_prompt_model
 
 
 class SearchCommands(commands.Cog):
@@ -25,7 +25,13 @@ class SearchCommands(commands.Cog):
 
         try:
             # 서울 지역을 기준으로 웹 검색 수행
-            response = web_search(input=내용, model="gpt-5-mini")
+            response = custom_prompt_model(
+                prompt={
+                    "id": "pmpt_68b25c89c1a48193a60de5a3cb23a1eb0c25a13613efd1bf",
+                    "version": "1",
+                    "variables": {"user_input": 내용},
+                }
+            )
         except Exception as e:
             response = f"Error: {e}"
 

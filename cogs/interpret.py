@@ -68,26 +68,23 @@ class InterpretSelectView(discord.ui.View):
         target_message = self.selected_message.get("content", "")
         image_url = self.selected_message.get("image_url")
 
-        messages = None
-
+        image_content = None
         if image_url:
-            messages = [
+            image_content = [
                 {
                     "role": "user",
                     "content": [
                         {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": image_url,
-                            },
-                        },
+                            "type": "input_image",
+                            "image_url": image_url,
+                        }
                     ],
                 },
             ]
 
         try:
             result_message = custom_prompt_model(
-                messages=messages,
+                image_content=image_content,
                 prompt={
                     "id": "pmpt_68abf98a25b481938994e409ffd1ecf20db1ff235be9e7ab",
                     "version": "5",
@@ -153,24 +150,22 @@ class InterpretCommands(commands.Cog):
     ):
         if text:
             image_url = image.url if image else None
-            messages = None
+            image_content = None
             if image_url:
-                messages = [
+                image_content = [
                     {
                         "role": "user",
                         "content": [
                             {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": image_url,
-                                },
-                            },
+                                "type": "input_image",
+                                "image_url": image_url,
+                            }
                         ],
                     }
                 ]
             try:
                 interpreted = custom_prompt_model(
-                    messages=messages,
+                    image_content=image_content,
                     prompt={
                         "id": "pmpt_68abf98a25b481938994e409ffd1ecf20db1ff235be9e7ab",
                         "version": "6",

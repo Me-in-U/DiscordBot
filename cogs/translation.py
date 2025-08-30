@@ -70,25 +70,23 @@ class TranslationSelectView(discord.ui.View):
         image_url = self.selected_message.get("image_url")
 
         # ChatGPT 요청 메시지 구성
-        messages = None
+        input = None
         if image_url:
-            messages = [
+            input = [
                 {
                     "role": "user",
                     "content": [
                         {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": image_url,
-                            },
-                        },
+                            "type": "input_image",
+                            "image_url": image_url,
+                        }
                     ],
                 },
             ]
 
         try:
             result_message = custom_prompt_model(
-                messages=messages,
+                input=input,
                 prompt={
                     "id": "pmpt_68ac23cf2e6c81969b355cc2d2ab11600ddeea74b62910b3",
                     "version": "3",
@@ -158,24 +156,22 @@ class TranslationCommands(commands.Cog):
         if text:
             target_message = text.strip()
             image_url = image.url if image else None
-            messages = None
+            image_content = None
             if image_url:
-                messages = [
+                image_content = [
                     {
                         "role": "user",
                         "content": [
                             {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": image_url,
-                                },
-                            },
+                                "type": "input_image",
+                                "image_url": image_url,
+                            }
                         ],
                     },
                 ]
             try:
                 translated_message = custom_prompt_model(
-                    messages=messages,
+                    image_content=image_content,
                     prompt={
                         "id": "pmpt_68ac23cf2e6c81969b355cc2d2ab11600ddeea74b62910b3",
                         "version": "3",
