@@ -85,7 +85,7 @@ async def summarize_comments_with_gpt(comments: list) -> str:
     response_text = custom_prompt_model(
         prompt={
             "id": "pmpt_68abfada6cc8819392effc146b3a39730a3a8fd787c57011",
-            "version": "7",
+            "version": "8",
             "variables": {"comments_text": comments_text},
         },
     )
@@ -372,7 +372,7 @@ async def summarize_text_with_gpt(youtube_text: str) -> str:
     response_text = custom_prompt_model(
         prompt={
             "id": "pmpt_68ac079c0d1081958393a758f0b6f4cc01c6576daa0b0eb7",
-            "version": "3",
+            "version": "4",
             "variables": {"youtube_text": youtube_text},
         }
     )
