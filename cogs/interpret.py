@@ -87,7 +87,7 @@ class InterpretSelectView(discord.ui.View):
                 image_content=image_content,
                 prompt={
                     "id": "pmpt_68abf98a25b481938994e409ffd1ecf20db1ff235be9e7ab",
-                    "version": "5",
+                    "version": "7",
                     "variables": {"question": target_message},
                 },
             )
