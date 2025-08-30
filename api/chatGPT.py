@@ -15,11 +15,11 @@ if not OPENAI_KEY:
 clientGPT = OpenAI(api_key=OPENAI_KEY)
 
 
-def custom_prompt_model(prompt, messages=None):
-    if messages:
+def custom_prompt_model(prompt, image_content=None):
+    if image_content:
         response = clientGPT.responses.create(
+            input=image_content,
             prompt=prompt,
-            messages=messages,
         )
     else:
         response = clientGPT.responses.create(
@@ -36,27 +36,3 @@ def custom_prompt_model(prompt, messages=None):
                     if getattr(c, "type", None) == "output_text":
                         message += c.text
     return message.strip()
-
-
-def web_search(input: str, model: str = "gpt-5") -> str:
-    """
-    :param input: 검색할 문자열
-    :return: 웹 검색 결과를 포함한 모델 응답 텍스트
-    """
-    response = clientGPT.responses.create(
-        model=model,
-        tools=[
-            {
-                "type": "web_search_preview",
-                "user_location": {
-                    "type": "approximate",
-                    "country": "KR",
-                    "city": "Seoul",
-                    "region": "Seoul",
-                },
-                "search_context_size": "high",
-            }
-        ],
-        input=input,
-    )
-    return response.output_text
