@@ -70,9 +70,9 @@ class TranslationSelectView(discord.ui.View):
         image_url = self.selected_message.get("image_url")
 
         # ChatGPT 요청 메시지 구성
-        input = None
+        image_content = None
         if image_url:
-            input = [
+            image_content = [
                 {
                     "role": "user",
                     "content": [
@@ -86,10 +86,10 @@ class TranslationSelectView(discord.ui.View):
 
         try:
             result_message = custom_prompt_model(
-                input=input,
+                image_content=image_content,
                 prompt={
                     "id": "pmpt_68ac23cf2e6c81969b355cc2d2ab11600ddeea74b62910b3",
-                    "version": "3",
+                    "version": "4",
                     "variables": {"target_message": target_message},
                 },
             )
