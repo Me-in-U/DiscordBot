@@ -22,11 +22,38 @@ load_dotenv()
 GUILD_ID = int(os.getenv("GUILD_ID"))  # 손팬노 길드 ID
 TEST_GUILD = Object(id=GUILD_ID)
 H_BAR = "\u2015"
+# 공통 상수
+PANEL_TITLE = "🎵 신창섭의 다해줬잖아"
+MSG_NO_PLAYING = "❌ 재생 중인 음악이 없습니다."
+UNKNOWN = "알 수 없음"
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+    "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
+}
+
+
+# 간단한 디버그 로깅 헬퍼
+def dbg(msg: str):
+    try:
+        now = datetime.now().strftime("%H:%M:%S")
+        print(f"[MUSIC {now}] {msg}", flush=True)
+    except Exception:
+        pass
+
 
 ffmpeg_options = {
     "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
     "options": "-threads 2 -vn -ac 2 -ar 48000 -acodec libopus -loglevel verbose",
 }
+
+
+# FFmpeg 경로 자동 감지: 로컬 bin\\ffmpeg.exe가 있으면 사용, 없으면 시스템 PATH의 ffmpeg 사용
+def _detect_ffmpeg_executable() -> str:
+    local_path = os.path.join("bin", "ffmpeg.exe")
+    if os.path.exists(local_path):
+        return local_path
+    return "ffmpeg"
+
 
 search_ytdl = youtube_dl.YoutubeDL(
     {
@@ -39,7 +66,6 @@ search_ytdl = youtube_dl.YoutubeDL(
 
 ytdl = youtube_dl.YoutubeDL(
     {
-        "format": "bestaudio/best",
         "noplaylist": True,
         "skip_download": True,
         "simulate": True,
@@ -54,24 +80,158 @@ ytdl = youtube_dl.YoutubeDL(
     }
 )
 
+# 포맷 강제 없이 메타/포맷 정보만 가져오는 용도 (에러 줄이기)
+info_ytdl = youtube_dl.YoutubeDL(
+    {
+        "noplaylist": True,
+        "skip_download": True,
+        "simulate": True,
+        "quiet": True,
+        "verbose": False,
+        "no_warnings": True,
+        "logtostderr": False,
+        "ignoreerrors": True,
+        "nocheckcertificate": True,
+        # 포맷 선택은 우리 코드에서 수동으로
+    }
+)
+
 
 async def fetch_stream_url(page_url: str) -> str:
+    dbg(f"fetch_stream_url: page_url={page_url}")
     # ① YouTube 페이지 HTML 한 번만 가져오기
-    async with aiohttp.ClientSession() as session:
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+        "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
+    }
+    async with aiohttp.ClientSession(headers=headers) as session:
         async with session.get(page_url) as resp:
             text = await resp.text()
 
     # ② ytInitialPlayerResponse JSON 추출
-    m = re.search(r"ytInitialPlayerResponse\s*=\s*(\{.+?\});", text)
+    # 원본은 탐욕적/비탐욕적 정규식 사용. 안전하게 세미콜론 기준으로 캡쳐
+    m = re.search(r"ytInitialPlayerResponse\s*=\s*(\{[^;]+\});", text)
+    if not m:
+        raise ValueError("ytInitialPlayerResponse not found in page")
     data = json.loads(m.group(1))
 
     # ③ adaptiveFormats 중 audio MIME만 필터
     af = data["streamingData"]["adaptiveFormats"]
     audio_formats = [f for f in af if f.get("mimeType", "").startswith("audio/")]
+    dbg(f"fetch_stream_url: audio_formats_count={len(audio_formats)}")
 
     # ④ 비트레이트 최고 스트림 URL 선택
     best = max(audio_formats, key=lambda f: f.get("averageBitrate", 0))
+    dbg(
+        f"fetch_stream_url: selected avgBitrate={best.get('averageBitrate')} mime={best.get('mimeType')}"
+    )
     return best["url"]
+
+
+def _make_ydl_opts(**overrides):
+    # cookies.txt가 있으면 사용할 수 있도록 옵션 구성
+    cookies_path = os.path.join(os.getcwd(), "cookies.txt")
+    base = {
+        "noplaylist": True,
+        "skip_download": True,
+        "simulate": True,
+        "quiet": True,
+        "verbose": False,
+        "no_warnings": True,
+        "logtostderr": False,
+        "ignoreerrors": True,
+        "nocheckcertificate": True,
+        "geo_bypass": True,
+        "extractor_retries": 2,
+        "source_address": "0.0.0.0",
+        # 포맷 선택은 필요 시 지정
+    }
+    if os.path.exists(cookies_path):
+        base["cookiefile"] = cookies_path
+    base.update(overrides)
+    return base
+
+
+def _extract_info_with_fallback(url: str):
+    """yt-dlp 메타 추출을 여러 전략으로 시도한다."""
+    dbg(f"_extract_info_with_fallback: url={url}")
+    attempts = [
+        _make_ydl_opts(),
+        _make_ydl_opts(
+            extractor_args={"youtube": {"player_client": ["android", "web"]}}
+        ),
+        _make_ydl_opts(http_headers=HEADERS),
+        _make_ydl_opts(
+            extractor_args={"youtube": {"player_client": ["android", "web", "ios"]}},
+            http_headers=HEADERS,
+        ),
+    ]
+    last_err = None
+    for opts in attempts:
+        try:
+            with youtube_dl.YoutubeDL(opts) as ydl:
+                dbg(f"_extract_info_with_fallback: using options: {opts}")
+                info = ydl.extract_info(url, download=False)
+                if not info:
+                    raise ValueError("yt-dlp returned None")
+                dbg(
+                    f"_extract_info_with_fallback: got info type={type(info)} keys={list(info.keys()) if isinstance(info,dict) else None}"
+                )
+                return info
+        except Exception as e:
+            dbg(f"_extract_info_with_fallback: attempt failed: {type(e)} {e}")
+            last_err = e
+            continue
+    raise ValueError(f"yt-dlp 메타 추출 실패: {type(last_err)} {last_err}")
+
+
+async def fetch_stream_info(page_url: str) -> tuple[str, dict]:
+    """직접 HTML을 파싱해 오디오 스트림 URL과 최소 메타데이터를 반환합니다.
+    반환: (audio_url, data)
+    data에는 title, webpage_url, duration, uploader, thumbnail 등이 포함됩니다.
+    """
+    dbg(f"fetch_stream_info: page_url={page_url}")
+    headers = HEADERS
+    async with aiohttp.ClientSession(headers=headers) as session:
+        async with session.get(page_url) as resp:
+            text = await resp.text()
+
+    m = re.search(r"ytInitialPlayerResponse\s*=\s*(\{[^;]+\});", text)
+    if not m:
+        raise ValueError("ytInitialPlayerResponse not found in page")
+    j = json.loads(m.group(1))
+
+    # 스트리밍 URL
+    af = j.get("streamingData", {}).get("adaptiveFormats", [])
+    audio_formats = [f for f in af if str(f.get("mimeType", "")).startswith("audio/")]
+    if not audio_formats:
+        raise ValueError("no audio formats in adaptiveFormats")
+    best = max(audio_formats, key=lambda f: f.get("averageBitrate", 0))
+    audio_url = best.get("url")
+
+    # 메타데이터 구성
+    vd = j.get("videoDetails", {})
+    pmr = j.get("microformat", {}).get("playerMicroformatRenderer", {})
+    # thumbnail
+    thumb = None
+    thumbs = (
+        (pmr.get("thumbnail", {}) or {}).get("thumbnails")
+        or (vd.get("thumbnail", {}) or {}).get("thumbnails")
+        or []
+    )
+    if thumbs:
+        thumb = thumbs[-1].get("url")
+    data = {
+        "title": vd.get("title"),
+        "webpage_url": page_url,
+        "duration": int(vd.get("lengthSeconds", 0) or 0),
+        "uploader": vd.get("author") or pmr.get("ownerChannelName"),
+        "thumbnail": thumb,
+    }
+    dbg(
+        f"fetch_stream_info: title={data['title']} duration={data['duration']} uploader={data['uploader']} thumb={bool(thumb)}"
+    )
+    return audio_url, data
 
 
 @dataclass
@@ -91,51 +251,155 @@ class GuildMusicState:
 
 class YTDLSource:
     def __init__(
-        self, source: discord.FFmpegOpusAudio, *, data, requester: discord.User = None
+        self,
+        source: discord.FFmpegOpusAudio,
+        *,
+        data,
+        requester: discord.User = None,
+        audio_url: Optional[str] = None,
     ):
         self.source = source
         self.data = data
         self.title = data.get("title")
         self.webpage_url = data.get("webpage_url")
         self.requester = requester
+        self.audio_url = audio_url  # 재시작/루프 시 재사용할 실제 스트림 URL
 
     @classmethod
     async def from_url(
         cls, url, *, loop=None, start_time: int = 0, requester: discord.User = None
     ):
+        dbg(
+            f"YTDLSource.from_url: start url={url} start_time={start_time} requester={getattr(requester,'id',None)}"
+        )
         loop = loop or asyncio.get_event_loop()
 
-        # ! 검색어면 먼저 ID만 빠르게 가져오기(제거해도 됨)
-        if not re.match(r"^https?://", url):
+        # ! 검색어면 먼저 ID/URL만 빠르게 가져오기(안전 처리)
+        if not re.match(r"^https?://", url or ""):
+            dbg("YTDLSource.from_url: keyword search path")
             search = f"ytsearch5:{url}"
             info = await loop.run_in_executor(
-                None, lambda: ytdl.extract_info(search, download=False)
+                None, lambda: _extract_info_with_fallback(search)
             )
-            entry = info["entries"][0]
-            url = entry["url"]  # 비디오 ID
+            entries = [e for e in (info.get("entries") or []) if e]
+            if not entries:
+                raise ValueError("검색 결과가 없습니다.")
+            entry = entries[0]
+            vid = entry.get("id")
+            url = (
+                entry.get("webpage_url")
+                or entry.get("url")
+                or (f"https://www.youtube.com/watch?v={vid}" if vid else None)
+            )
+            if not url:
+                raise ValueError("검색 결과 URL이 없습니다.")
+            dbg(f"YTDLSource.from_url: selected url={url}")
 
         # ! 실제 메타·스트림 준비
-        data = await loop.run_in_executor(
-            None, lambda: ytdl.extract_info(url, download=False, process=False)
-        )
+        try:
+            data = await loop.run_in_executor(
+                None, lambda: _extract_info_with_fallback(url)
+            )
+        except Exception as e:
+            # yt-dlp가 완전히 실패하는 경우: HTML 파싱 기반 완전 대체 경로
+            dbg(f"YTDLSource.from_url: yt-dlp failed -> HTML fallback: {type(e)} {e}")
+            audio_url, data = await fetch_stream_info(url)
+            # ffmpeg 옵션 구성
+            opts = ffmpeg_options.copy()
+            if start_time > 0:
+                opts["options"] = f"-ss {start_time} " + opts["options"]
+            if HEADERS:
+                header_str = "".join([f"{k}: {v}\r\n" for k, v in HEADERS.items()])
+                opts["options"] = opts["options"] + f' -headers "{header_str}"'
+            ffmpeg_exec = _detect_ffmpeg_executable()
+            dbg(
+                f"YTDLSource.from_url: [fallback] creating FFmpegOpusAudio exec={ffmpeg_exec}"
+            )
+            source = discord.FFmpegOpusAudio(audio_url, **opts, executable=ffmpeg_exec)
+            return cls(
+                source=source, data=data, requester=requester, audio_url=audio_url
+            )
+        if isinstance(data, dict):
+            dbg(f"YTDLSource.from_url: meta keys={list(data.keys())}")
+        else:
+            dbg(f"YTDLSource.from_url: meta type={type(data)}")
         # ! 단일 비디오인 경우
-        if "entries" in data:
-            data = data["entries"][0]
+        if data and "entries" in data:
+            # 첫 유효 항목 선택(포맷이 있는 엔트리 우선)
+            entries = [e for e in (data.get("entries") or []) if e]
+            data = next(
+                (e for e in entries if e.get("formats")),
+                entries[0] if entries else data,
+            )
+        if not data:
+            raise ValueError("메타데이터를 가져오지 못했습니다.")
 
         # ! 포맷 리스트 중 bestaudio 뽑기
-        formats = data.get("formats", [])
-        best = max(formats, key=lambda f: f.get("abr", 0) or 0)
+        formats = data.get("formats", []) or []
+        dbg(f"YTDLSource.from_url: formats_count={len(formats)}")
+        best = None
+        if formats:
+            # 1) 진짜 오디오만 우선 (audio_ext != 'none' && acodec != 'none')
+            strict_audio = [
+                f
+                for f in formats
+                if (f.get("audio_ext") and f.get("audio_ext") != "none")
+                and (str(f.get("acodec", "none")) != "none")
+                and f.get("url")
+            ]
+            # 2) vcodec == 'none' 이지만 acodec/abr가 의미있는 후보
+            loose_audio = [
+                f
+                for f in formats
+                if str(f.get("vcodec", "none")) == "none"
+                and f.get("url")
+                and ((f.get("abr") or 0) > 0 or str(f.get("acodec", "none")) != "none")
+            ]
+            candidates = strict_audio or loose_audio or formats
 
-        # ! ffmpeg 에 -ss(start_time) 옵션 추가
-        audio_url = best["url"]
+            def _rate_key(f):
+                # abr > asr > tbr > 0
+                return (f.get("abr") or 0, f.get("asr") or 0, f.get("tbr") or 0)
+
+            best = max(candidates, key=_rate_key)
+            try:
+                dbg(
+                    f"YTDLSource.from_url: best abr={best.get('abr')} tbr={best.get('tbr')} acodec={best.get('acodec')} vcodec={best.get('vcodec')}"
+                )
+            except Exception:
+                pass
+
+        # yt-dlp가 고른 직접 URL (format 지정 결과) fallback
+        audio_url = None
+        if best and best.get("url"):
+            audio_url = best["url"]
+        elif data.get("url"):
+            audio_url = data["url"]
+        else:
+            # 최후 수단: 웹페이지 URL에서 직접 추출 시도
+            try:
+                page_url = data.get("webpage_url") or url
+                audio_url = await fetch_stream_url(page_url)
+            except Exception as e:
+                dbg(f"YTDLSource.from_url: fetch_stream_url 실패: {type(e)} {e}")
+                raise
+        dbg(f"YTDLSource.from_url: audio_url selected={bool(audio_url)}")
+
+        # ! ffmpeg 에 -ss(start_time) 옵션 및 HTTP 헤더 추가
         opts = ffmpeg_options.copy()
         if start_time > 0:
             opts["options"] = f"-ss {start_time} " + opts["options"]
-        source = discord.FFmpegOpusAudio(
-            audio_url, **opts, executable="bin\\ffmpeg.exe"
-        )
-
-        return cls(source=source, data=data, requester=requester)
+        if HEADERS:
+            header_str = "".join([f"{k}: {v}\r\n" for k, v in HEADERS.items()])
+            # 입력에 적용되도록 before_options에 넣는다
+            opts["before_options"] = (
+                f'-headers "{header_str}" ' + opts["before_options"]
+            )
+        # ffmpeg 경로 결정
+        ffmpeg_exec = _detect_ffmpeg_executable()
+        dbg(f"YTDLSource.from_url: creating FFmpegOpusAudio exec={ffmpeg_exec}")
+        source = discord.FFmpegOpusAudio(audio_url, **opts, executable=ffmpeg_exec)
+        return cls(source=source, data=data, requester=requester, audio_url=audio_url)
 
 
 # 검색 결과 뷰
@@ -149,7 +413,7 @@ class SearchResultView(View):
         options: list[SelectOption] = []
         for i, v in enumerate(videos[:10], start=1):
             title = v.get("title", "<제목 없음>")[:60]
-            uploader = v.get("uploader") or "알 수 없음"
+            uploader = v.get("uploader") or UNKNOWN
             dur = int(v.get("duration", 0) or 0)
             m, s = divmod(dur, 60)
             length = f"{m}:{s:02d}"
@@ -409,28 +673,28 @@ class MusicCog(commands.Cog):
     async def _updater_loop(self, guild_id: int):
         state = self._get_state(guild_id)
         try:
-            print("[_updater_loop] updater_task 루프 시작")
+            dbg("_updater_loop: start")
             while state.player:
                 voice_client = state.control_msg.guild.voice_client
                 # ! voice_client 연결 끊김
                 if not voice_client:
-                    print("[_updater_loop] voice_client 연결 끊김")
-                    await self._stop()
+                    dbg("_updater_loop: voice_client disconnected")
+                    await self._force_stop(guild_id)
                     return await self._on_song_end(guild_id)
                 # ! 봇만 남아있음 → 종료 호출
                 if voice_client and len(voice_client.channel.members) == 1:
-                    print("[_updater_loop] 봇만 남아있음 → 종료 호출")
-                    await self._stop()
+                    dbg("_updater_loop: bot alone in channel, stopping")
+                    await self._force_stop(guild_id)
                     return await self._on_song_end(guild_id)
                 # ! 일시정지 대기
                 if voice_client.is_paused():
-                    print("[_updater_loop] 일시정지 대기")
+                    dbg("_updater_loop: paused")
                     await asyncio.sleep(1)
                     continue
                 # ! 재생시간 계산
                 elapsed = int(time.time() - state.start_ts)
                 total = state.player.data.get("duration", 0)
-                print("[_updater_loop] elapsed:", elapsed, "/ total:", total)
+                dbg(f"_updater_loop: elapsed={elapsed} total={total}")
                 # ! 노래시간이 지났고 반복이 아니고 구간이동중이 아니면 종료 호출
                 if (
                     total > 0
@@ -438,9 +702,7 @@ class MusicCog(commands.Cog):
                     and not state.is_loop
                     and not state.is_seeking
                 ):
-                    print(
-                        "[_updater_loop] 노래시간이 지났고 반복이 아니고 구간이동중이 아니면 종료 호출"
-                    )
+                    dbg("_updater_loop: natural end reached, calling on_song_end")
                     return await self._on_song_end(guild_id)
 
                 # ! 메시지 수정(임베드, 뷰)
@@ -448,7 +710,30 @@ class MusicCog(commands.Cog):
                 await self._edit_msg(state, embed, state.control_view)
                 await asyncio.sleep(5)
         finally:
-            print("[_updater_loop] updater_task 루프 종료")
+            dbg("_updater_loop: end")
+            state.updater_task = None
+
+    async def _force_stop(self, guild_id: int):
+        """interaction 없이 강제 정지하고 패널을 초기 상태로 돌립니다."""
+        dbg(f"_force_stop: guild_id={guild_id}")
+        state = self._get_state(guild_id)
+        guild = self.bot.get_guild(guild_id)
+        vc = guild.voice_client if guild else None
+        if vc:
+            try:
+                await vc.disconnect()
+            except Exception as e:
+                dbg(f"_force_stop: disconnect 실패: {type(e)} {e}")
+        state.control_view = MusicHelperView(self)
+        embed = self._make_default_embed()
+        try:
+            await self._edit_msg(state, embed, state.control_view)
+        except Exception as e:
+            dbg(f"_force_stop: 패널 리셋 실패: {type(e)} {e}")
+        # 상태 초기화
+        state.player = None
+        if state.updater_task:
+            state.updater_task.cancel()
             state.updater_task = None
 
     # ?완
@@ -486,7 +771,7 @@ class MusicCog(commands.Cog):
             )
             # ! footer
             embed.set_footer(
-                text=f"정상화 해줬잖아. 그냥 다 해줬잖아.",
+                text="정상화 해줬잖아. 그냥 다 해줬잖아.",
                 icon_url=self.bot.user.avatar.url,  # 봇 프로필 아이콘
             )
             return embed
@@ -504,7 +789,7 @@ class MusicCog(commands.Cog):
         try:
             total = player.data.get("duration", 0)
             # ! 임베드 기본 설정
-            embed = Embed(title="🎵 신창섭의 다해줬잖아", color=0xFFC0CB)
+            embed = Embed(title=PANEL_TITLE, color=0xFFC0CB)
             # ! 섬네일
             embed.set_thumbnail(url=player.data.get("thumbnail"))
             embed.add_field(name="곡 제목", value=player.title, inline=False)
@@ -515,7 +800,7 @@ class MusicCog(commands.Cog):
             # ! footer에 반복 상태
             state = self._get_state(guild_id)
             requester = player.requester
-            requester_name = requester.display_name if requester else "알 수 없음"
+            requester_name = requester.display_name if requester else UNKNOWN
             requester_icon = (
                 requester.display_avatar.url if requester else self.bot.user.avatar.url
             )
@@ -568,7 +853,7 @@ class MusicCog(commands.Cog):
             async for control_msg in history:
                 if control_msg.author == guild.me and control_msg.embeds:
                     em = control_msg.embeds[0]
-                    if em.title == "🎵 신창섭의 다해줬잖아":
+                    if em.title == PANEL_TITLE:
                         print("[기존 임베드 발견]")
                         # ! 메시지 수정(임베드, 뷰)
                         state.control_msg = control_msg
@@ -577,13 +862,16 @@ class MusicCog(commands.Cog):
 
         # ! 없으면 새로 보내기
         print("[기존 메시지 없음] -> 전송")
-        control_msg = await control_channel.send(embed=embed, view=state.control_view)
-        state.control_msg = control_msg
-        return
+        state.control_msg = await control_channel.send(
+            embed=embed, view=state.control_view
+        )
 
     # ?완
     # !노래 재생 or 대기열
     async def _play(self, interaction, url: str, skip_defer: bool = False):
+        dbg(
+            f"_play: called url={url} guild={interaction.guild.id} user={interaction.user.id}"
+        )
         # ? 검색어 처리
         if not re.match(r"^https?://", url):
             # ytsearch로 상위 10개까지 뽑되
@@ -591,7 +879,11 @@ class MusicCog(commands.Cog):
                 None,
                 lambda: search_ytdl.extract_info(f"ytsearch10:{url}", download=False),
             )
+            dbg(
+                f"_play: search info keys={list(info.keys()) if isinstance(info,dict) else type(info)}"
+            )
             raw = info.get("entries", []) or []
+            dbg(f"_play: raw entries count={len(raw)}")
             # 유효한 영상 URL만 필터
             videos = [
                 e
@@ -603,13 +895,13 @@ class MusicCog(commands.Cog):
                     "❌ 검색 결과가 없습니다.", ephemeral=True
                 )
 
-            print("[videos]: ", videos)
+            dbg(f"_play: videos_count={len(videos)}")
 
             # Embed  View 생성
             description = "\n".join(
                 f"{i+1}. {v.get('title','-')}" for i, v in enumerate(videos)
             )
-            print("[description]: ", description)
+            dbg(f"_play: description built length={len(description)}")
             embed = Embed(
                 title=f"🔍 `{url}` 검색 결과",
                 description=description,
@@ -627,7 +919,7 @@ class MusicCog(commands.Cog):
                         embed=embed, view=view, ephemeral=True
                     )
             except Exception as e:
-                print("[ERROR] interaction 응답 실패:", type(e), e)
+                dbg(f"_play: interaction response failed: {type(e)} {e}")
 
         # ? URL 재생
         if not skip_defer:
@@ -636,12 +928,28 @@ class MusicCog(commands.Cog):
         # ! 기본정보 로드
         guild_id = interaction.guild.id
         voice_client = interaction.guild.voice_client
-        player = await YTDLSource.from_url(
-            url, loop=self.bot.loop, requester=interaction.user
-        )
-        print(
-            "[_play] url:", url, "-> title:", getattr(player, "title", None), flush=True
-        )
+        try:
+            player = await YTDLSource.from_url(
+                url, loop=self.bot.loop, requester=interaction.user
+            )
+            dbg(f"_play: prepared player title={getattr(player,'title',None)}")
+        except FileNotFoundError:
+            # ffmpeg 미설치/미발견
+            msg = await interaction.followup.send(
+                "❌ FFmpeg 실행 파일을 찾을 수 없습니다.\n- bin/ffmpeg.exe를 다운로드해 배치하거나,\n- ffmpeg를 시스템 PATH에 추가한 뒤 다시 시도해 주세요.",
+                ephemeral=True,
+            )
+            _ = asyncio.create_task(self._auto_delete(msg, 12.0))
+            dbg("_play: ffmpeg not found")
+            return
+        except Exception as e:
+            dbg(f"_play: 소스 준비 실패: {type(e)} {e}")
+            msg = await interaction.followup.send(
+                "❌ 스트림 URL을 가져오지 못했습니다. 잠시 후 다시 시도하거나 다른 영상으로 시도해 주세요.",
+                ephemeral=True,
+            )
+            _ = asyncio.create_task(self._auto_delete(msg, 10.0))
+            return
 
         # ! 봇이 음성 채널에 없음
         if not voice_client:
@@ -652,16 +960,18 @@ class MusicCog(commands.Cog):
                 )
             # ! 봇을 채널 연결
             voice_client = await ch.connect()
+            dbg(f"_play: connected to voice channel id={ch.id}")
 
         # ! 이미 재생 중이면 큐에 추가
         state = self._get_state(interaction.guild.id)
         if voice_client.is_playing():
             state.queue.append(player)
+            dbg(f"_play: appended to queue size={len(state.queue)}")
             # ! 완료 메시지
             msg = await interaction.followup.send(
                 f"▶ **대기열에 추가되었습니다.**: {player.title}", ephemeral=True
             )
-            asyncio.create_task(self._auto_delete(msg, 5.0))
+            _ = asyncio.create_task(self._auto_delete(msg, 5.0))
             return
 
         # !상태 업데이트
@@ -672,6 +982,7 @@ class MusicCog(commands.Cog):
         # ! play & updater 재시작
         self._vc_play(guild_id=guild_id, source=player.source)
         await self._restart_updater(guild_id)
+        dbg("_play: playback started and updater restarted")
 
         # ! 임베드 및 진행 업데이터 시작
         embed = self._make_playing_embed(player, guild_id)
@@ -682,7 +993,7 @@ class MusicCog(commands.Cog):
         msg = await interaction.followup.send(
             f"▶ 재생: **{player.title}**", ephemeral=True
         )
-        asyncio.create_task(self._auto_delete(msg, 5.0))
+        _ = asyncio.create_task(self._auto_delete(msg, 5.0))
 
     async def _pause(self, interaction):
         # !기본정보 로드
@@ -692,10 +1003,9 @@ class MusicCog(commands.Cog):
         voice_client = interaction.guild.voice_client
         # !재생중 아님
         if not voice_client or not voice_client.is_playing():
-            msg = await interaction.followup.send(
-                "❌ 재생 중인 음악이 없습니다.", ephemeral=True
-            )
-            return asyncio.create_task(self._auto_delete(msg, 5.0))
+            msg = await interaction.followup.send(MSG_NO_PLAYING, ephemeral=True)
+            _ = asyncio.create_task(self._auto_delete(msg, 5.0))
+            return
         print("[일시정지]")
         voice_client.pause()
         # !상태설정
@@ -707,8 +1017,12 @@ class MusicCog(commands.Cog):
         state.control_view = MusicControlView(self, state)
         await self._edit_msg(state, embed, state.control_view)
         # !메시지
-        msg = await interaction.followup.send("⏸️ 일시정지했습니다.", ephemeral=True)
-        return asyncio.create_task(self._auto_delete(msg, 5.0))
+        _ = asyncio.create_task(
+            self._auto_delete(
+                await interaction.followup.send("⏸️ 일시정지했습니다.", ephemeral=True),
+                5.0,
+            )
+        )
 
     async def _resume(self, interaction):
         # !기본정보 로드
@@ -721,7 +1035,8 @@ class MusicCog(commands.Cog):
             msg = await interaction.followup.send(
                 "❌ 일시정지된 음악이 없습니다.", ephemeral=True
             )
-            return asyncio.create_task(self._auto_delete(msg, 5.0))
+            _ = asyncio.create_task(self._auto_delete(msg, 5.0))
+            return
         print("[다시재생]")
         voice_client.resume()
         # !상태설정
@@ -736,8 +1051,12 @@ class MusicCog(commands.Cog):
         state.control_view = MusicControlView(self, state)
         await self._edit_msg(state, embed, state.control_view)
         # !메시지
-        msg = await interaction.followup.send("▶️ 다시 재생합니다.", ephemeral=True)
-        return asyncio.create_task(self._auto_delete(msg, 5.0))
+        _ = asyncio.create_task(
+            self._auto_delete(
+                await interaction.followup.send("▶️ 다시 재생합니다.", ephemeral=True),
+                5.0,
+            )
+        )
 
     async def _skip(self, interaction: discord.Interaction):
         print("[스킵]")
@@ -747,10 +1066,9 @@ class MusicCog(commands.Cog):
         state = self._get_state(guild_id)
         voice_client = interaction.guild.voice_client
         if not voice_client or not voice_client.is_playing():
-            msg = await interaction.followup.send(
-                "❌ 재생 중인 음악이 없습니다.", ephemeral=True
-            )
-            return asyncio.create_task(self._auto_delete(msg, 5.0))
+            msg = await interaction.followup.send(MSG_NO_PLAYING, ephemeral=True)
+            _ = asyncio.create_task(self._auto_delete(msg, 5.0))
+            return
 
         if state.is_loop:
             # ! 현재 트랙 강제 중단
@@ -765,7 +1083,7 @@ class MusicCog(commands.Cog):
 
         # !메시지
         msg = await interaction.followup.send(msg_text, ephemeral=True)
-        asyncio.create_task(self._auto_delete(msg, 5.0))
+        _ = asyncio.create_task(self._auto_delete(msg, 5.0))
 
     async def _stop(self, interaction: discord.Interaction):
         print("[정지]")
@@ -776,7 +1094,8 @@ class MusicCog(commands.Cog):
             msg = await interaction.followup.send(
                 "❌ 봇이 음성채널에 없습니다.", ephemeral=True
             )
-            return asyncio.create_task(self._auto_delete(msg, 5.0))
+            _ = asyncio.create_task(self._auto_delete(msg, 5.0))
+            return
         await voice_client.disconnect()
 
         # ! reset panel
@@ -791,8 +1110,12 @@ class MusicCog(commands.Cog):
             state.updater_task = None
 
         # ! 메시지
-        msg = await interaction.followup.send("⏹️ 정지하고 나갑니다.", ephemeral=True)
-        return asyncio.create_task(self._auto_delete(msg, 5.0))
+        _ = asyncio.create_task(
+            self._auto_delete(
+                await interaction.followup.send("⏹️ 정지하고 나갑니다.", ephemeral=True),
+                5.0,
+            )
+        )
 
     async def _show_queue(self, interaction: discord.Interaction):
         print("[대기열보기]")
@@ -802,7 +1125,8 @@ class MusicCog(commands.Cog):
             msg = await interaction.followup.send(
                 "❌ 대기열이 비어있습니다.", ephemeral=True
             )
-            return asyncio.create_task(self._auto_delete(msg, 5.0))
+            _ = asyncio.create_task(self._auto_delete(msg, 5.0))
+            return
 
         n = len(state.queue)
         # !재생 중 정보
@@ -810,11 +1134,9 @@ class MusicCog(commands.Cog):
         if state.player and state.player.title:
             total = state.player.data.get("duration", 0)
             m, s = divmod(total, 60)
-            uploader = state.player.data.get("uploader") or "알 수 없음"
+            uploader = state.player.data.get("uploader") or UNKNOWN
             user = (
-                f"<@{state.player.requester.id}>"
-                if state.player.requester
-                else "알 수 없음"
+                f"<@{state.player.requester.id}>" if state.player.requester else UNKNOWN
             )
             desc_lines.append(
                 f"**현재 재생 중.** \n"
@@ -828,8 +1150,8 @@ class MusicCog(commands.Cog):
         for i, player in enumerate(state.queue, start=1):
             total = player.data.get("duration", 0)
             m, s = divmod(total, 60)
-            uploader = player.data.get("uploader") or "알 수 없음"
-            user = f"<@{player.requester.id}>" if player.requester else "알 수 없음"
+            uploader = player.data.get("uploader") or UNKNOWN
+            user = f"<@{player.requester.id}>" if player.requester else UNKNOWN
             desc_lines.append(
                 f"{i}. [{player.title}]({player.webpage_url})({m:02}:{s:02})"
                 f"({uploader}) - 신청자: {user}"
@@ -842,30 +1164,30 @@ class MusicCog(commands.Cog):
         )
 
         msg = await interaction.followup.send(embed=embed, ephemeral=True)
-        return asyncio.create_task(self._auto_delete(msg, 20.0))
+        _ = asyncio.create_task(self._auto_delete(msg, 20.0))
 
     async def _restart_updater(self, guild_id: int):
-        print("[_restart_updater] 호출")
+        dbg("_restart_updater: called")
         # ! 기본정보 로드
         state = self._get_state(guild_id)
 
         # ! task 종료
         if state.updater_task:
-            print("[_restart_updater] updater_task 종료")
+            dbg("_restart_updater: cancel existing updater_task")
             state.updater_task.cancel()
 
         # ! task 종료 대기
         while state.updater_task:
-            print("[_restart_updater] updater_task 종료 대기")
+            dbg("_restart_updater: waiting for updater_task to finish")
             await asyncio.sleep(0.5)
 
         # ! task 재등록
-        print("[_restart_updater] task 재등록")
+        dbg("_restart_updater: creating new updater task")
         state.updater_task = asyncio.create_task(self._updater_loop(guild_id))
         await asyncio.sleep(1)
 
     async def _seek(self, interaction: discord.Interaction, seconds: int):
-        print("[구간이동]")
+        dbg(f"_seek: seconds={seconds}")
         # ! 기본정보 로드
         await interaction.response.defer(thinking=True, ephemeral=True)
         guild_id = interaction.guild.id
@@ -873,10 +1195,9 @@ class MusicCog(commands.Cog):
         voice_client = interaction.guild.voice_client
         if not voice_client or not state.player:
             # ! 메시지
-            msg = await interaction.followup.send(
-                "❌ 재생 중인 음악이 없습니다.", ephemeral=True
-            )
-            return asyncio.create_task(self._auto_delete(msg, 5.0))
+            msg = await interaction.followup.send(MSG_NO_PLAYING, ephemeral=True)
+            _ = asyncio.create_task(self._auto_delete(msg, 5.0))
+            return
 
         # ! 새로운 player 생성 (start_time 포함)
         player = await YTDLSource.from_url(
@@ -888,6 +1209,7 @@ class MusicCog(commands.Cog):
         # ! 멈추고 재생 위치부터 새 소스 생성
         state.is_seeking = True
         voice_client.stop()
+        dbg("_seek: stopped current and will restart from position")
 
         # ! play & updater 재시작
         self._vc_play(interaction=interaction, source=player.source)
@@ -909,7 +1231,7 @@ class MusicCog(commands.Cog):
         msg = await interaction.followup.send(
             f"⏩ {seconds}초 지점으로 이동했습니다.", ephemeral=True
         )
-        asyncio.create_task(self._auto_delete(msg, 5.0))
+        _ = asyncio.create_task(self._auto_delete(msg, 5.0))
 
     # ?완료
     async def _toggle_loop(self, interaction: discord.Interaction):
@@ -922,7 +1244,7 @@ class MusicCog(commands.Cog):
         msg = await interaction.followup.send(
             f"🔁 반복 모드 {'켜짐' if state.is_loop else '꺼짐'}", ephemeral=True
         )
-        asyncio.create_task(self._auto_delete(msg, 5.0))
+        _ = asyncio.create_task(self._auto_delete(msg, 5.0))
 
     # ?완료
     def _vc_play(
@@ -931,9 +1253,9 @@ class MusicCog(commands.Cog):
         # ! 재생 및 다음 곡 콜백 등록
         def _after_play(error):
             if error:
-                print("[_after_play] 에러 발생:", error)
+                dbg(f"_after_play: error={error}")
             else:
-                print("[_after_play] 정상 종료")
+                dbg("_after_play: finished")
             self.bot.loop.create_task(self._on_song_end(guild_id))
 
         # ! voice_client 가져오기
@@ -945,20 +1267,21 @@ class MusicCog(commands.Cog):
 
         # ! 재생
         try:
+            dbg("_vc_play: voice_client.play invoked")
             voice_client.play(source, after=_after_play)
         except discord.errors.ClientException:
-            print("[_vc_play] ClientException")
+            dbg("_vc_play: ClientException -> stop then play")
             voice_client.stop()
             voice_client.play(source, after=_after_play)
 
     async def _on_song_end(self, guild_id: int):
-        print("[_on_song_end] called")
+        dbg("_on_song_end: called")
         # ! 기본정보 로드
         state = self._get_state(guild_id)
 
         # ! seek 발생시 종료 로직 무시
         if state.is_seeking:
-            print("[_on_song_end] seek 작동")
+            dbg("_on_song_end: in seeking, ignore")
             return
 
         # ! task 종료, 상태 업데이트
@@ -969,11 +1292,27 @@ class MusicCog(commands.Cog):
 
         # !루프이거나 루프상태인데 스킵하면 처음부터
         if state.is_skipping or state.is_loop:
-            print("[_on_song_end] loop/skip 재생")
-            audio_url = state.player.data["url"]
-            new_source = discord.FFmpegOpusAudio(
-                audio_url, **ffmpeg_options, executable="bin\\ffmpeg.exe"
-            )
+            dbg(f"_on_song_end: loop/skip replay queue_size={len(state.queue)}")
+            ffmpeg_exec = _detect_ffmpeg_executable()
+            try:
+                audio_url = getattr(
+                    state.player, "audio_url", None
+                ) or state.player.data.get("url")
+                new_source = discord.FFmpegOpusAudio(
+                    audio_url, **ffmpeg_options, executable=ffmpeg_exec
+                )
+            except Exception as e:
+                dbg(f"_on_song_end: reuse url failed -> refresh: {type(e)} {e}")
+                try:
+                    refreshed = await YTDLSource.from_url(
+                        state.player.webpage_url, loop=self.bot.loop
+                    )
+                    state.player.audio_url = refreshed.audio_url
+                    new_source = refreshed.source
+                except Exception as e2:
+                    dbg(f"_on_song_end: refresh failed: {type(e2)} {e2}")
+                    await self._force_stop(guild_id)
+                    return
             # ! 상태 업데이트
             state.player.source = new_source
             # ! play & updater 재시작
@@ -983,7 +1322,7 @@ class MusicCog(commands.Cog):
 
         # !대기열에 곡이 없으면 패널을 빈(embed 초기) 상태로 리셋
         if not state.queue:
-            print("[_on_song_end] 다음곡 없음")
+            dbg("_on_song_end: no next track -> reset panel")
             # ! 메시지 수정(임베드, 뷰)
             embed = self._make_default_embed()
             state.control_view = MusicHelperView(self)
@@ -991,7 +1330,7 @@ class MusicCog(commands.Cog):
             return
 
         # ! 상태 업데이트
-        print("[_on_song_end] 다음곡 pop")
+        dbg(f"_on_song_end: next track popped, queue_size={len(state.queue)}")
         state.player = state.queue.popleft()
 
         # ! 메시지 수정(임베드, 뷰)
@@ -1047,7 +1386,7 @@ class MusicCog(commands.Cog):
     async def on_command_error(self, ctx, error):
         if isinstance(error, discord.errors.ClientException):
             return
-        raise
+        print(f"[on_command_error] {type(error)} {error}")
 
 
 async def setup(bot: commands.Bot):
