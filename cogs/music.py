@@ -494,10 +494,10 @@ class SearchResultView(View):
                 row=(i - 1) // 5,
             )
 
-            async def _on_pick(interaction: discord.Interaction, _url=url):
-                # 즉시 재생(또는 대기열 추가)
+            async def _on_pick(interaction: discord.Interaction, _entry=v):
+                # 즉시 재생(또는 대기열 추가), 메타 함께 전달
                 await interaction.response.defer(thinking=True, ephemeral=True)
-                await self.cog._play(interaction, _url, skip_defer=True)
+                await self.cog._play_from_search_pick(interaction, _entry)
 
             btn.callback = _on_pick
             self.add_item(btn)
@@ -710,6 +710,50 @@ class MusicCog(commands.Cog):
             )
         except Exception as e:
             dbg(f"_fill_queue_meta: failed {type(e)} {e}")
+
+    async def _play_from_search_pick(
+        self, interaction: discord.Interaction, entry: dict
+    ):
+        """검색 버튼 선택 시, 가능한 메타를 최대한 채워서 바로 재생/대기열 추가"""
+        # yt 검색 결과는 url이 상대 경로일 수 있어 보정
+        raw_url = entry.get("webpage_url") or entry.get("url")
+        if raw_url and raw_url.startswith("/watch"):
+            raw_url = f"https://www.youtube.com{raw_url}"
+        url = raw_url or ""
+
+        # 이미 재생 중이면 대기열에 메타 포함 추가
+        voice_client = interaction.guild.voice_client
+        state = self._get_state(interaction.guild.id)
+        if voice_client and (voice_client.is_playing() or voice_client.is_paused()):
+            track = QueuedTrack(
+                url=url,
+                requester=interaction.user,
+                title=entry.get("title") or None,
+                duration=(
+                    int(entry.get("duration") or 0) if entry.get("duration") else 0
+                ),
+                webpage_url=entry.get("webpage_url") or url,
+                uploader=entry.get("uploader") or entry.get("channel") or None,
+                thumbnail=(
+                    (
+                        entry.get("thumbnail")
+                        or (entry.get("thumbnails") or [{}])[-1].get("url")
+                    )
+                    if isinstance(entry, dict)
+                    else None
+                ),
+            )
+            state.queue.append(track)
+            # 보강 메타 필요시 백그라운드로 채우기
+            self._spawn_bg(self._fill_queue_meta(track))
+            msg = await interaction.followup.send(
+                "▶ **대기열에 추가되었습니다.**", ephemeral=True
+            )
+            self._spawn_bg(self._auto_delete(msg, 5.0))
+            return
+
+        # 재생 중이 아니면 기존 _play 경로로 위임
+        await self._play(interaction, url, skip_defer=True)
 
     # !길드의 State 리턴
     def _get_state(self, guild_id: int) -> GuildMusicState:
