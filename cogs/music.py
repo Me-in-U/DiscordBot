@@ -337,6 +337,7 @@ class YTDLSource:
         # ! 포맷 리스트 중 bestaudio 뽑기
         formats = data.get("formats", []) or []
         dbg(f"YTDLSource.from_url: formats_count={len(formats)}")
+        dbg(f"formats sample: {formats}")
         best = None
         if formats:
             # 1) 진짜 오디오만 우선 (audio_ext != 'none' && acodec != 'none')
@@ -570,13 +571,13 @@ class MusicControlView(View):
         await self.cog._show_queue(interaction)
 
     async def _on_seek(self, interaction: discord.Interaction):
-        await interaction.response.send_modal(self.cog.SeekModal(self.cog))
+        await interaction.response.send_modal(SeekModal(self.cog))
 
     async def _on_loop(self, interaction: discord.Interaction):
         await self.cog._toggle_loop(interaction)
 
     async def _on_search(self, interaction: discord.Interaction):
-        await interaction.response.send_modal(self.cog.SearchModal(self.cog))
+        await interaction.response.send_modal(SearchModal(self.cog))
 
 
 # ! 구간 탐색 모달
@@ -590,10 +591,22 @@ class SeekModal(discord.ui.Modal, title="구간이동"):
         self.cog = cog
 
     async def on_submit(self, interaction: discord.Interaction):
-        t = self.time.value
-        seconds = (
-            int(t.split(":")[0]) * 60 + int(t.split(":")[1]) if ":" in t else int(t)
-        )
+        t = (self.time.value or "").strip()
+        try:
+            seconds = (
+                int(t.split(":")[0]) * 60 + int(t.split(":")[1]) if ":" in t else int(t)
+            )
+        except Exception:
+            # 입력 형식 오류에 대해 반드시 응답하여 상호작용 실패를 방지
+            if not interaction.response.is_done():
+                await interaction.response.send_message(
+                    "❌ 시간 형식이 올바르지 않습니다. 예: 1:23 또는 83", ephemeral=True
+                )
+            else:
+                await interaction.followup.send(
+                    "❌ 시간 형식이 올바르지 않습니다. 예: 1:23 또는 83", ephemeral=True
+                )
+            return
         await self.cog._seek(interaction, seconds)
 
 
@@ -1030,33 +1043,42 @@ class MusicCog(commands.Cog):
         guild_id = interaction.guild.id
         state = self._get_state(guild_id)
         voice_client = interaction.guild.voice_client
-        # !재생중 아님
-        if not voice_client or not voice_client.is_paused():
+        try:
+            # !재생중 아님
+            if not voice_client or not voice_client.is_paused():
+                msg = await interaction.followup.send(
+                    "❌ 일시정지된 음악이 없습니다.", ephemeral=True
+                )
+                _ = asyncio.create_task(self._auto_delete(msg, 5.0))
+                return
+            print("[다시재생]")
+            voice_client.resume()
+            # !상태설정
+            if state.paused_at:
+                delta = time.time() - state.paused_at
+                state.start_ts += delta
+                state.paused_at = None
+            # ! embed 업데이트
+            elapsed = int(time.time() - state.start_ts)
+            embed = self._make_playing_embed(state.player, guild_id, elapsed)
+            # ! view 재생성
+            state.control_view = MusicControlView(self, state)
+            await self._edit_msg(state, embed, state.control_view)
+            # !메시지
+            _ = asyncio.create_task(
+                self._auto_delete(
+                    await interaction.followup.send(
+                        "▶️ 다시 재생합니다.", ephemeral=True
+                    ),
+                    5.0,
+                )
+            )
+        except Exception as e:
+            dbg(f"_resume: failed: {type(e)} {e}")
             msg = await interaction.followup.send(
-                "❌ 일시정지된 음악이 없습니다.", ephemeral=True
+                "❌ 다시 재생 중 오류가 발생했습니다.", ephemeral=True
             )
             _ = asyncio.create_task(self._auto_delete(msg, 5.0))
-            return
-        print("[다시재생]")
-        voice_client.resume()
-        # !상태설정
-        if state.paused_at:
-            delta = time.time() - state.paused_at
-            state.start_ts += delta
-            state.paused_at = None
-        # ! embed 업데이트
-        elapsed = int(time.time() - state.start_ts)
-        embed = self._make_playing_embed(state.player, guild_id, elapsed)
-        # ! view 재생성
-        state.control_view = MusicControlView(self, state)
-        await self._edit_msg(state, embed, state.control_view)
-        # !메시지
-        _ = asyncio.create_task(
-            self._auto_delete(
-                await interaction.followup.send("▶️ 다시 재생합니다.", ephemeral=True),
-                5.0,
-            )
-        )
 
     async def _skip(self, interaction: discord.Interaction):
         print("[스킵]")
@@ -1198,40 +1220,47 @@ class MusicCog(commands.Cog):
             msg = await interaction.followup.send(MSG_NO_PLAYING, ephemeral=True)
             _ = asyncio.create_task(self._auto_delete(msg, 5.0))
             return
-
-        # ! 새로운 player 생성 (start_time 포함)
-        player = await YTDLSource.from_url(
-            url=state.player.webpage_url,
-            loop=self.bot.loop,
-            start_time=seconds,
-        )
-
-        # ! 멈추고 재생 위치부터 새 소스 생성
-        state.is_seeking = True
-        voice_client.stop()
-        dbg("_seek: stopped current and will restart from position")
-
-        # ! play & updater 재시작
-        self._vc_play(interaction=interaction, source=player.source)
-        await self._restart_updater(guild_id)
-
-        # ! 상태 업데이트
-        state.player = player
-        state.start_ts = time.time() - seconds
-        state.paused_at = None
-
-        # ! 메시지 수정(임베드, 뷰)
-        embed = self._make_playing_embed(state.player, guild_id, elapsed=seconds)
-        await self._edit_msg(state, embed, state.control_view)
-
-        # ! seek 끝
-        state.is_seeking = False
-
-        # ! 메시지
-        msg = await interaction.followup.send(
-            f"⏩ {seconds}초 지점으로 이동했습니다.", ephemeral=True
-        )
-        _ = asyncio.create_task(self._auto_delete(msg, 5.0))
+        try:
+            # ! 새로운 player 생성 (start_time 포함)
+            player = await YTDLSource.from_url(
+                url=state.player.webpage_url,
+                loop=self.bot.loop,
+                start_time=seconds,
+            )
+            # ! 멈추고 재생 위치부터 새 소스 생성
+            state.is_seeking = True
+            voice_client.stop()
+            dbg("_seek: stopped current and will restart from position")
+            # ! play & updater 재시작
+            self._vc_play(interaction=interaction, source=player.source)
+            await self._restart_updater(guild_id)
+            # ! 상태 업데이트
+            state.player = player
+            state.start_ts = time.time() - seconds
+            state.paused_at = None
+            # ! 메시지 수정(임베드, 뷰)
+            embed = self._make_playing_embed(state.player, guild_id, elapsed=seconds)
+            await self._edit_msg(state, embed, state.control_view)
+            # ! seek 끝
+            state.is_seeking = False
+            # ! 메시지
+            msg = await interaction.followup.send(
+                f"⏩ {seconds}초 지점으로 이동했습니다.", ephemeral=True
+            )
+            _ = asyncio.create_task(self._auto_delete(msg, 5.0))
+        except FileNotFoundError:
+            msg = await interaction.followup.send(
+                "❌ FFmpeg 실행 파일을 찾을 수 없습니다.", ephemeral=True
+            )
+            _ = asyncio.create_task(self._auto_delete(msg, 8.0))
+        except Exception as e:
+            dbg(f"_seek: failed: {type(e)} {e}")
+            # 실패 시 is_seeking 안전 복구
+            state.is_seeking = False
+            msg = await interaction.followup.send(
+                "❌ 구간 이동 중 오류가 발생했습니다.", ephemeral=True
+            )
+            _ = asyncio.create_task(self._auto_delete(msg, 6.0))
 
     # ?완료
     async def _toggle_loop(self, interaction: discord.Interaction):
