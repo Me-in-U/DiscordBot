@@ -13,9 +13,9 @@ from typing import Deque, Optional, Tuple, Coroutine, Any
 import aiohttp
 import discord
 import yt_dlp as youtube_dl
-from discord import Embed, Message, Object, SelectOption, TextChannel, app_commands
+from discord import Embed, Message, Object, TextChannel, app_commands
 from discord.ext import commands
-from discord.ui import Button, Select, View, button
+from discord.ui import Button, View, button
 from discord.utils import utcnow
 from dotenv import load_dotenv
 
@@ -467,48 +467,12 @@ class YTDLSource:
 # 검색 결과 뷰
 class SearchResultView(View):
     def __init__(self, cog, videos: list[dict]):
-        # ephemeral select menus only live for 60s
+        # 검색 결과를 최대 10개까지 숫자 버튼으로 제공
         super().__init__(timeout=None)
         self.cog = cog
 
-        # build up to 10 options
-        options: list[SelectOption] = []
-        for i, v in enumerate(videos[:10], start=1):
-            title = v.get("title", "<제목 없음>")[:60]
-            uploader = v.get("uploader") or UNKNOWN
-            dur = int(v.get("duration", 0) or 0)
-            m, s = divmod(dur, 60)
-            length = f"{m}:{s:02d}"
-            label = f"{i}. {title} – {uploader} | 길이: {length}"
-            label = label[:100]
-            # value must be the video URL, so we can hand it back to _play
-            options.append(SelectOption(label=label, value=v["url"]))
-        print("[SearchResultView] options:", options)
-
-        # 드롭다운 메뉴 추가(에러 방지를 위해 try/except)
-        if options:
-            try:
-                sel = Select(
-                    placeholder="▶️ 재생할 곡을 선택하세요",
-                    custom_id="search_select",
-                    options=options,
-                )
-                # callback 연결
-                sel.callback = self.on_select
-                self.add_item(sel)
-            except Exception as e:
-                print(f"[WARN] SearchResultView.add_item 실패: {e}")
-                # 실패 시 fallback: disabled 버튼으로 안내
-                self.clear_items()
-                self.add_item(
-                    Button(
-                        label="❌ 선택지를 생성할 수 없습니다",
-                        style=discord.ButtonStyle.secondary,
-                        disabled=True,
-                    )
-                )
-        else:
-            # 결과가 하나도 없으면 disabled 버튼
+        vids = list(videos[:10])
+        if not vids:
             self.add_item(
                 Button(
                     label="❌ 검색 결과가 없습니다",
@@ -516,12 +480,27 @@ class SearchResultView(View):
                     disabled=True,
                 )
             )
+            return
 
-    async def on_select(self, interaction: discord.Interaction):
-        url = interaction.data["values"][0]
-        print("[Select 클릭]", url)
-        await interaction.response.defer(thinking=True, ephemeral=True)
-        await self.cog._play(interaction, url, skip_defer=True)
+        # 1~10까지 번호 버튼 생성 (행: 5개씩 두 줄)
+        for i, v in enumerate(vids, start=1):
+            url = v.get("url")
+            if not isinstance(url, str):
+                continue
+            btn = Button(
+                label=str(i),
+                style=discord.ButtonStyle.secondary,
+                custom_id=f"search_pick_{i}",
+                row=(i - 1) // 5,
+            )
+
+            async def _on_pick(interaction: discord.Interaction, _url=url):
+                # 즉시 재생(또는 대기열 추가)
+                await interaction.response.defer(thinking=True, ephemeral=True)
+                await self.cog._play(interaction, _url, skip_defer=True)
+
+            btn.callback = _on_pick
+            self.add_item(btn)
 
 
 # ! 기본 임베드에 붙을 뷰
