@@ -8,7 +8,7 @@ import time
 from dataclasses import dataclass, field
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
-from typing import Deque, Optional, Tuple
+from typing import Deque, Optional, Tuple, Coroutine, Any
 
 import aiohttp
 import discord
@@ -42,6 +42,24 @@ def dbg(msg: str):
         pass
 
 
+# yt-dlp가 콘솔에 ERROR/경고를 직접 찍지 않도록 무음 로거 정의
+class _SilentYTDLLogger:
+    def debug(self, msg):
+        return
+
+    def info(self, msg):
+        return
+
+    def warning(self, msg):
+        return
+
+    def error(self, msg):
+        return
+
+
+YTDL_LOGGER = _SilentYTDLLogger()
+
+
 ffmpeg_options = {
     "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
     "options": "-threads 2 -vn -ac 2 -ar 48000 -acodec libopus -compression_level 5 -application audio -hide_banner -nostats -loglevel error",
@@ -65,6 +83,8 @@ search_ytdl = youtube_dl.YoutubeDL(
         "extract_flat": True,
         "noplaylist": True,
         "quiet": True,
+        "no_warnings": True,
+        "logger": YTDL_LOGGER,
     }
 )
 
@@ -79,8 +99,10 @@ ytdl = youtube_dl.YoutubeDL(
         "logtostderr": False,
         "ignoreerrors": True,
         "nocheckcertificate": True,
-        "youtube_include_dash_manifest": False,
-        "youtube_include_hls_manifest": False,
+        # DASH/HLS 매니페스트 차단은 일부 영상에서 포맷 부재 오류를 유발할 수 있어 제거
+        # "youtube_include_dash_manifest": False,
+        # "youtube_include_hls_manifest": False,
+        "logger": YTDL_LOGGER,
     }
 )
 
@@ -97,6 +119,7 @@ info_ytdl = youtube_dl.YoutubeDL(
         "ignoreerrors": True,
         "nocheckcertificate": True,
         # 포맷 선택은 우리 코드에서 수동으로
+        "logger": YTDL_LOGGER,
     }
 )
 
@@ -148,6 +171,7 @@ def _make_ydl_opts(**overrides):
         "geo_bypass": True,
         "extractor_retries": 2,
         "source_address": "0.0.0.0",
+        "logger": YTDL_LOGGER,
         # 포맷 선택은 필요 시 지정
     }
     if os.path.exists(cookies_path):
@@ -243,7 +267,7 @@ class GuildMusicState:
     player: Optional["YTDLSource"] = None
     start_ts: float = 0.0
     paused_at: Optional[float] = None
-    queue: Deque["YTDLSource"] = field(default_factory=collections.deque)
+    queue: Deque["QueuedTrack"] = field(default_factory=collections.deque)
     control_channel: Optional[TextChannel] = None
     control_msg: Optional[Message] = None
     control_view: Optional[View] = None
@@ -251,6 +275,22 @@ class GuildMusicState:
     is_loop: bool = False
     is_seeking: bool = False
     is_skipping: bool = False
+    is_stopping: bool = False
+
+
+@dataclass
+class QueuedTrack:
+    """대기열에 URL만 저장하는 경량 트랙"""
+
+    url: str
+    requester: Optional[discord.User] = None
+    # 아래 메타는 백그라운드에서 채울 수 있음
+    title: Optional[str] = None
+    duration: int = 0
+    webpage_url: Optional[str] = None
+    uploader: Optional[str] = None
+    thumbnail: Optional[str] = None
+    added_at: float = field(default_factory=lambda: time.time())
 
 
 class YTDLSource:
@@ -341,7 +381,7 @@ class YTDLSource:
         # ! 포맷 리스트 중 bestaudio 뽑기
         formats = data.get("formats", []) or []
         dbg(f"YTDLSource.from_url: formats_count={len(formats)}")
-        dbg(f"formats sample: {formats}")
+        # 상세 포맷 전체 덤프는 소음이 커서 생략
         best = None
         if formats:
             # 1) 진짜 오디오만 우선 (audio_ext != 'none' && acodec != 'none')
@@ -633,6 +673,47 @@ class MusicCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.states: dict[int, GuildMusicState] = {}  # 길드별 상태 저장
+        # 백그라운드 태스크 레퍼런스 보관(조기 GC 방지)
+        self._bg_tasks: set[asyncio.Task] = set()
+
+    def _spawn_bg(self, coro: "Coroutine[Any, Any, Any]") -> asyncio.Task:
+        """백그라운드 태스크를 등록하고 레퍼런스를 보관한다."""
+        task = asyncio.create_task(coro)
+        self._bg_tasks.add(task)
+        task.add_done_callback(self._bg_tasks.discard)
+        return task
+
+    async def _fill_queue_meta(self, track: "QueuedTrack"):
+        """대기열 트랙의 가벼운 메타데이터를 채운다(재생에 영향 없음)."""
+        try:
+            loop = asyncio.get_event_loop()
+
+            def _extract():
+                try:
+                    return info_ytdl.extract_info(track.url, download=False)
+                except Exception:
+                    return None
+
+            info = await loop.run_in_executor(YTDL_EXECUTOR, _extract)
+            if not info or not isinstance(info, dict):
+                return
+            # 단일 엔트리 처리
+            if "entries" in info and info.get("entries"):
+                info = (info.get("entries") or [None])[0] or info
+            track.title = info.get("title") or track.title
+            track.duration = int(info.get("duration") or 0) or track.duration
+            track.webpage_url = (
+                info.get("webpage_url") or track.webpage_url or track.url
+            )
+            track.uploader = info.get("uploader") or track.uploader
+            # 썸네일은 여러 키가 있을 수 있음
+            track.thumbnail = (
+                info.get("thumbnail")
+                or (info.get("thumbnails") or [{}])[-1].get("url")
+                or track.thumbnail
+            )
+        except Exception as e:
+            dbg(f"_fill_queue_meta: failed {type(e)} {e}")
 
     # !길드의 State 리턴
     def _get_state(self, guild_id: int) -> GuildMusicState:
@@ -736,6 +817,8 @@ class MusicCog(commands.Cog):
         state = self._get_state(guild_id)
         guild = self.bot.get_guild(guild_id)
         vc = guild.voice_client if guild else None
+        # 정지 상태 진입
+        state.is_stopping = True
         if vc:
             try:
                 await vc.disconnect()
@@ -749,6 +832,9 @@ class MusicCog(commands.Cog):
             dbg(f"_force_stop: 패널 리셋 실패: {type(e)} {e}")
         # 상태 초기화
         state.player = None
+        state.queue.clear()
+        state.is_loop = False
+        state.is_skipping = False
         if state.updater_task:
             state.updater_task.cancel()
             state.updater_task = None
@@ -937,6 +1023,8 @@ class MusicCog(commands.Cog):
                     )
             except Exception as e:
                 dbg(f"_play: interaction response failed: {type(e)} {e}")
+            # 검색 모드에서는 여기서 종료 (선택은 SelectView가 처리)
+            return
 
         # ? URL 재생
         if not skip_defer:
@@ -945,28 +1033,6 @@ class MusicCog(commands.Cog):
         # ! 기본정보 로드
         guild_id = interaction.guild.id
         voice_client = interaction.guild.voice_client
-        try:
-            player = await YTDLSource.from_url(
-                url, loop=self.bot.loop, requester=interaction.user
-            )
-            dbg(f"_play: prepared player title={getattr(player,'title',None)}")
-        except FileNotFoundError:
-            # ffmpeg 미설치/미발견
-            msg = await interaction.followup.send(
-                "❌ FFmpeg 실행 파일을 찾을 수 없습니다.\n- bin/ffmpeg.exe를 다운로드해 배치하거나,\n- ffmpeg를 시스템 PATH에 추가한 뒤 다시 시도해 주세요.",
-                ephemeral=True,
-            )
-            _ = asyncio.create_task(self._auto_delete(msg, 12.0))
-            dbg("_play: ffmpeg not found")
-            return
-        except Exception as e:
-            dbg(f"_play: 소스 준비 실패: {type(e)} {e}")
-            msg = await interaction.followup.send(
-                "❌ 스트림 URL을 가져오지 못했습니다. 잠시 후 다시 시도하거나 다른 영상으로 시도해 주세요.",
-                ephemeral=True,
-            )
-            _ = asyncio.create_task(self._auto_delete(msg, 10.0))
-            return
 
         # ! 봇이 음성 채널에 없음
         if not voice_client:
@@ -979,38 +1045,60 @@ class MusicCog(commands.Cog):
             voice_client = await ch.connect()
             dbg(f"_play: connected to voice channel id={ch.id}")
 
-        # ! 이미 재생 중이면 큐에 추가
+        # ! 이미 재생(또는 일시정지) 중이면 URL만 큐에 추가
         state = self._get_state(interaction.guild.id)
-        if voice_client.is_playing():
-            state.queue.append(player)
-            dbg(f"_play: appended to queue size={len(state.queue)}")
+        if (voice_client and voice_client.is_playing()) or (
+            voice_client and voice_client.is_paused()
+        ):
+            track = QueuedTrack(url=url, requester=interaction.user)
+            state.queue.append(track)
+            dbg(f"_play: appended URL to queue size={len(state.queue)}")
+            # 메타데이터는 백그라운드에서 채움(가벼운 작업으로 유지)
+            self._spawn_bg(self._fill_queue_meta(track))
             # ! 완료 메시지
             msg = await interaction.followup.send(
-                f"▶ **대기열에 추가되었습니다.**: {player.title}", ephemeral=True
+                "▶ **대기열에 추가되었습니다.**", ephemeral=True
             )
-            _ = asyncio.create_task(self._auto_delete(msg, 5.0))
+            self._spawn_bg(self._auto_delete(msg, 5.0))
             return
 
-        # !상태 업데이트
+        # ! 재생 중이 아니면 지금 URL로 바로 준비 후 재생
+        try:
+            player = await YTDLSource.from_url(
+                url, loop=self.bot.loop, requester=interaction.user
+            )
+            dbg(f"_play: prepared player title={getattr(player,'title',None)}")
+        except FileNotFoundError:
+            msg = await interaction.followup.send(
+                "❌ FFmpeg 실행 파일을 찾을 수 없습니다.\n- bin/ffmpeg.exe를 다운로드해 배치하거나,\n- ffmpeg를 시스템 PATH에 추가한 뒤 다시 시도해 주세요.",
+                ephemeral=True,
+            )
+            self._spawn_bg(self._auto_delete(msg, 12.0))
+            dbg("_play: ffmpeg not found")
+            return
+        except Exception as e:
+            dbg(f"_play: 소스 준비 실패: {type(e)} {e}")
+            msg = await interaction.followup.send(
+                "❌ 스트림 URL을 가져오지 못했습니다. 잠시 후 다시 시도하거나 다른 영상으로 시도해 주세요.",
+                ephemeral=True,
+            )
+            self._spawn_bg(self._auto_delete(msg, 10.0))
+            return
+
+        # !상태 업데이트 및 재생 시작
         state.player = player
         state.start_ts = time.time()
         state.paused_at = None
-
-        # ! play & updater 재시작
         self._vc_play(guild_id=guild_id, source=player.source)
         await self._restart_updater(guild_id)
         dbg("_play: playback started and updater restarted")
-
-        # ! 임베드 및 진행 업데이터 시작
         embed = self._make_playing_embed(player, guild_id)
         state.control_view = MusicControlView(self, state)
         await self._edit_msg(state=state, embed=embed, view=state.control_view)
-
-        # ! 메시지
         msg = await interaction.followup.send(
             f"▶ 재생: **{player.title}**", ephemeral=True
         )
-        _ = asyncio.create_task(self._auto_delete(msg, 5.0))
+        self._spawn_bg(self._auto_delete(msg, 5.0))
 
     async def _pause(self, interaction):
         # !기본정보 로드
@@ -1122,6 +1210,8 @@ class MusicCog(commands.Cog):
             )
             _ = asyncio.create_task(self._auto_delete(msg, 5.0))
             return
+        # 정지 상태 진입
+        state.is_stopping = True
         await voice_client.disconnect()
 
         # ! reset panel
@@ -1131,6 +1221,9 @@ class MusicCog(commands.Cog):
 
         # ! 재생 상태 완전 초기화
         state.player = None
+        state.queue.clear()
+        state.is_loop = False
+        state.is_skipping = False
         if state.updater_task:
             state.updater_task.cancel()
             state.updater_task = None
@@ -1171,16 +1264,17 @@ class MusicCog(commands.Cog):
             )
             desc_lines.append("")  # 구분선 역할
 
-        # 대기열 리스트
-        # ── 수정 후 _show_queue: None 처리 ──
-        for i, player in enumerate(state.queue, start=1):
-            total = player.data.get("duration", 0)
+        # 대기열 리스트 (URL 기반 QueuedTrack)
+        for i, track in enumerate(state.queue, start=1):
+            total = track.duration or 0
             m, s = divmod(total, 60)
-            uploader = player.data.get("uploader") or UNKNOWN
-            user = f"<@{player.requester.id}>" if player.requester else UNKNOWN
+            uploader = track.uploader or UNKNOWN
+            user = f"<@{track.requester.id}>" if track.requester else UNKNOWN
+            title = track.title or "(제목 정보 없음)"
+            link = track.webpage_url or track.url
+            length = f"({m:02}:{s:02})" if total else ""
             desc_lines.append(
-                f"{i}. [{player.title}]({player.webpage_url})({m:02}:{s:02})"
-                f"({uploader}) - 신청자: {user}"
+                f"{i}. [{title}]({link}){length}({uploader}) - 신청자: {user}"
             )
 
         embed = Embed(
@@ -1312,6 +1406,12 @@ class MusicCog(commands.Cog):
         # ! 기본정보 로드
         state = self._get_state(guild_id)
 
+        # 정지 상태면 아무 것도 하지 않음
+        if state.is_stopping:
+            dbg("_on_song_end: stopping flag set -> return")
+            state.is_stopping = False
+            return
+
         # ! seek 발생시 종료 로직 무시
         if state.is_seeking:
             dbg("_on_song_end: in seeking, ignore")
@@ -1360,17 +1460,26 @@ class MusicCog(commands.Cog):
             embed = self._make_default_embed()
             state.control_view = MusicHelperView(self)
             await self._edit_msg(state, embed, state.control_view)
+            state.player = None
             return
 
-        # ! 상태 업데이트
+        # ! 다음 곡 준비: URL -> YTDLSource 변환 후 재생
         dbg(f"_on_song_end: next track popped, queue_size={len(state.queue)}")
-        state.player = state.queue.popleft()
-
-        # ! 메시지 수정(임베드, 뷰)
+        track = state.queue.popleft()
+        try:
+            player = await YTDLSource.from_url(
+                track.url, loop=self.bot.loop, requester=track.requester
+            )
+        except Exception as e:
+            dbg(f"_on_song_end: next track prepare failed: {type(e)} {e}")
+            # 실패 시 다음 곡으로 넘어가기 시도 (재귀적 호출 방지 위해 task로)
+            self._spawn_bg(self._on_song_end(guild_id))
+            return
+        state.player = player
+        state.start_ts = time.time()
+        state.paused_at = None
         embed = self._make_playing_embed(state.player, guild_id)
         await self._edit_msg(state, embed, state.control_view)
-
-        # ! play & updater 재시작
         self._vc_play(guild_id, source=state.player.source)
         await self._restart_updater(guild_id)
 
