@@ -35,6 +35,7 @@ HEADERS = {
     "Sec-Fetch-Mode": "navigate",
 }
 
+
 # yt-dlp 무음 로거
 class _SilentYTDLLogger:
     def debug(self, msg):
@@ -81,7 +82,9 @@ async def _fetch_stream_info(page_url: str) -> tuple[str, dict]:
     best = max(audio_formats, key=lambda f: f.get("averageBitrate", 0))
     return best.get("url"), {
         "title": (data.get("videoDetails", {}) or {}).get("title"),
-        "duration": int((data.get("videoDetails", {}) or {}).get("lengthSeconds", 0) or 0),
+        "duration": int(
+            (data.get("videoDetails", {}) or {}).get("lengthSeconds", 0) or 0
+        ),
         "webpage_url": page_url,
         "thumbnail": None,
     }
@@ -324,7 +327,9 @@ def download_youtube_subtitles(
                 )
                 return subtitle_file
             else:
-                print(f"{lang} {'자동생성 ' if auto else ''}자막 파일이 생성되지 않았습니다.")
+                print(
+                    f"{lang} {'자동생성 ' if auto else ''}자막 파일이 생성되지 않았습니다."
+                )
 
         except Exception as e:
             print(f"{lang} {'자동생성 ' if auto else ''}자막 다운로드 중 오류: {e}")
@@ -408,7 +413,9 @@ async def youtube_to_mp3(url: str) -> None:
                     "preferredquality": "320",
                 }
             ],
-            "ffmpeg_location": os.path.dirname(ffmpeg_exec) if ffmpeg_exec != "ffmpeg" else None,
+            "ffmpeg_location": (
+                os.path.dirname(ffmpeg_exec) if ffmpeg_exec != "ffmpeg" else None
+            ),
             "http_headers": HEADERS,
             "noplaylist": True,
             "no_warnings": True,
@@ -463,7 +470,9 @@ async def youtube_to_mp3(url: str) -> None:
             if os.path.exists("youtube_audio.mp3"):
                 print("MP3 파일이 생성되었습니다.(ffmpeg)")
             else:
-                raise FileNotFoundError("youtube_audio.mp3 파일이 생성되지 않았습니다.(ffmpeg)")
+                raise FileNotFoundError(
+                    "youtube_audio.mp3 파일이 생성되지 않았습니다.(ffmpeg)"
+                )
         except Exception as e2:
             print(f"ffmpeg 직접 추출도 실패: {e2}")
             raise
