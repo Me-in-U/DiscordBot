@@ -29,7 +29,7 @@ async def spring_ai(DISCORD_CLIENT, message):
         await message.channel.send(f"HTTP 요청 실패: {e}")
         return
 
-    # print("Spring AI 응답:", response_data)
+    print("Spring AI 응답:", response_data)
 
     # DTO 전체 응답: showMessage가 True이면 메시지 출력
     if response_data.get("showMessage"):
