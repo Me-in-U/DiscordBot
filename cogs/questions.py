@@ -59,9 +59,11 @@ class QuestionCommands(commands.Cog):
                 image_content=image_content,
                 prompt={
                     "id": "pmpt_68ac254fa8008190861e8f3f686556d50c6160cd272b9aca",
-                    "version": "2",
+                    "version": "3",
                     "variables": {
-                        "recent_messages": recent_message(limit=20),
+                        "recent_messages": get_recent_messages(
+                            client=self.bot, limit=20
+                        ),
                         "user_name": interaction.user.name,
                         "question": text.strip(),
                     },
