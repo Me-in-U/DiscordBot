@@ -183,22 +183,39 @@ def _make_ydl_opts(**overrides):
 def _extract_info_with_fallback(url: str):
     """yt-dlp 메타 추출을 여러 전략으로 시도한다."""
     dbg(f"_extract_info_with_fallback: url={url}")
+    # 1순위: player_client를 android+web로 지정하고 헤더도 함께 전송 (현실적으로 가장 성공률이 높음)
+    # 2순위: 기본 웹 헤더만 지정
+    # 3순위: player_client 확장(android+web+ios) + 헤더
+    # 4순위: 완전 기본값
     attempts = [
-        _make_ydl_opts(),
         _make_ydl_opts(
-            extractor_args={"youtube": {"player_client": ["android", "web"]}}
+            extractor_args={"youtube": {"player_client": ["android", "web"]}},
+            http_headers=HEADERS,
         ),
         _make_ydl_opts(http_headers=HEADERS),
         _make_ydl_opts(
             extractor_args={"youtube": {"player_client": ["android", "web", "ios"]}},
             http_headers=HEADERS,
         ),
+        _make_ydl_opts(),
     ]
     last_err = None
+
+    def _summarize_opts(opts: dict) -> str:
+        parts = []
+        ex = opts.get("extractor_args", {}).get("youtube", {})
+        pc = ex.get("player_client")
+        if pc:
+            parts.append(f"pc={','.join(pc)}")
+        else:
+            parts.append("pc=default")
+        parts.append(f"hdr={'Y' if 'http_headers' in opts else 'N'}")
+        return " ".join(parts)
+
     for opts in attempts:
         try:
             with youtube_dl.YoutubeDL(opts) as ydl:
-                dbg(f"_extract_info_with_fallback: using options: {opts}")
+                dbg(f"_extract_info_with_fallback: using {_summarize_opts(opts)}")
                 info = ydl.extract_info(url, download=False)
                 if not info:
                     raise ValueError("yt-dlp returned None")
@@ -855,7 +872,7 @@ class MusicCog(commands.Cog):
             # ! 임베드 기본 설정
             embed = Embed(
                 title="🎵 신창섭의 다해줬잖아",
-                description="명령어로 음악을 재생·일시정지·스킵할 수 있습니다.\n 재생이후 버튼을 통해 제어도 가능합니다.",
+                description="명령어로 음악을 재생·일시정지·스킵할 수 있습니다.\n 재생이후 버튼을 통해 제어도 가능합니다.\n(재생 후 첫 대기열 추가기 노래가 일시 끊길수도 있습니다.)",
                 color=0xFFC0CB,
                 timestamp=datetime.now(),
             )
