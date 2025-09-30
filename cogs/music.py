@@ -6,6 +6,7 @@ import os
 import re
 import time
 from dataclasses import dataclass, field
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Deque, Optional, Tuple
 
@@ -43,8 +44,11 @@ def dbg(msg: str):
 
 ffmpeg_options = {
     "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
-    "options": "-threads 2 -vn -ac 2 -ar 48000 -acodec libopus -loglevel verbose",
+    "options": "-threads 2 -vn -ac 2 -ar 48000 -acodec libopus -compression_level 5 -application audio -hide_banner -nostats -loglevel error",
 }
+
+# yt-dlp 전용 쓰레드 풀(작게 제한) — 재생 중 추가 검색/추출이 이벤트 루프를 굶기지 않도록 격리
+YTDL_EXECUTOR = ThreadPoolExecutor(max_workers=2, thread_name_prefix="ytdl")
 
 
 # FFmpeg 경로 자동 감지: 로컬 bin\\ffmpeg.exe가 있으면 사용, 없으면 시스템 PATH의 ffmpeg 사용
@@ -279,7 +283,7 @@ class YTDLSource:
             dbg("YTDLSource.from_url: keyword search path")
             search = f"ytsearch5:{url}"
             info = await loop.run_in_executor(
-                None, lambda: _extract_info_with_fallback(search)
+                YTDL_EXECUTOR, lambda: _extract_info_with_fallback(search)
             )
             entries = [e for e in (info.get("entries") or []) if e]
             if not entries:
@@ -298,7 +302,7 @@ class YTDLSource:
         # ! 실제 메타·스트림 준비
         try:
             data = await loop.run_in_executor(
-                None, lambda: _extract_info_with_fallback(url)
+                YTDL_EXECUTOR, lambda: _extract_info_with_fallback(url)
             )
         except Exception as e:
             # yt-dlp가 완전히 실패하는 경우: HTML 파싱 기반 완전 대체 경로
