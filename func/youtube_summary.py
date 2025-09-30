@@ -5,6 +5,8 @@ import os
 import re
 
 import discord
+import aiohttp
+import subprocess
 import whisper
 from dotenv import load_dotenv
 from googleapiclient.discovery import build
@@ -24,6 +26,65 @@ if not GOOGLE_API_KEY:
 YOUTUBE_PATTERN = re.compile(
     r"(https?://)?(www\.)?(youtube\.com|youtu\.be)/(watch\?v=|live/)?[\w\-\_]+"
 )
+
+# 공통 HTTP 헤더 (YouTube 우회에 도움)
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
+    "Sec-Fetch-Mode": "navigate",
+}
+
+# yt-dlp 무음 로거
+class _SilentYTDLLogger:
+    def debug(self, msg):
+        return
+
+    def info(self, msg):
+        return
+
+    def warning(self, msg):
+        return
+
+    def error(self, msg):
+        return
+
+
+YTDL_LOGGER = _SilentYTDLLogger()
+
+
+def _detect_ffmpeg_executable() -> str:
+    """bin/ffmpeg.exe가 있으면 우선 사용, 없으면 시스템 PATH의 ffmpeg 사용"""
+    local = os.path.join(os.getcwd(), "bin", "ffmpeg.exe")
+    if os.path.exists(local):
+        return local
+    return "ffmpeg"
+
+
+def _build_headers_str(headers: dict) -> str:
+    return "".join([f"{k}: {v}\r\n" for k, v in headers.items()])
+
+
+async def _fetch_stream_info(page_url: str) -> tuple[str, dict]:
+    """YouTube 페이지에서 ytInitialPlayerResponse를 파싱해 최고 비트레이트 오디오 URL을 얻는다."""
+    async with aiohttp.ClientSession(headers=HEADERS) as session:
+        async with session.get(page_url) as resp:
+            text = await resp.text()
+    m = re.search(r"ytInitialPlayerResponse\s*=\s*(\{[^;]+\});", text)
+    if not m:
+        raise ValueError("ytInitialPlayerResponse not found")
+    data = __import__("json").loads(m.group(1))
+    af = (data.get("streamingData", {}) or {}).get("adaptiveFormats", [])
+    audio_formats = [f for f in af if str(f.get("mimeType", "")).startswith("audio/")]
+    if not audio_formats:
+        raise ValueError("no audio formats")
+    best = max(audio_formats, key=lambda f: f.get("averageBitrate", 0))
+    return best.get("url"), {
+        "title": (data.get("videoDetails", {}) or {}).get("title"),
+        "duration": int((data.get("videoDetails", {}) or {}).get("lengthSeconds", 0) or 0),
+        "webpage_url": page_url,
+        "thumbnail": None,
+    }
 
 
 # --- 영상 ID 추출 함수 추가 ---
@@ -209,30 +270,47 @@ def download_youtube_subtitles(
 
     def find_subtitle_file(lang: str, auto: bool = False) -> str:
         """다운로드된 자막 파일 검색"""
-        subtitle_files = glob.glob(f"youtube_subtitles.{lang}.vtt")
-        if subtitle_files:
-            return subtitle_files[0]
+        # 일반: youtube_subtitles.ko.vtt
+        for pattern in [f"youtube_subtitles.{lang}.vtt", "youtube_subtitles.vtt"]:
+            subtitle_files = glob.glob(pattern)
+            if subtitle_files:
+                return subtitle_files[0]
         return ""
 
     def delete_existing_files(lang: str, auto: bool = False) -> None:
         """기존 자막 파일 삭제"""
-        subtitle_file = find_subtitle_file(lang, auto)
-        if subtitle_file and os.path.exists(subtitle_file):
-            os.remove(subtitle_file)
-            print(f"기존 파일 삭제: {subtitle_file}")
+        for pattern in [f"youtube_subtitles.{lang}.vtt", "youtube_subtitles.vtt"]:
+            for fp in glob.glob(pattern):
+                try:
+                    os.remove(fp)
+                    print(f"기존 파일 삭제: {fp}")
+                except Exception:
+                    pass
 
     def download_subtitles(lang: str, auto: bool = False) -> str:
         """지정된 언어로 자막 다운로드"""
         # 기존 파일 삭제
         delete_existing_files(lang, auto)
 
+        # cookies.txt가 있으면 사용
+        cookies_path = os.path.join(os.getcwd(), "cookies.txt")
         ydl_opts = {
             "writesubtitles": True,
             "writeautomaticsub": auto,  # 자동생성 자막 다운로드
             "subtitleslangs": [lang],
             "skip_download": True,
-            "outtmpl": f"youtube_subtitles.%(ext)s",  # 현재 디렉토리 지정
+            "outtmpl": "youtube_subtitles.%(ext)s",  # 베이스명 유지
+            "noplaylist": True,
+            "no_warnings": True,
+            "quiet": True,
+            "logger": YTDL_LOGGER,
+            "http_headers": HEADERS,
+            "extractor_retries": 2,
+            "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
+            "source_address": "0.0.0.0",
         }
+        if os.path.exists(cookies_path):
+            ydl_opts["cookiefile"] = cookies_path
 
         try:
             with YoutubeDL(ydl_opts) as ydl:
@@ -246,14 +324,10 @@ def download_youtube_subtitles(
                 )
                 return subtitle_file
             else:
-                print(
-                    f"{lang} {'자동생성 ' if auto else ''}자막 파일이 생성되지 않았습니다."
-                )
+                print(f"{lang} {'자동생성 ' if auto else ''}자막 파일이 생성되지 않았습니다.")
 
         except Exception as e:
-            print(
-                f"{lang} {'자동생성 ' if auto else ''}자막 다운로드 중 오류가 발생했습니다: {e}"
-            )
+            print(f"{lang} {'자동생성 ' if auto else ''}자막 다운로드 중 오류: {e}")
         return ""
 
     # 한글 자막 우선 다운로드 시도
@@ -316,24 +390,37 @@ def remove_unnecessary_line_breaks(text: str) -> str:
     return text.strip()
 
 
-async def youtube_to_mp3(url: str, output_path: str = "youtube_audio") -> None:
+async def youtube_to_mp3(url: str) -> None:
     """
     유튜브 영상을 다운로드(mp4) 한 뒤, mp3로 변환
     """
     try:
-        # yt-dlp를 사용하여 오디오만 다운로드
+        ffmpeg_exec = _detect_ffmpeg_executable()
+        # yt-dlp를 사용하여 오디오만 다운로드 후 mp3로 변환
+        cookies_path = os.path.join(os.getcwd(), "cookies.txt")
         ydl_opts = {
             "format": "bestaudio/best",
-            "outtmpl": "youtube_audio",
+            "outtmpl": "youtube_audio",  # 베이스 파일명
             "postprocessors": [
-                {  # Post-process to convert to MP3
+                {
                     "key": "FFmpegExtractAudio",
-                    "preferredcodec": "mp3",  # Convert to mp3
-                    "preferredquality": "320",  # '0' means best quality, auto-determined by source
+                    "preferredcodec": "mp3",
+                    "preferredquality": "320",
                 }
             ],
+            "ffmpeg_location": os.path.dirname(ffmpeg_exec) if ffmpeg_exec != "ffmpeg" else None,
+            "http_headers": HEADERS,
+            "noplaylist": True,
+            "no_warnings": True,
+            "quiet": True,
+            "logger": YTDL_LOGGER,
+            "extractor_retries": 2,
+            "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
+            "source_address": "0.0.0.0",
         }
-        with YoutubeDL(ydl_opts) as ydl:
+        if os.path.exists(cookies_path):
+            ydl_opts["cookiefile"] = cookies_path
+        with YoutubeDL({k: v for k, v in ydl_opts.items() if v is not None}) as ydl:
             ydl.download([url])
 
         # 파일 쓰기 완료 후 확인
@@ -345,7 +432,41 @@ async def youtube_to_mp3(url: str, output_path: str = "youtube_audio") -> None:
     except VideoUnavailable:
         print("해당 유튜브 영상을 다운로드할 수 없습니다.")
     except Exception as e:
-        print(f"유튜브 다운로드 중 오류가 발생했습니다: {e}")
+        print(f"yt-dlp 다운로드/변환 실패, ffmpeg 직접 추출 시도: {e}")
+        try:
+            # HTML 파싱으로 오디오 스트림 URL 얻기
+            page_url = normalize_youtube_link(url)
+            audio_url, _ = await _fetch_stream_info(page_url)
+            if not audio_url:
+                raise RuntimeError("오디오 스트림 URL을 찾지 못했습니다.")
+            # ffmpeg로 직접 mp3 변환
+            header_str = _build_headers_str(HEADERS)
+            cmd = [
+                _detect_ffmpeg_executable(),
+                "-y",
+                "-hide_banner",
+                "-nostats",
+                "-loglevel",
+                "error",
+                "-headers",
+                header_str,
+                "-i",
+                audio_url,
+                "-vn",
+                "-acodec",
+                "libmp3lame",
+                "-b:a",
+                "320k",
+                "youtube_audio.mp3",
+            ]
+            subprocess.run(cmd, check=True)
+            if os.path.exists("youtube_audio.mp3"):
+                print("MP3 파일이 생성되었습니다.(ffmpeg)")
+            else:
+                raise FileNotFoundError("youtube_audio.mp3 파일이 생성되지 않았습니다.(ffmpeg)")
+        except Exception as e2:
+            print(f"ffmpeg 직접 추출도 실패: {e2}")
+            raise
 
 
 async def speech_to_text(audio_path: str) -> str:
