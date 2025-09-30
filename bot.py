@@ -141,12 +141,21 @@ async def on_message(message):
     else:
         print(f"{timestamp} {author_key}: {message.content}")
 
-    if author_key not in DISCORD_CLIENT.USER_MESSAGES:
-        DISCORD_CLIENT.USER_MESSAGES[author_key] = []
+    # 길드별 -> 유저별 저장소 준비 (DM은 스킵)
+    if not message.guild:
+        # 길드 외(DM)는 길드별 로그에 포함하지 않음
+        await DISCORD_CLIENT.process_commands(message)
+        return
+    guild_id = message.guild.id
+    if guild_id not in DISCORD_CLIENT.USER_MESSAGES:
+        DISCORD_CLIENT.USER_MESSAGES[guild_id] = {}
+    guild_map = DISCORD_CLIENT.USER_MESSAGES[guild_id]
+    if author_key not in guild_map:
+        guild_map[author_key] = []
 
     #! 봇 메시지는 이하 명령 무시 / 단순 채팅 저장만
     if message.author == DISCORD_CLIENT.user:
-        DISCORD_CLIENT.USER_MESSAGES[author_key].append(
+        guild_map[author_key].append(
             {
                 "author": author_key,
                 "role": "assistant",
@@ -163,7 +172,7 @@ async def on_message(message):
         return  # client 스스로가 보낸 메세지는 무시
     else:
         if image_url:
-            DISCORD_CLIENT.USER_MESSAGES[author_key].append(
+            guild_map[author_key].append(
                 {
                     "author": author_key,
                     "role": "user",
@@ -178,7 +187,7 @@ async def on_message(message):
                 }
             )
         else:
-            DISCORD_CLIENT.USER_MESSAGES[author_key].append(
+            guild_map[author_key].append(
                 {
                     "author": author_key,
                     "role": "user",
