@@ -20,7 +20,7 @@ intents.members = True
 intents.voice_states = True
 DISCORD_CLIENT = commands.Bot(command_prefix="/", intents=intents)
 DISCORD_CLIENT.remove_command("help")
-DISCORD_CLIENT.USER_MESSAGES = {}  # 유저별 채팅팅 저장용 딕셔너리
+DISCORD_CLIENT.USER_MESSAGES = {}  # 길드별 -> 유저별 -> 메시지 리스트
 DISCORD_CLIENT.SETTING_DATA = os.path.join(
     BASE_DIR, "settingData.json"
 )  # settingData 파일 이름
@@ -231,92 +231,96 @@ async def ping(ctx):
     await ctx.respond(f"퐁! Latency is {DISCORD_CLIENT.latency}")
 
 
-async def load_recent_messages():
-    target_channel = DISCORD_CLIENT.get_channel(CHANNEL_ID)
+async def load_recent_messages(guild_id: int | None = None):
     print("------------------- 메시지 로드 -------------------")
-    if not target_channel:
-        print("대상 채널을 찾을 수 없습니다.")
-        return
-
-    print(f"채널 '{target_channel.name}'에서 오늘의 메시지를 불러옵니다...")
     today = datetime.now(SEOUL_TZ).date()
 
-    # 필요시 초기화 키 (기존 로직 유지)
-    DISCORD_CLIENT.USER_MESSAGES["神᲼"] = []
+    # 길드별 순회 (특정 길드만 요청 시 해당 길드만)
+    guilds = (
+        [g for g in DISCORD_CLIENT.guilds if g.id == guild_id]
+        if guild_id is not None
+        else list(DISCORD_CLIENT.guilds)
+    )
+    for guild in guilds:
+        # 길드 맵 준비
+        if guild.id not in DISCORD_CLIENT.USER_MESSAGES:
+            DISCORD_CLIENT.USER_MESSAGES[guild.id] = {}
 
-    async for message in target_channel.history(limit=100):  # 최대 1557개 로드
-        # KST 기준 timestamp / date
-        message_kst = message.created_at.astimezone(SEOUL_TZ)
-        message_timestamp = message_kst.strftime("%Y-%m-%d %H:%M:%S")
-        message_date = message_kst.date()
-
-        if message_date != today:
-            continue  # 오늘 메시지만
-
-        # 사용자별 리스트 준비
-        if isinstance(message.author, discord.Member):
-            # 서버 내 멤버라면 nick(별명) 우선, 없으면 username
-            author_key = message.author.nick or message.author.name
-        else:
-            # DM 또는 봇(Self) 메시지 등은 name
-            author_key = message.author.name
-
-        if author_key not in DISCORD_CLIENT.USER_MESSAGES:
-            DISCORD_CLIENT.USER_MESSAGES[author_key] = []
-
-        # --- 런타임 저장 포맷과 동일한 content 구성 ---
-        parts = []
-
-        # 1) 텍스트
-        text = (message.content or "").strip()
-        if text:
-            parts.append({"type": "input_text", "text": text})
-
-        # 2) 이미지(여러 개 가능)
-        #   - content_type이 image/* 이거나
-        #   - 파일 확장자가 이미지이면 저장
-        def _is_image(att):
+        # 해당 길드의 텍스트 채널 전체 순회 (필요시 특정 채널만 보려면 필터링)
+        for channel in guild.text_channels:
             try:
-                if getattr(att, "content_type", None):
-                    return str(att.content_type).lower().startswith("image/")
+                async for message in channel.history(limit=100):
+                    # 날짜 필터(오늘)
+                    message_kst = message.created_at.astimezone(SEOUL_TZ)
+                    message_timestamp = message_kst.strftime("%Y-%m-%d %H:%M:%S")
+                    if message_kst.date() != today:
+                        continue
+
+                    # 작성자 키(닉 우선)
+                    if isinstance(message.author, discord.Member):
+                        author_key = message.author.nick or message.author.name
+                    else:
+                        author_key = message.author.name
+
+                    guild_map = DISCORD_CLIENT.USER_MESSAGES[guild.id]
+                    if author_key not in guild_map:
+                        guild_map[author_key] = []
+
+                    # content 파츠 구성
+                    parts = []
+                    text = (message.content or "").strip()
+                    if text:
+                        parts.append({"type": "input_text", "text": text})
+
+                    def _is_image(att):
+                        try:
+                            if getattr(att, "content_type", None):
+                                return (
+                                    str(att.content_type).lower().startswith("image/")
+                                )
+                        except Exception:
+                            pass
+                        name = (getattr(att, "filename", "") or "").lower()
+                        return name.endswith(
+                            (".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp")
+                        )
+
+                    for att in getattr(message, "attachments", []):
+                        if _is_image(att):
+                            url = getattr(att, "url", None) or getattr(
+                                att, "proxy_url", None
+                            )
+                            if url:
+                                parts.append({"type": "input_image", "image_url": url})
+
+                    role = (
+                        "assistant" if message.author == DISCORD_CLIENT.user else "user"
+                    )
+                    guild_map[author_key].append(
+                        {
+                            "author": author_key,
+                            "role": role,
+                            "content": (
+                                parts if parts else [{"type": "input_text", "text": ""}]
+                            ),
+                            "time": message_timestamp,
+                        }
+                    )
             except Exception:
-                pass
-            # fallback: 확장자 기준
-            name = (getattr(att, "filename", "") or "").lower()
-            return name.endswith((".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"))
+                # 채널 접근 권한 없음 등은 무시
+                continue
 
-        for att in getattr(message, "attachments", []):
-            if _is_image(att):
-                # 원본 URL 우선 사용
-                url = getattr(att, "url", None) or getattr(att, "proxy_url", None)
-                if url:
-                    parts.append({"type": "input_image", "image_url": url})
+        # 작성자별 오래된→최신 정렬
+        for author in DISCORD_CLIENT.USER_MESSAGES[guild.id].keys():
+            DISCORD_CLIENT.USER_MESSAGES[guild.id][author] = list(
+                reversed(DISCORD_CLIENT.USER_MESSAGES[guild.id][author])
+            )
 
-        # role 결정 및 append
-        if message.author == DISCORD_CLIENT.user:
-            role = "assistant"
-        else:
-            role = "user"
-
-        DISCORD_CLIENT.USER_MESSAGES[author_key].append(
-            {
-                "author": author_key,
-                "role": role,
-                "content": parts if parts else [{"type": "input_text", "text": ""}],
-                "time": message_timestamp,
-            }
-        )
+        # 로그 샘플
+        sample = get_recent_messages(client=DISCORD_CLIENT, guild_id=guild.id, limit=50)
+        print(f"[guild={guild.id}] recent sample:\n", sample)
 
     print("---------------------------------------------------\n")
-
-    # 각 사용자별로 오래된→최신 순서로 정렬(기존 로직 유지)
-    for user in DISCORD_CLIENT.USER_MESSAGES.keys():
-        DISCORD_CLIENT.USER_MESSAGES[user] = list(
-            reversed(DISCORD_CLIENT.USER_MESSAGES[user])
-        )
-    print("각 사용자별 메시지 정렬 완료!", DISCORD_CLIENT.USER_MESSAGES)
-    text = get_recent_messages(client=DISCORD_CLIENT, limit=150)
-    print("get_recent_messages(limit=150) 결과\n", text)
 
 
 async def main():

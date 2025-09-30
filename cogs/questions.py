@@ -62,7 +62,7 @@ class QuestionCommands(commands.Cog):
                     "version": "3",
                     "variables": {
                         "recent_messages": get_recent_messages(
-                            client=self.bot, limit=20
+                            client=self.bot, guild_id=interaction.guild.id, limit=20
                         ),
                         "user_name": interaction.user.name,
                         "question": text.strip(),
@@ -124,7 +124,7 @@ class QuestionCommands(commands.Cog):
                     "version": "2",
                     "variables": {
                         "recent_messages": get_recent_messages(
-                            client=self.bot, limit=20
+                            client=self.bot, guild_id=interaction.guild.id, limit=20
                         ),
                         "user_name": interaction.user.name,
                         "question": text.strip(),

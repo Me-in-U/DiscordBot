@@ -46,7 +46,7 @@ class SummarizeCommands(commands.Cog):
                     "version": "3",
                     "variables": {
                         "recent_messages": get_recent_messages(
-                            client=self.bot, limit=150
+                            client=self.bot, guild_id=interaction.guild.id, limit=150
                         ),
                         "additional_requests": request_message,
                     },

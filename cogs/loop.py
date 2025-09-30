@@ -35,9 +35,13 @@ class LoopTasks(commands.Cog):
     @tasks.loop(seconds=60)
     async def presence_update_task(self):
         """1분마다 Discord 봇 상태(Presence)를 갱신합니다."""
-        total_messages = sum(
-            len(msg_list) for msg_list in self.bot.USER_MESSAGES.values()
-        )
+        # 길드별 -> 유저별 -> 메시지 리스트 구조를 합산
+        total_messages = 0
+        for guild_map in self.bot.USER_MESSAGES.values():
+            if isinstance(guild_map, dict):
+                for lst in guild_map.values():
+                    if isinstance(lst, list):
+                        total_messages += len(lst)
         formatted_total_messages = f"{total_messages:,}"
         # discord.Activity를 명시적으로 사용
         activity = discord.Activity(
