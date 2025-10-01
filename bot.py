@@ -37,6 +37,7 @@ DISCORD_CLIENT.SPRING_AI_STYLE = "공격적"
 load_dotenv()
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 CHANNEL_ID = int(os.getenv("MY_CHANNEL_ID"))
+SSAFY_CHANNEL_ID = int(os.getenv("SSAFY_CHANNEL_ID"))
 TEST_CHANNEL_ID = int(os.getenv("TEST_CHANNEL_ID"))  # 테스트용 채널 ID
 GUILD_ID = int(os.getenv("GUILD_ID"))  # 손팬노 길드 ID
 
