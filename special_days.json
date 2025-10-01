@@ -430,7 +430,13 @@
 	"09-29": ["국제 커피의 날 (International Coffee Day)", "국제 식품손실과 폐기 인식의 날 (International Day of Awareness of Food Loss and Waste)"],
 	"09-30": ["세계 번역의 날 (International Translation Day)", "진실과 화해의 날(National Day for Truth and Reconciliation)"],
 	"10-01": ["국군의 날", "국제 커피의 날 (International Coffee Day)", "세계 노인의 날 (International Day of Older Persons)"],
-	"10-02": ["국제 비폭력의 날 (International Day of Non-Violence)"],
+	"10-02": [
+		"국제 비폭력의 날 (International Day of Non-Violence)",
+		"대한민국: 노인의 날(1997년~)",
+		"세계 농장동물의 날(World Day for Farmed Animals)",
+		"일본: 두부의 날",
+		"인도: 연방공휴일 - Gandhi Jayanti 생일"
+	],
 	"10-03": ["개천절"],
 	"10-04": ["천사데이", "세계 동물의 날 (World Animal Day)"],
 	"10-05": ["세계 한인의 날", "세계 교사의 날 (World Teachers' Day)", "세계 주거의 날 (World Habitat Day)"],
@@ -497,7 +503,7 @@
 	"12-02": ["국제 잡종견의 날(National Mutt Day)", "국제 노예제 철폐의 날 (International Day for the Abolition of Slavery)"],
 	"12-03": ["국제 장애인의 날 (International Day of Persons with Disabilities)", "레츠허그 데이(Let's Hug Day)"],
 	"12-04": ["국제 은행의 날 (International Bank Day)", "쿠키의 날(National Cookie Day)"],
-	"12-05": ["무역의 날", "국제 경제, 사회 발전을 위한 자원봉사자의 날 (International Volunteer Day for Economic and Social Development)", "세계 토양의 날 (World Soil Day)"],
+	"12-05": ["무역의 날", "국제 경제, 사회 발전을 위한 자원봉사자의 날 (International Volunteer Day for Economic and Social Development)", "세계 토양의 날 (World Soil Day)", "민희 탄생일 ^O^"],
 	"12-06": ["세인트 니콜라스 데이 (Saint Nicholas Day)", "가즈파쵸 데이(National Gazpacho Day)"],
 	"12-07": ["국제 민간 항공의 날 (International Civil Aviation Day)", "솜사탕의 날(National Cotton Candy Day)", "편지쓰기의 날(Letter Writing Day)"],
 	"12-08": ["국제 기후 행동의 날 (Global Climate Action Day)", "브라우니의 날(National Brownie Day)"],

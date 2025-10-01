@@ -9,7 +9,13 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
 from api.riot import get_rank_data
-from bot import CHANNEL_ID, TEST_CHANNEL_ID, SEOUL_TZ, load_recent_messages
+from bot import (
+    CHANNEL_ID,
+    SSAFY_CHANNEL_ID,
+    TEST_CHANNEL_ID,
+    SEOUL_TZ,
+    load_recent_messages,
+)
 from func.find1557 import clearCount
 
 SPECIAL_DAYS_FILE = "special_days.json"
@@ -59,8 +65,20 @@ class LoopTasks(commands.Cog):
     async def new_day_clear(self):
         """매일 자정에 user_messages를 초기화하고, 기념일 및 공휴일 정보를 알림."""
         target_channel = self.bot.get_channel(CHANNEL_ID)
-        if not target_channel:
+        ssafy_channel = self.bot.get_channel(SSAFY_CHANNEL_ID)
+
+        channels = []
+        if target_channel:
+            channels.append(target_channel)
+        else:
             print("대상 채널을 찾을 수 없습니다.")
+
+        if ssafy_channel:
+            channels.append(ssafy_channel)
+        elif SSAFY_CHANNEL_ID != CHANNEL_ID:
+            print("SSAFY 채널을 찾을 수 없습니다.")
+
+        if not channels:
             return
 
         today = datetime.now().date()
@@ -87,7 +105,8 @@ class LoopTasks(commands.Cog):
         if holiday_list:
             message += "\n### 기념일\n- " + "\n- ".join(holiday_list)
 
-        await target_channel.send(message)
+        for channel in {ch.id: ch for ch in channels}.values():
+            await channel.send(message)
 
         # 유저 메시지 초기화 및 리로드
         self.bot.USER_MESSAGES = {}
