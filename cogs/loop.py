@@ -10,7 +10,7 @@ from googleapiclient.errors import HttpError
 
 from api.riot import get_rank_data
 from bot import (
-    CHANNEL_ID,
+    SONPANNO_GUILD_ID,
     SSAFY_CHANNEL_ID,
     TEST_CHANNEL_ID,
     SEOUL_TZ,
@@ -64,7 +64,7 @@ class LoopTasks(commands.Cog):
     @tasks.loop(time=time(hour=0, minute=0, tzinfo=SEOUL_TZ))  # 매일 자정
     async def new_day_clear(self):
         """매일 자정에 user_messages를 초기화하고, 기념일 및 공휴일 정보를 알림."""
-        target_channel = self.bot.get_channel(CHANNEL_ID)
+        target_channel = self.bot.get_channel(SONPANNO_GUILD_ID)
         ssafy_channel = self.bot.get_channel(SSAFY_CHANNEL_ID)
 
         channels = []
@@ -75,7 +75,7 @@ class LoopTasks(commands.Cog):
 
         if ssafy_channel:
             channels.append(ssafy_channel)
-        elif SSAFY_CHANNEL_ID != CHANNEL_ID:
+        elif SSAFY_CHANNEL_ID != SONPANNO_GUILD_ID:
             print("SSAFY 채널을 찾을 수 없습니다.")
 
         if not channels:
@@ -122,7 +122,7 @@ class LoopTasks(commands.Cog):
             return
         print(f"Debug {['월','화','수','목','금','토','일'][r]}요일")
 
-        target_channel = self.bot.get_channel(CHANNEL_ID)
+        target_channel = self.bot.get_channel(SONPANNO_GUILD_ID)
         if not target_channel:
             print("대상 채널을 찾을 수 없습니다.")
             return
@@ -187,7 +187,7 @@ class LoopTasks(commands.Cog):
             print(f"Youtube API 에러: {e}")
             return
 
-        target = self.bot.get_channel(CHANNEL_ID)
+        target = self.bot.get_channel(SONPANNO_GUILD_ID)
         test_target = self.bot.get_channel(TEST_CHANNEL_ID)
         if vid and vid != self._last_live_id:
             await target.send(

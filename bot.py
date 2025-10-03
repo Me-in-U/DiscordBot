@@ -36,7 +36,7 @@ DISCORD_CLIENT.SPRING_AI_STYLE = "공격적"
 # 환경 변수를 .env 파일에서 로딩
 load_dotenv()
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
-CHANNEL_ID = int(os.getenv("MY_CHANNEL_ID"))
+SONPANNO_GUILD_ID = int(os.getenv("MY_CHANNEL_ID"))
 SSAFY_CHANNEL_ID = int(os.getenv("SSAFY_CHANNEL_ID"))
 TEST_CHANNEL_ID = int(os.getenv("TEST_CHANNEL_ID"))  # 테스트용 채널 ID
 GUILD_ID = int(os.getenv("GUILD_ID"))  # 손팬노 길드 ID
@@ -206,7 +206,16 @@ async def on_message(message):
     await DISCORD_CLIENT.process_commands(message)
 
     # !1557 처리
-    await find1557(message)
+    # SONPANNO_GUILD_ID 채널의 메시지에서만 1557 처리 수행
+    try:
+        if (
+            getattr(message, "channel", None)
+            and message.channel.id == SONPANNO_GUILD_ID
+        ):
+            await find1557(message)
+    except Exception as e:
+        # 1557 처리 중 예외는 전체 흐름을 막지 않도록 로깅만 수행
+        print(f"[1557 처리 오류] {e}")
 
     # !스프링 AI
     await spring_ai(DISCORD_CLIENT, message)
