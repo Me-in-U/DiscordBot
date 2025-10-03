@@ -6,7 +6,7 @@ from discord import app_commands
 from discord.ext import commands, tasks
 
 from api.riot import get_rank_data
-from bot import CHANNEL_ID, SEOUL_TZ
+from bot import SONPANNO_GUILD_ID, SEOUL_TZ
 
 
 class RankCommands(commands.Cog):
@@ -46,7 +46,7 @@ class RankCommands(commands.Cog):
     @tasks.loop(time=time(hour=0, minute=0, tzinfo=SEOUL_TZ))  # 매일 자정
     async def update_rank_data(self):
         """매일 자정에 랭킹 정보를 업데이트합니다."""
-        target_channel = self.bot.get_channel(CHANNEL_ID)
+        target_channel = self.bot.get_channel(SONPANNO_GUILD_ID)
         if not target_channel:
             print("대상 채널을 찾을 수 없습니다.")
             return
