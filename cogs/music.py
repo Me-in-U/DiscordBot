@@ -6,6 +6,7 @@ import os
 import re
 import time
 from dataclasses import dataclass, field
+import json as _json
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Deque, Optional, Tuple, Coroutine, Any
@@ -671,6 +672,37 @@ class MusicCog(commands.Cog):
         self.states: dict[int, GuildMusicState] = {}  # 길드별 상태 저장
         # 백그라운드 태스크 레퍼런스 보관(조기 GC 방지)
         self._bg_tasks: set[asyncio.Task] = set()
+        # 패널 메시지 ID 저장 로드
+        self._panel_store_path = os.path.join(os.getcwd(), "panelMessageIds.json")
+        self._panel_ids: dict[str, int] = self._load_panel_ids()
+
+    # === 패널 ID 저장/로드 유틸 ===
+    def _load_panel_ids(self) -> dict[str, int]:
+        try:
+            if not os.path.exists(self._panel_store_path):
+                return {}
+            with open(self._panel_store_path, "r", encoding="utf-8") as f:
+                data = _json.load(f)
+            if isinstance(data, dict):
+                # ensure int values
+                cleaned = {}
+                for k, v in data.items():
+                    try:
+                        cleaned[str(k)] = int(v)
+                    except Exception:
+                        continue
+                return cleaned
+            return {}
+        except Exception as e:
+            print(f"[WARN] 패널 ID 로드 실패: {e}")
+            return {}
+
+    def _save_panel_ids(self):
+        try:
+            with open(self._panel_store_path, "w", encoding="utf-8") as f:
+                _json.dump(self._panel_ids, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"[WARN] 패널 ID 저장 실패: {e}")
 
     def _spawn_bg(self, coro: "Coroutine[Any, Any, Any]") -> asyncio.Task:
         """백그라운드 태스크를 등록하고 레퍼런스를 보관한다."""
@@ -784,27 +816,31 @@ class MusicCog(commands.Cog):
     # ?완
     # !메시지 수정(임베드, 뷰)
     async def _edit_msg(self, state, embed, view):
-        # ! 메시지 수정. 실패시 -> 채널 전체 클리어 + 새로 전송
+        # 기존 메시지 재사용. 존재하지 않거나 삭제된 경우만 새로 생성
         try:
-            now = utcnow()
-            if (now - state.control_msg.created_at).total_seconds() > 3600:
-                new_msg = await state.control_channel.send(embed=embed, view=view)
-                try:
-                    await state.control_msg.delete()
-                except discord.HTTPException as e:
-                    print(f"[WARN] 이전 메시지 삭제 실패: {e}\n-> 채널 전체 클리어 중")
-                    await state.control_channel.purge(limit=None)
-                state.control_msg = new_msg
+            if state.control_msg is None:
+                state.control_msg = await state.control_channel.send(
+                    embed=embed, view=view
+                )
+                # 새로 만든 경우 저장
+                if state.control_channel and state.control_channel.guild:
+                    gid = str(state.control_channel.guild.id)
+                    self._panel_ids[gid] = state.control_msg.id
+                    self._save_panel_ids()
                 return
             await state.control_msg.edit(embed=embed, view=view)
         except discord.HTTPException as e:
-            if getattr(e, "code", None) in (30046, 10008):
-                print(f"[WARN] 이전 메시지 삭제 실패: {e}\n-> 채널 전체 클리어 중")
-                await state.control_channel.purge(limit=None)
-                new_msg = await state.control_channel.send(embed=embed, view=view)
-                state.control_msg = new_msg
+            if getattr(e, "code", None) == 10008:  # Unknown Message
+                print("[INFO] 패널 메시지가 사라져 새로 생성합니다.")
+                state.control_msg = await state.control_channel.send(
+                    embed=embed, view=view
+                )
+                if state.control_channel and state.control_channel.guild:
+                    gid = str(state.control_channel.guild.id)
+                    self._panel_ids[gid] = state.control_msg.id
+                    self._save_panel_ids()
             else:
-                raise
+                print(f"[WARN] 패널 업데이트 실패: {e}")
 
     # ?완
     # ! 노래 재생 상황 업데이트 루프
@@ -990,24 +1026,55 @@ class MusicCog(commands.Cog):
         state.control_channel = control_channel
         state.control_view = MusicHelperView(self)
 
-        # ! 과거 메시지 뒤져보기
-        history = control_channel.history(limit=50)
-        if history:
-            async for control_msg in history:
+        # 1) 저장된 ID 우선 시도
+        fetched = False
+        gid_key = str(guild.id)
+        stored_id = self._panel_ids.get(gid_key)
+        if stored_id:
+            try:
+                control_msg = await control_channel.fetch_message(stored_id)
+                if (
+                    control_msg
+                    and control_msg.author == guild.me
+                    and control_msg.embeds
+                ):
+                    em = control_msg.embeds[0]
+                    if em.title in (PANEL_TITLE, embed.title):
+                        print("[저장된 패널 메시지 재사용]")
+                        state.control_msg = control_msg
+                        await self._edit_msg(state, embed, state.control_view)
+                        fetched = True
+            except Exception as e:
+                print(f"[INFO] 저장된 패널 ID fetch 실패 -> fallback: {e}")
+                # 실패 시 dict에서 제거
+                self._panel_ids.pop(gid_key, None)
+                self._save_panel_ids()
+
+        if not fetched:
+            # 2) 히스토리 스캔
+            async for control_msg in control_channel.history(limit=50):
                 if control_msg.author == guild.me and control_msg.embeds:
                     em = control_msg.embeds[0]
                     if em.title == PANEL_TITLE:
                         print("[기존 임베드 발견]")
-                        # ! 메시지 수정(임베드, 뷰)
                         state.control_msg = control_msg
+                        # 발견 즉시 ID 저장
+                        self._panel_ids[gid_key] = control_msg.id
+                        self._save_panel_ids()
                         await self._edit_msg(state, embed, state.control_view)
-                        return
+                        fetched = True
+                        break
+
+        if fetched:
+            return
 
         # ! 없으면 새로 보내기
         print("[기존 메시지 없음] -> 전송")
         state.control_msg = await control_channel.send(
             embed=embed, view=state.control_view
         )
+        self._panel_ids[gid_key] = state.control_msg.id
+        self._save_panel_ids()
 
     # ?완
     # !노래 재생 or 대기열
