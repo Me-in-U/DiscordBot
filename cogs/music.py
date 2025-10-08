@@ -678,6 +678,8 @@ class MusicCog(commands.Cog):
         # 음악 채널 일반 채팅 자동삭제 경고 쿨다운 관리
         self._last_warn: dict[int, float] = {}
         self._warn_cooldown = 10.0  # 초
+        # 부팅시 1회 정리 수행 여부
+        self._purged_guilds: set[int] = set()
 
     # === 패널 ID 저장/로드 유틸 ===
     def _load_panel_ids(self) -> dict[str, int]:
@@ -1078,6 +1080,57 @@ class MusicCog(commands.Cog):
         )
         self._panel_ids[gid_key] = state.control_msg.id
         self._save_panel_ids()
+
+    # === 부팅 직후 음악 채널 정리 ===
+    async def _purge_music_channel_extras(self, guild: discord.Guild, limit: int = 500):
+        """음악 채널에서 '패널 임베드' 메시지를 제외한 일반 사용자/과거 메세지를 정리.
+
+        조건:
+        - 채널명: 🎵ㆍ神-음악채널
+        - 유지: 봇이 보낸 패널 메시지(제목이 PANEL_TITLE 또는 기본 패널 제목)
+        - 나머지: 모두 삭제 (핀 고정은 존중 -> pinned True면 건너뜀)
+        - 1회만 수행 (재연결 시 중복 제거 방지)
+        """
+        if guild.id in self._purged_guilds:
+            return
+        state = self._get_state(guild.id)
+        channel = state.control_channel or discord.utils.get(
+            guild.text_channels, name="🎵ㆍ神-음악채널"
+        )
+        if channel is None:
+            return
+        panel_msg_id = (
+            state.control_msg.id
+            if state.control_msg
+            else self._panel_ids.get(str(guild.id))
+        )
+        kept_ids = {panel_msg_id} if panel_msg_id else set()
+        removed = 0
+        try:
+            async for msg in channel.history(limit=limit, oldest_first=False):
+                if msg.pinned:
+                    continue
+                if kept_ids and msg.id in kept_ids:
+                    continue
+                # 패널 메시지 판별(혹시 id 저장 실패 케이스 대비)
+                if (
+                    msg.author == guild.me
+                    and msg.embeds
+                    and msg.embeds[0].title in (PANEL_TITLE, "🎵 신창섭의 다해줬잖아")
+                ):
+                    # 패널로 간주하고 ID 업데이트 후 유지
+                    if not kept_ids:
+                        kept_ids.add(msg.id)
+                    continue
+                try:
+                    await msg.delete()
+                    removed += 1
+                except discord.HTTPException:
+                    continue
+        finally:
+            if removed:
+                dbg(f"_purge_music_channel_extras: guild={guild.id} removed={removed}")
+            self._purged_guilds.add(guild.id)
 
     # ?완
     # !노래 재생 or 대기열
@@ -1631,6 +1684,8 @@ class MusicCog(commands.Cog):
             try:
                 print("[on_ready] 길드 음악 상태 로드:", guild)
                 await self._get_or_create_panel(guild)
+                # 패널 확보 후 불필요 메세지 정리
+                await self._purge_music_channel_extras(guild)
             except Exception as e:
                 print(f"[on_ready] 길드 {guild.id} 패널 생성 실패: {e}")
 
