@@ -38,7 +38,20 @@ class GamblingCommands(commands.Cog):
         if guild_id not in data:
             data[guild_id] = {}
         if user_id not in data[guild_id]:
-            data[guild_id][user_id] = {"balance": 0, "last_daily": None}
+            # 신규 필드 추가 시 여기에서 기본값 초기화
+            data[guild_id][user_id] = {
+                "balance": 0,
+                "last_daily": None,
+                "wins": 0,
+                "losses": 0,
+            }
+        else:
+            # 기존 사용자 (마이그레이션): 누락된 키만 보충
+            u = data[guild_id][user_id]
+            if "wins" not in u:
+                u["wins"] = 0
+            if "losses" not in u:
+                u["losses"] = 0
 
     def get_user_balance(self, guild_id: str, user_id: str) -> int:
         data = self._load_all()
@@ -49,6 +62,23 @@ class GamblingCommands(commands.Cog):
         self._ensure_user(data, guild_id, user_id)
         data[guild_id][user_id]["balance"] = amount
         self._save_all(data)
+
+    def add_result(self, guild_id: str, user_id: str, is_win: bool):
+        """도박 결과(승/패) 기록."""
+        data = self._load_all()
+        self._ensure_user(data, guild_id, user_id)
+        key = "wins" if is_win else "losses"
+        data[guild_id][user_id][key] = int(data[guild_id][user_id].get(key, 0)) + 1
+        self._save_all(data)
+
+    def get_stats(self, guild_id: str, user_id: str) -> tuple[int, int, float]:
+        data = self._load_all()
+        user = data.get(guild_id, {}).get(user_id, {})
+        w = int(user.get("wins", 0) or 0)
+        l = int(user.get("losses", 0) or 0)
+        total = w + l
+        rate = (w / total * 100) if total > 0 else 0.0
+        return w, l, rate
 
     def get_last_daily(self, guild_id: str, user_id: str):
         data = self._load_all()
@@ -303,6 +333,21 @@ class GamblingCommands(commands.Cog):
 
         win_chance = random.randint(30, 70)
         roll = random.randint(1, 100)
+
+        def build_roulette(chance: int, value: int, width: int = 30) -> str:
+            if width < 10:
+                width = 10
+            step = 100 / width
+            pointer_index = min(width - 1, int((value - 1) / step))
+            win_last_index = int((chance - 1) / step)
+            bar_chars = ["█" if i <= win_last_index else "░" for i in range(width)]
+            bar_line = "".join(bar_chars)
+            pointer_line = [" "] * width
+            pointer_line[pointer_index] = "▼"
+            pointer_line = "".join(pointer_line)
+            return f"`{bar_line}`\n`{pointer_line}`\n({chance}% 당첨 / 추첨 {value})"
+
+        roulette_visual = build_roulette(win_chance, roll)
         is_win = roll <= win_chance
         if is_win:
             prize = bet_amount * 2
@@ -312,8 +357,12 @@ class GamblingCommands(commands.Cog):
             prize = 0
             result_text = "💥 실패..."
             color = 0xE74C3C
+        # 잔액/통계 반영 (정상 들여쓰기 복구)
         final_bal = bal_after_bet + prize
         self.set_user_balance(guild_id, user_id, final_bal)
+        # 승/패 누적 반영
+        self.add_result(guild_id, user_id, is_win)
+        wins, losses, rate = self.get_stats(guild_id, user_id)
 
         embed = discord.Embed(
             title="🎰 도박 결과",
@@ -322,7 +371,12 @@ class GamblingCommands(commands.Cog):
             timestamp=datetime.now(SEOUL_TZ),
         )
         embed.add_field(name="당첨 확률", value=f"{win_chance}%", inline=True)
-        embed.add_field(name="추첨 값", value=f"{roll}/100", inline=True)
+        embed.add_field(name="룰렛", value=roulette_visual, inline=False)
+        embed.add_field(
+            name="전적",
+            value=f"승 {wins} · 패 {losses} (승률 {rate:.1f}%)",
+            inline=False,
+        )
         footer_text = f"배팅 {bet_amount:,}원 • 획득 {prize:,}원 • 잔액 {final_bal:,}원"
         avatar_url = (
             interaction.user.display_avatar.url
