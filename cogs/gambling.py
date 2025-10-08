@@ -343,9 +343,9 @@ class GamblingCommands(commands.Cog):
             bar_chars = ["█" if i <= win_last_index else "░" for i in range(width)]
             bar_line = "".join(bar_chars)
             pointer_line = [" "] * width
-            pointer_line[pointer_index] = "▼"
+            pointer_line[pointer_index] = "▲"
             pointer_line = "".join(pointer_line)
-            return f"`{bar_line}`\n`{pointer_line}`\n({chance}% 당첨 / 추첨 {value})"
+            return f"`{bar_line}`\n`{pointer_line}`\n"
 
         roulette_visual = build_roulette(win_chance, roll)
         is_win = roll <= win_chance
