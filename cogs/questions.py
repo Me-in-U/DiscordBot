@@ -120,7 +120,7 @@ class QuestionCommands(commands.Cog):
             response = custom_prompt_model(
                 image_content=image_content,
                 prompt={
-                    "id": "pmpt_68ac254fa8008190861e8f3f686556d50c6160cd272b9aca",
+                    "id": "pmpt_68acfa93ac6481959537fcb1853c883307d25e6bf62ef36c",
                     "version": "2",
                     "variables": {
                         "recent_messages": get_recent_messages(
