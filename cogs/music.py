@@ -675,6 +675,9 @@ class MusicCog(commands.Cog):
         # 패널 메시지 ID 저장 로드
         self._panel_store_path = os.path.join(os.getcwd(), "panelMessageIds.json")
         self._panel_ids: dict[str, int] = self._load_panel_ids()
+        # 음악 채널 일반 채팅 자동삭제 경고 쿨다운 관리
+        self._last_warn: dict[int, float] = {}
+        self._warn_cooldown = 10.0  # 초
 
     # === 패널 ID 저장/로드 유틸 ===
     def _load_panel_ids(self) -> dict[str, int]:
@@ -1630,6 +1633,42 @@ class MusicCog(commands.Cog):
                 await self._get_or_create_panel(guild)
             except Exception as e:
                 print(f"[on_ready] 길드 {guild.id} 패널 생성 실패: {e}")
+
+    @commands.Cog.listener()
+    async def on_message(self, message: discord.Message):
+        """음악 전용 채널에서 일반 유저 메시지를 자동 삭제.
+
+        - 채널명: "🎵ㆍ神-음악채널"
+        - 봇 메시지는 허용
+        - 패널/컨트롤 유지
+        - Slash 명령은 별도의 application interaction이라 일반 메시지 객체가 아니므로 별도 처리 불필요
+        """
+        # DM / 시스템 / 웹훅 제외
+        if not message.guild or message.type != discord.MessageType.default:
+            return
+        if message.author.bot:
+            return
+        if message.channel.name != "🎵ㆍ神-음악채널":
+            return
+        # 유저가 붙여넣은 일반 텍스트/URL 등 모두 삭제
+        try:
+            await message.delete()
+        except discord.HTTPException:
+            return
+        # 경고 메시지 (쿨다운 내 중복 표시 방지)
+        now = time.time()
+        last = self._last_warn.get(message.author.id, 0)
+        if now - last < self._warn_cooldown:
+            return
+        self._last_warn[message.author.id] = now
+        try:
+            warn_msg = await message.channel.send(
+                f"{message.author.mention} 이 채널은 음악 명령 전용입니다. 다른 대화는 다른 채널을 이용해주세요!"
+            )
+            # 5초 후 자동 삭제
+            self._spawn_bg(self._auto_delete(warn_msg, 5.0))
+        except Exception:
+            pass
 
     @commands.Cog.listener()
     async def on_command_error(self, ctx, error):
