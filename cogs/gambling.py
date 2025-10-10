@@ -101,6 +101,139 @@ class GamblingCommands(commands.Cog):
     def get_guild_balances(self, guild_id: str) -> dict:
         return self._load_all().get(guild_id, {})
 
+    # ---------- 내부 유틸: 사다리 그리기 ----------
+    @staticmethod
+    def _generate_ladder(rows: int = 8) -> list[tuple[bool, bool]]:
+        """사다리 가로줄 생성. 각 row는 (r12, r23):
+        - r12: 1-2 사이 가로줄 존재 여부
+        - r23: 2-3 사이 가로줄 존재 여부
+        동시에 True가 되지 않도록 조정.
+        """
+        result: list[tuple[bool, bool]] = []
+        for _ in range(rows):
+            r = random.random()
+            # 가로줄 확률을 적당히: 약 55%
+            if r < 0.25:
+                result.append((True, False))
+            elif r < 0.5:
+                result.append((False, True))
+            elif r < 0.55:
+                # 드물게 없음
+                result.append((False, False))
+            else:
+                # 기본: 없음으로 균형
+                result.append((False, False))
+        return result
+
+    @staticmethod
+    def _trace_ladder_path(start_col: int, rungs: list[tuple[bool, bool]]):
+        """사다리를 위→아래로 타며 마지막 도착 column(1..3)과 각 row에서의 위치 반환.
+        반환: (end_col, positions_per_row)
+        positions_per_row: 각 row 시작 전의 column 기준으로 저장.
+        """
+        pos = start_col
+        positions = []
+        for r12, r23 in rungs:
+            positions.append(pos)
+            if r12 and pos in (1, 2):
+                pos = 3 - pos  # 1<->2 교환
+            elif r23 and pos in (2, 3):
+                pos = 5 - pos  # 2<->3 교환
+        return pos, positions
+
+    @staticmethod
+    def _build_ladder_ascii(
+        rungs: list[tuple[bool, bool]],
+        *,
+        reveal_middle: bool,
+        highlight_path: list[int] | None = None,
+        winner_bottom: int | None = None,
+        choice_top: int | None = None,
+    ) -> str:
+        """사다리 ASCII 아트 생성.
+        - reveal_middle: False면 중간 가림(▒), True면 가로줄 표시
+        - highlight_path: 각 row에서의 column 위치를 강조(◆)
+        - winner_bottom: 1..3 중 당첨 위치, 하단에 표시
+        - choice_top: 사용자가 선택한 상단 column
+        """
+        # 컬럼 간격을 넓혀 가독성 향상
+        gap = 13  # 각 세로 줄 사이 간격(문자 수)
+        col_x = [0, gap, gap * 2]  # 수평 위치 (문자 단위)
+        width = gap * 2 + 1
+        lines: list[str] = []
+
+        # 상단 라벨
+        top_line = [" "] * width
+        for i, x in enumerate(col_x, start=1):
+            ch = str(i)
+            top_line[x] = ch
+        lines.append("".join(top_line))
+
+        # 세로줄 초기화
+        def blank_row():
+            row = [" "] * width
+            for x in col_x:
+                row[x] = "|"
+            return row
+
+        # 중간 구간
+        for idx, (r12, r23) in enumerate(rungs):
+            row = blank_row()
+            # 현재 경로의 열(해당 row 시작 위치)
+            path_pos = None
+            if highlight_path is not None and idx < len(highlight_path):
+                path_pos = highlight_path[idx]
+                px = col_x[path_pos - 1]
+                row[px] = "◆"
+            if reveal_middle:
+                if r12:
+                    # 경로가 1<->2 사이 가로줄을 타고 이동하는 경우 '◆'로 표시
+                    fill_char = "◆" if path_pos in (1, 2) else "-"
+                    for x in range(col_x[0] + 1, col_x[1]):
+                        row[x] = fill_char
+                    # 가로 이동을 했다면 도착 열의 세로줄도 ◆로 표시
+                    if path_pos in (1, 2):
+                        dest_col = 3 - path_pos  # 1<->2
+                        row[col_x[dest_col - 1]] = "◆"
+                if r23:
+                    # 경로가 2<->3 사이 가로줄을 타고 이동하는 경우 '◆'로 표시
+                    fill_char = "◆" if path_pos in (2, 3) else "-"
+                    for x in range(col_x[1] + 1, col_x[2]):
+                        row[x] = fill_char
+                    # 가로 이동을 했다면 도착 열의 세로줄도 ◆로 표시
+                    if path_pos in (2, 3):
+                        dest_col = 5 - path_pos  # 2<->3
+                        row[col_x[dest_col - 1]] = "◆"
+            else:
+                # 가림 처리
+                for x in range(col_x[0] + 1, col_x[2]):
+                    if row[x] == " ":
+                        row[x] = "▒"
+            lines.append("".join(row))
+
+        # 하단 라벨
+        bottom = [" "] * width
+        for i, x in enumerate(col_x, start=1):
+            if winner_bottom and i == winner_bottom:
+                # 'WIN' 3글자가 항상 캔버스 안에 들어가도록 시작 위치를 보정
+                label = "WIN"
+                start_idx = min(max(x - 1, 0), width - len(label))
+                for j, ch in enumerate(label):
+                    bottom[start_idx + j] = ch
+            else:
+                if 0 <= x < width:
+                    bottom[x] = "·"
+        lines.append("".join(bottom))
+
+        # 상단 선택 표시(optional)
+        if choice_top:
+            choice_line = [" "] * width
+            cx = col_x[choice_top - 1]
+            choice_line[cx] = "▲"
+            lines.insert(1, "".join(choice_line))
+
+        return "```\n" + "\n".join(lines) + "\n```"
+
     # ---------- 자동 이벤트(프로그램 호출용) ----------
     async def start_daily_lottery(
         self, channel: discord.abc.Messageable, guild_id: str
@@ -767,6 +900,157 @@ class GamblingCommands(commands.Cog):
             name=FINAL_BALANCE_LABEL, value=f"{final_bal:,}원", inline=False
         )
         await interaction.response.send_message(embed=embed)
+
+    # ---------- 명령어: 사다리 ----------
+    @app_commands.command(
+        name="사다리",
+        description="3사다리 중 1개 당첨! 배팅액을 걸고 사다리를 타보세요.",
+    )
+    @app_commands.rename(bet_amount="배팅액")
+    @app_commands.describe(bet_amount="배팅할 금액")
+    async def ladder_game(self, interaction: discord.Interaction, bet_amount: int):
+        guild_id = str(interaction.guild_id)
+        user_id = str(interaction.user.id)
+
+        if bet_amount <= 0:
+            await interaction.response.send_message(
+                "❌ 배팅 금액은 0보다 커야 합니다.", ephemeral=True
+            )
+            return
+
+        # 현재 잔액 확인 (선택 시 차감 예정)
+        bal = self.get_user_balance(guild_id, user_id)
+        if bal < bet_amount:
+            await interaction.response.send_message(
+                f"❌ 잔액 부족 (현재 {bal:,}원)", ephemeral=True
+            )
+            return
+
+        # 사다리 상태 생성
+        rungs = self._generate_ladder(rows=8)
+        winner_bottom = random.randint(1, 3)
+        payout_multiplier = 2.7  # 기대값 < 1이 되도록 약간의 하우스 엣지
+
+        class LadderView(discord.ui.View):
+            def __init__(self, cog: "GamblingCommands", *, timeout: int = 180):
+                super().__init__(timeout=timeout)
+                self.cog = cog
+                self.lock = asyncio.Lock()
+                self.finished = False
+
+            async def _resolve(self, interaction: discord.Interaction, choice: int):
+                async with self.lock:
+                    if self.finished:
+                        await interaction.response.send_message(
+                            "이미 결과가 공개된 게임입니다.", ephemeral=True
+                        )
+                        return
+                    # 요청자만 가능
+                    if str(interaction.user.id) != user_id:
+                        await interaction.response.send_message(
+                            "❌ 이 게임은 요청자만 참여할 수 있습니다.", ephemeral=True
+                        )
+                        return
+
+                    # 클릭 시점에 차감
+                    current_bal = self.cog.get_user_balance(guild_id, user_id)
+                    if current_bal < bet_amount:
+                        await interaction.response.send_message(
+                            "❌ 잔액이 부족합니다.", ephemeral=True
+                        )
+                        return
+                    self.cog.set_user_balance(
+                        guild_id, user_id, current_bal - bet_amount
+                    )
+
+                    # 경로 추적 및 결과 판정
+                    end_col, path_positions = self.cog._trace_ladder_path(choice, rungs)
+                    is_win = end_col == winner_bottom
+                    prize = int(bet_amount * payout_multiplier) if is_win else 0
+                    final_bal = self.cog.get_user_balance(guild_id, user_id) + prize
+                    if prize:
+                        self.cog.set_user_balance(guild_id, user_id, final_bal)
+
+                    # 결과 임베드 구성 (중간 공개 + 경로 강조)
+                    art = self.cog._build_ladder_ascii(
+                        rungs,
+                        reveal_middle=True,
+                        highlight_path=path_positions,
+                        winner_bottom=winner_bottom,
+                        choice_top=choice,
+                    )
+                    title = "🪜 사다리 결과"
+                    desc = (
+                        "🎉 당첨!" if is_win else "😢 꽝..."
+                    ) + f"  선택:{choice} → 도착:{end_col}"
+                    color = 0x2ECC71 if is_win else 0xE74C3C
+                    embed = discord.Embed(
+                        title=title,
+                        description=desc,
+                        color=color,
+                        timestamp=datetime.now(SEOUL_TZ),
+                    )
+                    embed.add_field(name="사다리", value=art, inline=False)
+                    footer = f"배팅 {bet_amount:,}원 • 획득 {prize:,}원 • 잔액 {final_bal:,}원"
+                    avatar_url = (
+                        interaction.user.display_avatar.url
+                        if interaction.user.display_avatar
+                        else None
+                    )
+                    if avatar_url:
+                        embed.set_footer(text=footer, icon_url=avatar_url)
+                    else:
+                        embed.set_footer(text=footer)
+
+                    # 버튼 비활성화
+                    for child in self.children:
+                        if isinstance(child, discord.ui.Button):
+                            child.disabled = True
+                    self.finished = True
+                    try:
+                        await interaction.response.edit_message(embed=embed, view=self)
+                    except Exception:
+                        pass
+
+            @discord.ui.button(label="사다리 1", style=discord.ButtonStyle.primary)
+            async def pick1(
+                self, interaction: discord.Interaction, _btn: discord.ui.Button
+            ):
+                await self._resolve(interaction, 1)
+
+            @discord.ui.button(label="사다리 2", style=discord.ButtonStyle.primary)
+            async def pick2(
+                self, interaction: discord.Interaction, _btn: discord.ui.Button
+            ):
+                await self._resolve(interaction, 2)
+
+            @discord.ui.button(label="사다리 3", style=discord.ButtonStyle.primary)
+            async def pick3(
+                self, interaction: discord.Interaction, _btn: discord.ui.Button
+            ):
+                await self._resolve(interaction, 3)
+
+            async def on_timeout(self):
+                for child in self.children:
+                    if isinstance(child, discord.ui.Button):
+                        child.disabled = True
+
+        # 초기 임베드 (중간 가림)
+        art_masked = self._build_ladder_ascii(
+            rungs, reveal_middle=False, winner_bottom=None, choice_top=None
+        )
+        embed = discord.Embed(
+            title="🪜 사다리 타기",
+            description=(
+                f"3개 사다리 중 1개만 당첨! 배팅: {bet_amount:,}원\n"
+                "중간은 가려져 있으며, 선택 후 경로와 결과가 공개됩니다."
+            ),
+            color=0x95A5A6,
+            timestamp=datetime.now(SEOUL_TZ),
+        )
+        embed.add_field(name="사다리", value=art_masked, inline=False)
+        view = LadderView(self)
+        await interaction.response.send_message(embed=embed, view=view)
 
 
 async def setup(bot):

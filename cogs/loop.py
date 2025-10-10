@@ -165,7 +165,7 @@ class LoopTasks(commands.Cog):
         now = datetime.now(SEOUL_TZ)
         if now.weekday() > 4:  # 0~4만 허용
             return
-        # 게시 채널: 기본 채널에 송출
+        # 게시 채널: 싸피 채널에 송출
         channel = self.bot.get_channel(SSAFY_CHANNEL_ID)
         if not channel:
             print("일일 복주머니 채널을 찾을 수 없습니다.")
