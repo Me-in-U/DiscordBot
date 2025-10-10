@@ -105,12 +105,12 @@ class GamblingCommands(commands.Cog):
     async def start_daily_lottery(
         self, channel: discord.abc.Messageable, guild_id: str
     ):
-        """주간 복주머니를 지정 채널에 게시합니다 (25 버튼, 5 당첨)."""
+        """주간 복주머니를 지정 채널에 게시합니다 (25 버튼, 10 당첨)."""
         # 당첨 금액 5개 생성 (중복 허용, 1천원 단위)
-        prizes = [random.randint(10, 30) * 1000 for _ in range(5)]
-        # 25개 중 5개만 당첨, 나머지는 꽝(0원)
+        prizes = [random.randint(10, 30) * 1000 for _ in range(10)]
+        # 25개 중 10개만 당첨, 나머지는 꽝(0원)
         prize_map = [0] * 25
-        win_indices = random.sample(range(25), 5)
+        win_indices = random.sample(range(25), 10)
         for idx, prize in zip(win_indices, prizes):
             prize_map[idx] = prize
 
@@ -182,14 +182,14 @@ class GamblingCommands(commands.Cog):
 
                         await self._update_embed(interaction)
 
-                        # 5명 모두 당첨이면 종료
+                        # 10명 모두 당첨이면 종료
                         if (
                             sum(
                                 1
                                 for s in self.btn_states
                                 if s["prize"] > 0 and s["claimed"]
                             )
-                            >= 5
+                            >= 10
                         ):
                             for child in self.children:
                                 if isinstance(child, discord.ui.Button):
@@ -212,7 +212,7 @@ class GamblingCommands(commands.Cog):
                 for idx, (uid, prize) in enumerate(winners, start=1):
                     name = f"<@{uid}>" if uid else "(미수령)"
                     lines.append(f"{idx}. {name} — {prize:,}원")
-                desc = "주간 복주머니! 25개 중 5개가 당첨입니다. 한 번만 참여 가능."
+                desc = "주간 복주머니! 25개 중 10개가 당첨입니다. 한 번만 참여 가능."
                 if finished:
                     desc += "\n🎊 모든 당첨자가 결정되었습니다!"
                 embed = discord.Embed(
@@ -256,7 +256,7 @@ class GamblingCommands(commands.Cog):
         # 초기 임베드 + View 송출
         embed = discord.Embed(
             title="🎁 주간 복주머니 이벤트",
-            description="주간 복주머니! 25개 중 5개가 당첨입니다. 한 번만 참여 가능.",
+            description="주간 복주머니! 25개 중 10개가 당첨입니다. 한 번만 참여 가능.",
             color=0xF39C12,
             timestamp=datetime.now(SEOUL_TZ),
         )
