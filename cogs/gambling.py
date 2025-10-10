@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 import random
@@ -101,6 +102,181 @@ class GamblingCommands(commands.Cog):
         return self._load_all().get(guild_id, {})
 
     # ---------- 명령어 ----------
+    @app_commands.command(
+        name="뿌리기",
+        description="지정 금액을 지정 인원에게 랜덤하게 나눠드립니다 (선착순 버튼 수령).",
+    )
+    @app_commands.rename(total_amount="금액", people="인원")
+    @app_commands.describe(total_amount="뿌릴 총 금액", people="수령할 인원 수")
+    async def sprinkle(
+        self,
+        interaction: discord.Interaction,
+        total_amount: int,
+        people: int,
+    ):
+        guild_id = str(interaction.guild_id)
+        sender_id = str(interaction.user.id)
+
+        # 검증
+        if total_amount <= 0 or people <= 0:
+            await interaction.response.send_message(
+                "❌ 금액과 인원은 0보다 커야 합니다.", ephemeral=True
+            )
+            return
+        # 사람 수가 금액보다 큰 경우 최소 1원 보장을 위해 제한
+        if people > total_amount:
+            await interaction.response.send_message(
+                f"❌ 인원({people})이 금액({total_amount})보다 많습니다. 최소 1원씩 지급하려면 인원을 줄여주세요.",
+                ephemeral=True,
+            )
+            return
+        # 송금자 잔액 확인
+        sender_bal = self.get_user_balance(guild_id, sender_id)
+        if sender_bal < total_amount:
+            await interaction.response.send_message(
+                f"❌ 잔액 부족 (현재 {sender_bal:,}원)", ephemeral=True
+            )
+            return
+
+        # 미리 선차감
+        self.set_user_balance(guild_id, sender_id, sender_bal - total_amount)
+
+        # 랜덤 분할 (정수, 총합 = total_amount, 각 파트 >= 1)
+        # 방법: 1..total_amount-1 범위에서 (people-1)개의 컷 포인트를 뽑아 차이로 분할
+        cuts = (
+            sorted(random.sample(range(1, total_amount), people - 1))
+            if people > 1
+            else []
+        )
+        parts = []
+        prev = 0
+        for c in cuts + [total_amount]:
+            parts.append(c - prev)
+            prev = c
+        random.shuffle(parts)  # 버튼 수령 시 금액이 고정된 순서로 보이지 않게 섞기
+
+        class SprinkleView(discord.ui.View):
+            def __init__(
+                self,
+                cog: "GamblingCommands",
+                *,
+                parts_list: list[int],
+                sender_user: discord.User,
+                guild_id_str: str,
+                timeout: int = 300,
+            ):
+                super().__init__(timeout=timeout)
+                self.cog = cog
+                self.parts: list[int] = parts_list  # 미지급 금액들
+                self.claimed_users: set[str] = set()
+                self.sender = sender_user
+                self.guild_id = guild_id_str
+                self.lock = asyncio.Lock()
+                self.original_message: discord.Message | None = None
+
+            @discord.ui.button(label="받기", style=discord.ButtonStyle.success)
+            async def claim_button(
+                self, interaction: discord.Interaction, button: discord.ui.Button
+            ):
+                async with self.lock:
+                    user_id = str(interaction.user.id)
+
+                    # 송금자는 수령 불가 (원하시면 허용 가능)
+                    if interaction.user.id == self.sender.id:
+                        await interaction.response.send_message(
+                            "❌ 본인이 뿌린 금액은 받을 수 없습니다.", ephemeral=True
+                        )
+                        return
+
+                    # 이미 수령했는지 체크
+                    if user_id in self.claimed_users:
+                        await interaction.response.send_message(
+                            "❌ 이미 수령했습니다.", ephemeral=True
+                        )
+                        return
+
+                    # 남은 파트가 없으면 비활성화
+                    if not self.parts:
+                        button.disabled = True
+                        button.label = "종료"
+                        await interaction.response.edit_message(view=self)
+                        await interaction.response.send_message(
+                            "❌ 이미 모두 수령되었습니다.", ephemeral=True
+                        )
+                        return
+
+                    # 한 파트 지급
+                    amount = self.parts.pop()
+                    self.claimed_users.add(user_id)
+                    # 사용자 잔액 증가
+                    current = self.cog.get_user_balance(self.guild_id, user_id)
+                    self.cog.set_user_balance(self.guild_id, user_id, current + amount)
+
+                    # 안내 (개인 메시지)
+                    await interaction.response.send_message(
+                        f"✅ {amount:,}원을 수령했습니다!", ephemeral=True
+                    )
+
+                    # 남은 파트 없으면 버튼 비활성화
+                    if not self.parts:
+                        button.disabled = True
+                        button.label = "종료"
+                        try:
+                            if self.original_message:
+                                await self.original_message.edit(view=self)
+                        except Exception:
+                            pass
+                        self.stop()
+
+            async def on_timeout(self):
+                # 타임아웃 시 남은 금액 환불
+                remaining = sum(self.parts)
+                if remaining > 0:
+                    # 송금자에게 환불
+                    sender_bal2 = self.cog.get_user_balance(
+                        self.guild_id, str(self.sender.id)
+                    )
+                    self.cog.set_user_balance(
+                        self.guild_id, str(self.sender.id), sender_bal2 + remaining
+                    )
+                # 버튼 비활성화 및 안내 문구 편집
+                for child in self.children:
+                    if isinstance(child, discord.ui.Button):
+                        child.disabled = True
+                        child.label = "기간만료"
+                        child.style = discord.ButtonStyle.secondary
+                if self.original_message:
+                    try:
+                        await self.original_message.edit(view=self)
+                    except Exception:
+                        pass
+
+        # 임베드 생성 및 뷰 표시
+        embed = discord.Embed(
+            title="🧧 뿌리기",
+            description=f"{interaction.user.mention} 님이 총 {total_amount:,}원을 {people}명에게 뿌립니다!",
+            color=0xE67E22,
+            timestamp=datetime.now(SEOUL_TZ),
+        )
+        embed.add_field(
+            name="수령 방법", value="버튼을 눌러 선착순으로 수령하세요.", inline=False
+        )
+        embed.set_footer(text="남은 인원이 모두 수령하면 자동 종료됩니다. (최대 5분)")
+
+        view = SprinkleView(
+            self,
+            parts_list=parts,
+            sender_user=interaction.user,
+            guild_id_str=guild_id,
+            timeout=300,
+        )
+        await interaction.response.send_message(embed=embed, view=view)
+        try:
+            sent = await interaction.original_response()
+            view.original_message = sent
+        except Exception:
+            pass
+
     @app_commands.command(
         name="돈줘", description="매일 1번 10,000원을 받을 수 있습니다."
     )
