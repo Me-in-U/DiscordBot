@@ -380,9 +380,10 @@ class GamblingCommands(commands.Cog):
                     current = self.cog.get_user_balance(self.guild_id, user_id)
                     self.cog.set_user_balance(self.guild_id, user_id, current + amount)
 
-                    # 안내 (개인 메시지)
+                    # 안내 (공개 메시지로 전체가 보도록)
                     await interaction.response.send_message(
-                        f"✅ {amount:,}원을 수령했습니다!", ephemeral=True
+                        f"✅ {interaction.user.mention} 님이 {amount:,}원을 수령했습니다!",
+                        ephemeral=False,
                     )
 
                     # 남은 파트 없으면 버튼 비활성화
