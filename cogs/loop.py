@@ -27,7 +27,7 @@ class LoopTasks(commands.Cog):
         self.presence_update_task.start()
         self.new_day_clear.start()
         self.weekly_1557_report.start()
-        self.weekly_lottery_task.start()
+        self.daily_lottery_task.start()
         api_key = os.getenv("GOOGLE_API_KEY")
         self._youtube = build("youtube", "v3", developerKey=api_key)
         self._last_live_id = None
