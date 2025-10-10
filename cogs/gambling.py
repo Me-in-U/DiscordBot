@@ -101,6 +101,170 @@ class GamblingCommands(commands.Cog):
     def get_guild_balances(self, guild_id: str) -> dict:
         return self._load_all().get(guild_id, {})
 
+    # ---------- 자동 이벤트(프로그램 호출용) ----------
+    async def start_weekly_lottery(
+        self, channel: discord.abc.Messageable, guild_id: str
+    ):
+        """주간 복주머니를 지정 채널에 게시합니다 (25 버튼, 5 당첨)."""
+        # 당첨 금액 5개 생성 (중복 허용, 1천원 단위)
+        prizes = [random.randint(10, 30) * 1000 for _ in range(5)]
+        # 25개 중 5개만 당첨, 나머지는 꽝(0원)
+        prize_map = [0] * 25
+        win_indices = random.sample(range(25), 5)
+        for idx, prize in zip(win_indices, prizes):
+            prize_map[idx] = prize
+
+        # 내부 View 정의(명령어와 동일 로직)
+        class WeeklyLotteryView(discord.ui.View):
+            def __init__(
+                self,
+                cog: "GamblingCommands",
+                *,
+                prize_map: list[int],
+                guild_id: str,
+                timeout: int = 3600,
+            ):
+                super().__init__(timeout=timeout)
+                self.cog = cog
+                self.prize_map = prize_map.copy()
+                self.claimed: dict[int, tuple[int, int]] = {}
+                self.btn_states: list[dict] = [
+                    dict(claimed=False, user=None, prize=prize) for prize in prize_map
+                ]
+                self.guild_id = guild_id
+                self.lock = asyncio.Lock()
+                self.original_message: discord.Message | None = None
+
+                for i in range(25):
+                    self.add_item(self._make_button(i))
+
+            def _make_button(self, idx: int):
+                label = f"복주머니 {idx+1}"
+                style = discord.ButtonStyle.primary
+                custom_id = f"lottery_{idx}"
+                btn = discord.ui.Button(label=label, style=style, custom_id=custom_id)
+
+                async def callback(interaction: discord.Interaction):
+                    async with self.lock:
+                        user_id = interaction.user.id
+                        # 한 유저 1회 제한
+                        if user_id in self.claimed:
+                            await interaction.response.send_message(
+                                "❌ 이미 참여하셨습니다.", ephemeral=True
+                            )
+                            return
+                        if self.btn_states[idx]["claimed"]:
+                            await interaction.response.send_message(
+                                "❌ 이미 선택된 복주머니입니다.", ephemeral=True
+                            )
+                            return
+                        prize = self.btn_states[idx]["prize"]
+                        self.btn_states[idx]["claimed"] = True
+                        self.btn_states[idx]["user"] = user_id
+                        self.claimed[user_id] = (idx, prize)
+                        btn.disabled = True
+                        if prize > 0:
+                            btn.label = f"🎉 {prize:,}원!"
+                            btn.style = discord.ButtonStyle.success
+                            current = self.cog.get_user_balance(
+                                self.guild_id, str(user_id)
+                            )
+                            self.cog.set_user_balance(
+                                self.guild_id, str(user_id), current + prize
+                            )
+                        else:
+                            btn.label = "꽝"
+                            btn.style = discord.ButtonStyle.secondary
+
+                        await self._update_embed(interaction)
+
+                        # 5명 모두 당첨이면 종료
+                        if (
+                            sum(
+                                1
+                                for s in self.btn_states
+                                if s["prize"] > 0 and s["claimed"]
+                            )
+                            >= 5
+                        ):
+                            for child in self.children:
+                                if isinstance(child, discord.ui.Button):
+                                    child.disabled = True
+                            await self._update_embed(interaction, finished=True)
+                            self.stop()
+
+                btn.callback = callback
+                return btn
+
+            async def _update_embed(
+                self, interaction: discord.Interaction, finished: bool = False
+            ):
+                winners = [
+                    (s["user"], s["prize"])
+                    for s in self.btn_states
+                    if s["prize"] > 0 and s["claimed"]
+                ]
+                lines = []
+                for idx, (uid, prize) in enumerate(winners, start=1):
+                    name = f"<@{uid}>" if uid else "(미수령)"
+                    lines.append(f"{idx}. {name} — {prize:,}원")
+                desc = "주간 복주머니! 25개 중 5개가 당첨입니다. 한 번만 참여 가능."
+                if finished:
+                    desc += "\n🎊 모든 당첨자가 결정되었습니다!"
+                embed = discord.Embed(
+                    title="🎁 주간 복주머니 이벤트",
+                    description=desc,
+                    color=0xF39C12,
+                    timestamp=datetime.now(SEOUL_TZ),
+                )
+                embed.add_field(
+                    name="당첨자 현황",
+                    value="\n".join(lines) if lines else "아직 없음",
+                    inline=False,
+                )
+                embed.set_footer(text="버튼을 눌러 복주머니를 열어보세요! (최대 1시간)")
+                if self.original_message:
+                    try:
+                        await self.original_message.edit(embed=embed, view=self)
+                    except Exception:
+                        pass
+                else:
+                    await interaction.response.edit_message(embed=embed, view=self)
+
+            async def on_timeout(self):
+                for child in self.children:
+                    if isinstance(child, discord.ui.Button):
+                        child.disabled = True
+                        # 당첨 버튼은 기간만료 표시
+                        try:
+                            idx = int(child.custom_id.split("_")[1])
+                            if self.btn_states[idx]["prize"] > 0:
+                                child.label = "기간만료"
+                                child.style = discord.ButtonStyle.secondary
+                        except Exception:
+                            pass
+                if self.original_message:
+                    try:
+                        await self.original_message.edit(view=self)
+                    except Exception:
+                        pass
+
+        # 초기 임베드 + View 송출
+        embed = discord.Embed(
+            title="🎁 주간 복주머니 이벤트",
+            description="주간 복주머니! 25개 중 5개가 당첨입니다. 한 번만 참여 가능.",
+            color=0xF39C12,
+            timestamp=datetime.now(SEOUL_TZ),
+        )
+        embed.add_field(name="당첨자 현황", value="아직 없음", inline=False)
+        embed.set_footer(text="버튼을 눌러 복주머니를 열어보세요! (최대 1시간)")
+
+        view = WeeklyLotteryView(
+            self, prize_map=prize_map, guild_id=guild_id, timeout=3600
+        )
+        msg = await channel.send(embed=embed, view=view)
+        view.original_message = msg
+
     # ---------- 명령어 ----------
     @app_commands.command(
         name="뿌리기",

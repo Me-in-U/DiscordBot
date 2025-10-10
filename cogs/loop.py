@@ -27,6 +27,7 @@ class LoopTasks(commands.Cog):
         self.presence_update_task.start()
         self.new_day_clear.start()
         self.weekly_1557_report.start()
+        self.weekly_lottery_task.start()
         api_key = os.getenv("GOOGLE_API_KEY")
         self._youtube = build("youtube", "v3", developerKey=api_key)
         self._last_live_id = None
@@ -121,7 +122,6 @@ class LoopTasks(commands.Cog):
         if r != 0:  # 0=월요일
             return
         print(f"Debug {['월','화','수','목','금','토','일'][r]}요일")
-
         target_channel = self.bot.get_channel(SONPANNO_GUILD_ID)
         if not target_channel:
             print("대상 채널을 찾을 수 없습니다.")
@@ -157,6 +157,34 @@ class LoopTasks(commands.Cog):
 
         # 카운트 초기화
         clearCount()
+
+    @tasks.loop(time=time(hour=17, minute=30, tzinfo=SEOUL_TZ))
+    async def weekly_lottery_task(self):
+        """월~금 오후 2시에 주간 복주머니 이벤트를 자동으로 게시합니다."""
+        # 요일 체크 (월=0 ... 일=6)
+        now = datetime.now(SEOUL_TZ)
+        if now.weekday() > 4:  # 0~4만 허용
+            return
+        # 게시 채널: 기본 채널에 송출
+        channel = self.bot.get_channel(SONPANNO_GUILD_ID)
+        if not channel:
+            print("주간 복주머니 채널을 찾을 수 없습니다.")
+            return
+        # Gambling Cog 호출
+        gamble_cog = self.bot.get_cog("GamblingCommands")
+        if not gamble_cog:
+            print("GamblingCommands Cog을 찾을 수 없어 이벤트를 건너뜁니다.")
+            return
+        try:
+            await gamble_cog.start_weekly_lottery(channel, str(channel.guild.id))
+            print(f"[{now}] 주간 복주머니 이벤트 게시 완료.")
+        except Exception as e:
+            print(f"주간 복주머니 게시 실패: {e}")
+
+    @weekly_lottery_task.before_loop
+    async def before_weekly_lottery_task(self):
+        print("-------------주간 복주머니 대기중...---------------")
+        await self.bot.wait_until_ready()
 
     @tasks.loop(seconds=120)
     async def youtube_live_check(self):
