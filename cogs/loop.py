@@ -158,7 +158,7 @@ class LoopTasks(commands.Cog):
         # 카운트 초기화
         clearCount()
 
-    @tasks.loop(time=time(hour=17, minute=30, tzinfo=SEOUL_TZ))
+    @tasks.loop(time=time(hour=17, minute=31, tzinfo=SEOUL_TZ))
     async def weekly_lottery_task(self):
         """월~금 오후 2시에 주간 복주머니 이벤트를 자동으로 게시합니다."""
         # 요일 체크 (월=0 ... 일=6)
