@@ -102,7 +102,7 @@ class GamblingCommands(commands.Cog):
         return self._load_all().get(guild_id, {})
 
     # ---------- 자동 이벤트(프로그램 호출용) ----------
-    async def start_weekly_lottery(
+    async def start_daily_lottery(
         self, channel: discord.abc.Messageable, guild_id: str
     ):
         """주간 복주머니를 지정 채널에 게시합니다 (25 버튼, 5 당첨)."""
@@ -175,6 +175,10 @@ class GamblingCommands(commands.Cog):
                         else:
                             btn.label = "꽝"
                             btn.style = discord.ButtonStyle.secondary
+                            # 꽝일 때 에페메랄 안내 추가
+                            await interaction.response.send_message(
+                                "😢 아쉽게도 꽝입니다! 다음 기회에...", ephemeral=True
+                            )
 
                         await self._update_embed(interaction)
 
