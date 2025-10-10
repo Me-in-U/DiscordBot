@@ -166,7 +166,7 @@ class LoopTasks(commands.Cog):
         if now.weekday() > 4:  # 0~4만 허용
             return
         # 게시 채널: 기본 채널에 송출
-        channel = self.bot.get_channel(SONPANNO_GUILD_ID)
+        channel = self.bot.get_channel(SSAFY_CHANNEL_ID)
         if not channel:
             print("주간 복주머니 채널을 찾을 수 없습니다.")
             return
