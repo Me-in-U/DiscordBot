@@ -21,8 +21,6 @@ from discord.utils import utcnow
 from dotenv import load_dotenv
 
 load_dotenv()
-GUILD_ID = int(os.getenv("GUILD_ID"))  # 손팬노 길드 ID
-TEST_GUILD = Object(id=GUILD_ID)
 H_BAR = "\u2015"
 # 공통 상수
 PANEL_TITLE = "🎵 신창섭의 다해줬잖아"
