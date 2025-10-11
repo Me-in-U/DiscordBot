@@ -11,11 +11,10 @@ from googleapiclient.errors import HttpError
 from api.riot import get_rank_data
 from bot import (
     SONPANNO_GUILD_ID,
-    SSAFY_CHANNEL_ID,
-    TEST_CHANNEL_ID,
     SEOUL_TZ,
     load_recent_messages,
 )
+from util.channel_settings import get_channels_by_purpose
 from func.find1557 import clearCount
 
 SPECIAL_DAYS_FILE = "special_days.json"
@@ -66,20 +65,25 @@ class LoopTasks(commands.Cog):
     async def new_day_clear(self):
         """매일 자정에 user_messages를 초기화하고, 기념일 및 공휴일 정보를 알림."""
         target_channel = self.bot.get_channel(SONPANNO_GUILD_ID)
-        ssafy_channel = self.bot.get_channel(SSAFY_CHANNEL_ID)
+        celebration_channels = get_channels_by_purpose("celebration")
 
-        channels = []
-        if target_channel:
-            channels.append(target_channel)
-        else:
+        channel_map: dict[int, discord.abc.Messageable] = {}
+
+        for guild_id, channel_id in celebration_channels.items():
+            channel = self.bot.get_channel(channel_id)
+            if channel:
+                channel_map[channel.id] = channel
+            else:
+                print(
+                    f"기념일 채널을 찾을 수 없습니다. guild={guild_id} channel={channel_id}"
+                )
+
+        if not channel_map and target_channel:
+            channel_map[target_channel.id] = target_channel
+        elif not target_channel:
             print("대상 채널을 찾을 수 없습니다.")
 
-        if ssafy_channel:
-            channels.append(ssafy_channel)
-        elif SSAFY_CHANNEL_ID != SONPANNO_GUILD_ID:
-            print("SSAFY 채널을 찾을 수 없습니다.")
-
-        if not channels:
+        if not channel_map:
             return
 
         today = datetime.now().date()
@@ -106,7 +110,7 @@ class LoopTasks(commands.Cog):
         if holiday_list:
             message += "\n### 기념일\n- " + "\n- ".join(holiday_list)
 
-        for channel in {ch.id: ch for ch in channels}.values():
+        for channel in channel_map.values():
             await channel.send(message)
 
         # 유저 메시지 초기화 및 리로드
@@ -166,20 +170,28 @@ class LoopTasks(commands.Cog):
         if now.weekday() > 4:  # 0~4만 허용
             return
         # 게시 채널: 싸피 채널에 송출
-        channel = self.bot.get_channel(SSAFY_CHANNEL_ID)
-        if not channel:
-            print("일일 복주머니 채널을 찾을 수 없습니다.")
+        channels = get_channels_by_purpose("gamble")
+        if not channels:
+            print("등록된 도박 채널이 없어 복주머니 이벤트를 건너뜁니다.")
             return
-        # Gambling Cog 호출
+
         gamble_cog = self.bot.get_cog("GamblingCommands")
         if not gamble_cog:
             print("GamblingCommands Cog을 찾을 수 없어 이벤트를 건너뜁니다.")
             return
-        try:
-            await gamble_cog.start_daily_lottery(channel, str(channel.guild.id))
-            print(f"[{now}] 일일 복주머니 이벤트 게시 완료.")
-        except Exception as e:
-            print(f"일일 복주머니 게시 실패: {e}")
+
+        for guild_id, channel_id in channels.items():
+            channel = self.bot.get_channel(channel_id)
+            if not channel:
+                print(
+                    f"일일 복주머니 채널을 찾을 수 없습니다. guild={guild_id} channel={channel_id}"
+                )
+                continue
+            try:
+                await gamble_cog.start_daily_lottery(channel, str(channel.guild.id))
+                print(f"[{now}] 일일 복주머니 이벤트 게시 완료 (guild={guild_id}).")
+            except Exception as e:
+                print(f"일일 복주머니 게시 실패 (guild={guild_id}): {e}")
 
     @daily_lottery_task.before_loop
     async def before_daily_lottery_task(self):

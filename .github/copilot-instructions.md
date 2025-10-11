@@ -16,7 +16,7 @@ This repo hosts a modular Discord bot built with `discord.py`. Use these pointer
 
 ## Setup & workflows
 
-- Required `.env` keys: `DISCORD_TOKEN`, `MY_CHANNEL_ID`, `TEST_CHANNEL_ID`, `GUILD_ID`, `OPENAI_KEY`, `GOOGLE_API_KEY`, `RIOT_KEY`.
+- Required `.env` keys: `DISCORD_TOKEN`, `SONPANNO_GUILD_ID`, `TEST_CHANNEL_ID`, `GUILD_ID`, `OPENAI_KEY`, `GOOGLE_API_KEY`, `RIOT_KEY`.
 - Dependencies: install from `pip_install.txt` (no `requirements.txt`).
 - Windows launch scripts:
   - `_launchBot.ps1` / `_launchBot.bat`: activate `.venv` then run `python bot.py`.

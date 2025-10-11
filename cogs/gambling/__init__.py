@@ -13,6 +13,7 @@ from .lottery import start_daily_lottery as run_lottery_event
 from .ranking import show_ranking as show_guild_ranking
 from .rps import run_rock_paper_scissors
 from .services import balance_service
+from util.channel_settings import get_channel
 from .sprinkle_command import run_sprinkle
 from .slot_machine import run_slot_machine
 from .transfer import execute_transfer
@@ -55,6 +56,34 @@ class GamblingCommands(commands.Cog):
     def get_guild_balances(self, guild_id: str) -> dict:
         return self.balance.get_guild_balances(guild_id)
 
+    async def _ensure_gamble_channel(self, interaction: discord.Interaction) -> bool:
+        guild_id = interaction.guild_id
+        if guild_id is None:
+            return True
+
+        allowed_channel_id = get_channel(guild_id, "gamble")
+        if allowed_channel_id is None:
+            return True
+
+        if interaction.channel_id == allowed_channel_id:
+            return True
+
+        mention = (
+            interaction.guild.get_channel(allowed_channel_id).mention
+            if interaction.guild and interaction.guild.get_channel(allowed_channel_id)
+            else f"<#{allowed_channel_id}>"
+        )
+        message = (
+            "이 명령어는 설정된 도박 채널에서만 사용할 수 있습니다.\n"
+            f"→ 지정 채널: {mention}"
+        )
+
+        if interaction.response.is_done():
+            await interaction.followup.send(message, ephemeral=True)
+        else:
+            await interaction.response.send_message(message, ephemeral=True)
+        return False
+
     # ---------- 자동 이벤트(프로그램 호출용) ----------
     async def start_daily_lottery(
         self, channel: discord.abc.Messageable, guild_id: str
@@ -75,6 +104,8 @@ class GamblingCommands(commands.Cog):
         total_amount: int,
         people: int,
     ):
+        if not await self._ensure_gamble_channel(interaction):
+            return
         await run_sprinkle(
             interaction,
             self.balance,
@@ -86,16 +117,22 @@ class GamblingCommands(commands.Cog):
         name="돈줘", description="매일 1번 10,000원을 받을 수 있습니다."
     )
     async def daily_money(self, interaction: discord.Interaction):
+        if not await self._ensure_gamble_channel(interaction):
+            return
         await grant_daily_money(interaction, self.balance)
 
     @app_commands.command(name="잔액", description="현재 잔액을 확인합니다.")
     async def check_balance(self, interaction: discord.Interaction):
+        if not await self._ensure_gamble_channel(interaction):
+            return
         await show_user_balance(interaction, self.balance)
 
     @app_commands.command(
         name="순위", description="현재 길드의 보유 금액 순위를 보여줍니다."
     )
     async def show_ranking(self, interaction: discord.Interaction):
+        if not await self._ensure_gamble_channel(interaction):
+            return
         await show_guild_ranking(interaction, self.balance)
 
     @app_commands.command(name="송금", description="다른 사용자에게 돈을 송금합니다.")
@@ -107,6 +144,8 @@ class GamblingCommands(commands.Cog):
         target_member: discord.Member,
         amount: int,
     ):
+        if not await self._ensure_gamble_channel(interaction):
+            return
         await execute_transfer(
             interaction,
             self.balance,
@@ -131,6 +170,8 @@ class GamblingCommands(commands.Cog):
         choice: app_commands.Choice[str],
         bet_amount: int,
     ):
+        if not await self._ensure_gamble_channel(interaction):
+            return
         await run_rock_paper_scissors(
             interaction,
             self.balance,
@@ -142,10 +183,14 @@ class GamblingCommands(commands.Cog):
     @app_commands.rename(bet_amount="배팅금액")
     @app_commands.describe(bet_amount="배팅할 금액")
     async def gamble(self, interaction: discord.Interaction, bet_amount: int):
+        if not await self._ensure_gamble_channel(interaction):
+            return
         await run_gamble(interaction, self.balance, bet_amount=bet_amount)
 
     @app_commands.command(name="즉석복권", description="300원 구매 / 확률형 보상")
     async def instant_lottery(self, interaction: discord.Interaction):
+        if not await self._ensure_gamble_channel(interaction):
+            return
         await run_instant_lottery(interaction, self.balance)
 
     # ---------- 명령어: 사다리 ----------
@@ -156,6 +201,8 @@ class GamblingCommands(commands.Cog):
     @app_commands.rename(bet_amount="배팅액")
     @app_commands.describe(bet_amount="배팅할 금액")
     async def ladder_game(self, interaction: discord.Interaction, bet_amount: int):
+        if not await self._ensure_gamble_channel(interaction):
+            return
         await run_ladder_game(interaction, self.balance, bet_amount=bet_amount)
 
     @app_commands.command(
@@ -165,6 +212,8 @@ class GamblingCommands(commands.Cog):
     @app_commands.rename(bet_amount="배팅금액")
     @app_commands.describe(bet_amount="배팅할 금액")
     async def slot_machine(self, interaction: discord.Interaction, bet_amount: int):
+        if not await self._ensure_gamble_channel(interaction):
+            return
         await run_slot_machine(interaction, self.balance, bet_amount=bet_amount)
 
 
