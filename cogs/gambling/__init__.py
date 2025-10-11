@@ -14,6 +14,7 @@ from .ranking import show_ranking as show_guild_ranking
 from .rps import run_rock_paper_scissors
 from .services import balance_service
 from .sprinkle_command import run_sprinkle
+from .slot_machine import run_slot_machine
 from .transfer import execute_transfer
 
 
@@ -156,6 +157,15 @@ class GamblingCommands(commands.Cog):
     @app_commands.describe(bet_amount="배팅할 금액")
     async def ladder_game(self, interaction: discord.Interaction, bet_amount: int):
         await run_ladder_game(interaction, self.balance, bet_amount=bet_amount)
+
+    @app_commands.command(
+        name="슬롯",
+        description="3개의 슬롯을 돌려 같은 그림이 나오면 배당을 받습니다.",
+    )
+    @app_commands.rename(bet_amount="배팅금액")
+    @app_commands.describe(bet_amount="배팅할 금액")
+    async def slot_machine(self, interaction: discord.Interaction, bet_amount: int):
+        await run_slot_machine(interaction, self.balance, bet_amount=bet_amount)
 
 
 async def setup(bot: commands.Bot):
