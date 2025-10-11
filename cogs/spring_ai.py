@@ -4,8 +4,6 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-TEST_GUILD_ID = int(os.getenv("GUILD_ID"))
-
 
 class AICog(commands.Cog):
     def __init__(self, bot: commands.Bot):
