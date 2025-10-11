@@ -49,10 +49,30 @@ SEOUL_TZ = timezone(timedelta(hours=9))  # 서울 시간대 설정 (UTC+9)
 async def load_cogs():
     """Cog를 로드하고 초기 설정값을 전달합니다."""
     print("-------------------Cog 로드 시작-------------------")
-    for filename in os.listdir("cogs"):
-        if filename.endswith(".py"):
-            extension = "cogs." + filename[:-3]
-            await DISCORD_CLIENT.load_extension(extension)
+    cogs_path = os.path.join(BASE_DIR, "cogs")
+    entries = os.listdir(cogs_path)
+    package_names = {
+        entry
+        for entry in entries
+        if os.path.isdir(os.path.join(cogs_path, entry))
+        and os.path.exists(os.path.join(cogs_path, entry, "__init__.py"))
+    }
+
+    for entry in sorted(entries):
+        if entry.endswith(".py"):
+            base_name = entry[:-3]
+            if base_name in package_names:
+                continue
+            extension = f"cogs.{base_name}"
+        elif entry in package_names:
+            extension = f"cogs.{entry}"
+        else:
+            continue
+
+        if extension in DISCORD_CLIENT.extensions:
+            continue
+
+        await DISCORD_CLIENT.load_extension(extension)
     print("-------------------Cog 로드 완료-------------------\n")
 
 
