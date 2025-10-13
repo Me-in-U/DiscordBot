@@ -104,6 +104,7 @@ def totals_text(cards: List[Card]) -> str:
         return f"{val} (버스트)" if val > 21 else str(val)
     return "/".join(str(v) for v in totals)
 
+
 # ---------- ASCII 렌더링 유틸 ----------
 def _card_ascii_lines(rank: str, suit: str) -> List[str]:
     # 고정 폭 카드(폭 11)로 정렬: 5줄 구성
@@ -418,7 +419,9 @@ class BlackjackView(discord.ui.View):
 
         # 플레이어
         p_total, p_bj, _ = hand_values(self.player)
-        p_hand_txt = _render_cards_ascii(self.player) + f"\n합계: {totals_text(self.player)}"
+        p_hand_txt = (
+            _render_cards_ascii(self.player) + f"\n합계: {totals_text(self.player)}"
+        )
         if p_bj and len(self.player) == 2:
             p_title = f"플레이어 ({p_total}) — Blackjack"
         else:
@@ -428,7 +431,9 @@ class BlackjackView(discord.ui.View):
         # 딜러
         d_title, d_hand_txt = self._dealer_field(reveal_dealer)
         if reveal_dealer and self.dealer:
-            d_hand_txt = _render_cards_ascii(self.dealer) + f"\n합계: {totals_text(self.dealer)}"
+            d_hand_txt = (
+                _render_cards_ascii(self.dealer) + f"\n합계: {totals_text(self.dealer)}"
+            )
         elif not reveal_dealer and self.dealer:
             # 업카드만 공개, 홀카드는 뒷면 처리
             d_hand_txt = _render_cards_ascii(self.dealer, hidden_index=1)
@@ -485,7 +490,11 @@ class BlackjackView(discord.ui.View):
             d_hand_txt = _render_cards_ascii(self.dealer) if self.dealer else EMPTY_HAND
         else:
             d_title = "딜러 ( ? )"
-            d_hand_txt = _render_cards_ascii(self.dealer, hidden_index=1) if self.dealer else EMPTY_HAND
+            d_hand_txt = (
+                _render_cards_ascii(self.dealer, hidden_index=1)
+                if self.dealer
+                else EMPTY_HAND
+            )
         return d_title, d_hand_txt
 
 
