@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -9,13 +10,28 @@ SETTINGS_PATH = BASE_DIR / "channel_settings.json"
 
 
 def _load() -> Dict[str, Dict[str, int]]:
-    if not SETTINGS_PATH.exists():
-        return {}
-    try:
-        with SETTINGS_PATH.open("r", encoding="utf-8") as fp:
-            data = json.load(fp)
-    except Exception:
-        return {}
+    def _try_load(path: Path) -> Dict:
+        try:
+            with path.open("r", encoding="utf-8") as fp:
+                return json.load(fp)
+        except Exception:
+            return {}
+
+    data: Dict = {}
+    if SETTINGS_PATH.exists():
+        data = _try_load(SETTINGS_PATH)
+    else:
+        # Fallback to backup if main is missing
+        bak = SETTINGS_PATH.with_suffix(".bak")
+        if bak.exists():
+            data = _try_load(bak)
+        else:
+            return {}
+    # If main was unreadable, try backup
+    if not isinstance(data, dict) or not data:
+        bak = SETTINGS_PATH.with_suffix(".bak")
+        if bak.exists():
+            data = _try_load(bak)
 
     if not isinstance(data, dict):
         return {}
@@ -41,9 +57,25 @@ def _normalize_channels(raw: object) -> Dict[str, int]:
 
 
 def _save(data: Dict[str, Dict[str, int]]) -> None:
+    """Atomically write settings to disk to avoid truncation/corruption."""
     SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with SETTINGS_PATH.open("w", encoding="utf-8") as fp:
+    tmp_path = SETTINGS_PATH.with_suffix(".tmp")
+    bak_path = SETTINGS_PATH.with_suffix(".bak")
+    # Write to temp
+    with tmp_path.open("w", encoding="utf-8") as fp:
         json.dump(data, fp, ensure_ascii=False, indent=2)
+        fp.flush()
+        os.fsync(fp.fileno())
+    # Backup existing file
+    if SETTINGS_PATH.exists():
+        try:
+            if bak_path.exists():
+                bak_path.unlink(missing_ok=True)  # type: ignore[arg-type]
+            SETTINGS_PATH.replace(bak_path)
+        except Exception:
+            pass
+    # Atomic replace
+    os.replace(tmp_path, SETTINGS_PATH)
 
 
 def get_channel(guild_id: int, purpose: str) -> Optional[int]:

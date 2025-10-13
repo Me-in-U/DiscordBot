@@ -12,7 +12,7 @@ from .services import BalanceService
 
 
 class WeeklyLotteryView(discord.ui.View):
-    """주간 복주머니 인터랙션 뷰."""
+    """주중 복주머니 인터랙션 뷰."""
 
     def __init__(
         self,
@@ -116,12 +116,12 @@ class WeeklyLotteryView(discord.ui.View):
             display = f"<@{user_id}>" if user_id else "(미수령)"
             lines.append(f"{idx}. {display} — {prize:,}원")
 
-        desc = "주간 복주머니! 25개 중 10개가 당첨입니다. 한 번만 참여 가능."
+        desc = "주중 복주머니! 25개 중 10개가 당첨입니다. 한 번만 참여 가능."
         if finished:
             desc += "\n🎊 모든 당첨자가 결정되었습니다!"
 
         embed = discord.Embed(
-            title="🎁 주간 복주머니 이벤트",
+            title="🎁 주중 복주머니 이벤트",
             description=desc,
             color=0xF39C12,
             timestamp=datetime.now(SEOUL_TZ),
@@ -161,8 +161,8 @@ class WeeklyLotteryView(discord.ui.View):
 
 def create_lottery_embed() -> discord.Embed:
     embed = discord.Embed(
-        title="🎁 주간 복주머니 이벤트",
-        description="주간 복주머니! 25개 중 10개가 당첨입니다. 한 번만 참여 가능.",
+        title="🎁 주중 복주머니 이벤트",
+        description="주중 복주머니! 25개 중 10개가 당첨입니다. 한 번만 참여 가능.",
         color=0xF39C12,
         timestamp=datetime.now(SEOUL_TZ),
     )
@@ -172,7 +172,7 @@ def create_lottery_embed() -> discord.Embed:
 
 
 def generate_prize_map() -> List[int]:
-    prizes = [random.randint(10, 30) * 1000 for _ in range(10)]
+    prizes = [random.randint(30, 50) * 1000 for _ in range(10)]
     prize_map = [0] * 25
     for idx, prize in zip(random.sample(range(25), 10), prizes):
         prize_map[idx] = prize
