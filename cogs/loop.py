@@ -162,14 +162,14 @@ class LoopTasks(commands.Cog):
         # 카운트 초기화
         clearCount()
 
-    @tasks.loop(time=time(hour=14, minute=00, tzinfo=SEOUL_TZ))
+    @tasks.loop(time=time(hour=13, minute=30, tzinfo=SEOUL_TZ))
     async def daily_lottery_task(self):
-        """월~금 오후 2시에 일일 복주머니 이벤트를 자동으로 게시합니다."""
+        """월~금 오후 2시에 주중 복주머니 이벤트를 자동으로 게시합니다 (도박 채널별)."""
         # 요일 체크 (월=0 ... 일=6)
         now = datetime.now(SEOUL_TZ)
         if now.weekday() > 4:  # 0~4만 허용
             return
-        # 게시 채널: 싸피 채널에 송출
+        # 게시 채널: 길드별 도박 채널에 송출
         channels = get_channels_by_purpose("gamble")
         if not channels:
             print("등록된 도박 채널이 없어 복주머니 이벤트를 건너뜁니다.")
@@ -189,13 +189,13 @@ class LoopTasks(commands.Cog):
                 continue
             try:
                 await gamble_cog.start_daily_lottery(channel, str(channel.guild.id))
-                print(f"[{now}] 일일 복주머니 이벤트 게시 완료 (guild={guild_id}).")
+                print(f"[{now}] 주중 복주머니 이벤트 게시 완료 (guild={guild_id}).")
             except Exception as e:
-                print(f"일일 복주머니 게시 실패 (guild={guild_id}): {e}")
+                print(f"주중 복주머니 게시 실패 (guild={guild_id}): {e}")
 
     @daily_lottery_task.before_loop
     async def before_daily_lottery_task(self):
-        print("-------------일일 복주머니 대기중...---------------")
+        print("-------------주중 복주머니 대기중...---------------")
         await self.bot.wait_until_ready()
 
     @tasks.loop(seconds=120)
@@ -228,7 +228,7 @@ class LoopTasks(commands.Cog):
             return
 
         target = self.bot.get_channel(SONPANNO_GUILD_ID)
-        test_target = self.bot.get_channel(TEST_CHANNEL_ID)
+        # test_target = self.bot.get_channel(TEST_CHANNEL_ID)  # 정의되지 않으면 주석 처리
         if vid and vid != self._last_live_id:
             await target.send(
                 f"📺 **메이플스토리 LIVE 시작!** ▶ https://youtu.be/{vid}"
@@ -240,7 +240,8 @@ class LoopTasks(commands.Cog):
                 json.dump(settings, f, ensure_ascii=False, indent=4)
             self.youtube_live_check.stop()
         else:
-            await test_target.send("❌ 현재 LIVE가 없습니다.")
+            # if test_target:
+            #     await test_target.send("❌ 현재 LIVE가 없습니다.")
             self._last_live_id = None
 
     @youtube_live_check.before_loop
