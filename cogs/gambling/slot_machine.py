@@ -74,11 +74,11 @@ class SlotMachineView(discord.ui.View):
         interaction: discord.Interaction,
         button: discord.ui.Button,
     ) -> None:
-        embed, should_disable = self._spin(interaction)
-        if should_disable:
-            for child in self.children:
-                child.disabled = True
-            self.stop()
+        # 한 번만 스핀 가능: 스핀 후 버튼 비활성화
+        embed, _ = self._spin(interaction)
+        for child in self.children:
+            child.disabled = True
+        self.stop()
         await interaction.response.edit_message(embed=embed, view=self)
 
     def _spin(self, interaction: discord.Interaction) -> tuple[discord.Embed, bool]:
@@ -143,17 +143,14 @@ async def run_slot_machine(
         user_id=user_id,
         bet_amount=bet_amount,
     )
-    embed, should_disable = view._spin(interaction)
-    if should_disable:
-        for child in view.children:
-            child.disabled = True
-    await interaction.response.send_message(embed=embed, view=view)
+    # 최초에는 결과를 바로 보여주지 않고 대기 화면을 출력
+    initial_embed = _build_initial_embed(
+        interaction=interaction,
+        bet_amount=bet_amount,
+        current_balance=current,
+    )
+    await interaction.response.send_message(embed=initial_embed, view=view)
     view.message = await interaction.original_response()
-    if should_disable:
-        try:
-            await view.message.edit(view=view)
-        except discord.HTTPException:
-            pass
 
 
 def _build_result_embed(
@@ -212,6 +209,42 @@ def _build_result_embed(
 
     avatar = interaction.user.display_avatar
     footer_text = "돌리기 버튼으로 다시 도전하세요!"
+    if avatar:
+        embed.set_footer(text=footer_text, icon_url=avatar.url)
+    else:
+        embed.set_footer(text=footer_text)
+    return embed
+
+
+def _build_initial_embed(
+    *,
+    interaction: discord.Interaction,
+    bet_amount: int,
+    current_balance: int,
+) -> discord.Embed:
+    """슬롯 최초 호출 시 보여줄 대기 화면 임베드."""
+    timestamp = interaction.created_at or datetime.now(SEOUL_TZ)
+    spins = ["❓", "❔", "❓"]
+    embed = discord.Embed(
+        title="🎰 슬롯 머신",
+        description="버튼을 눌러 슬롯을 돌려보세요!",
+        color=discord.Color.blurple(),
+        timestamp=timestamp,
+    )
+    embed.add_field(
+        name="🎡 슬롯 휠",
+        value=_build_slot_ascii(spins, highlight=False),
+        inline=False,
+    )
+    embed.add_field(
+        name="배팅 정보",
+        value=f"배팅: {bet_amount:,}원\n현재 잔액: {current_balance:,}원",
+        inline=True,
+    )
+    embed.add_field(name="배당표", value=PROBABILITY_TABLE, inline=True)
+
+    avatar = interaction.user.display_avatar
+    footer_text = "돌리기 버튼을 눌러 플레이하세요!"
     if avatar:
         embed.set_footer(text=footer_text, icon_url=avatar.url)
     else:
