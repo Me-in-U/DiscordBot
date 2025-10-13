@@ -16,6 +16,7 @@ from .services import balance_service
 from util.channel_settings import get_channel
 from .sprinkle_command import run_sprinkle
 from .slot_machine import run_slot_machine
+from .blackjack import run_blackjack
 from .transfer import execute_transfer
 
 
@@ -215,6 +216,17 @@ class GamblingCommands(commands.Cog):
         if not await self._ensure_gamble_channel(interaction):
             return
         await run_slot_machine(interaction, self.balance, bet_amount=bet_amount)
+
+    @app_commands.command(
+        name="블랙잭",
+        description="Hit/Stand/Double 지원, 블랙잭 1.5배(총 2.5배) 배당",
+    )
+    @app_commands.rename(bet_amount="배팅금액")
+    @app_commands.describe(bet_amount="배팅할 금액")
+    async def blackjack(self, interaction: discord.Interaction, bet_amount: int):
+        if not await self._ensure_gamble_channel(interaction):
+            return
+        await run_blackjack(interaction, self.balance, bet_amount=bet_amount)
 
 
 async def setup(bot: commands.Bot):
