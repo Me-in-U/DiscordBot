@@ -39,6 +39,10 @@ class BalanceService:
                 "last_daily": None,
                 "wins": 0,
                 "losses": 0,
+                # Blackjack specific stats
+                "bj_wins": 0,
+                "bj_losses": 0,
+                "bj_pushes": 0,
             }
         else:
             payload = data[guild_id][user_id]
@@ -46,6 +50,9 @@ class BalanceService:
             payload.setdefault("losses", 0)
             payload.setdefault("balance", 0)
             payload.setdefault("last_daily", None)
+            payload.setdefault("bj_wins", 0)
+            payload.setdefault("bj_losses", 0)
+            payload.setdefault("bj_pushes", 0)
 
     # 공개 API
     def get_balance(self, guild_id: str, user_id: str) -> int:
@@ -93,6 +100,32 @@ class BalanceService:
 
     def get_guild_balances(self, guild_id: str) -> Dict[str, dict]:
         return self._load_all().get(guild_id, {})
+
+    # ----- Blackjack specific API -----
+    def add_blackjack_result(self, guild_id: str, user_id: str, outcome: str) -> None:
+        """outcome: 'win' | 'lose' | 'push'"""
+        data = self._load_all()
+        self._ensure_user(data, guild_id, user_id)
+        if outcome == "win":
+            key = "bj_wins"
+        elif outcome == "lose":
+            key = "bj_losses"
+        else:
+            key = "bj_pushes"
+        data[guild_id][user_id][key] = int(data[guild_id][user_id].get(key, 0)) + 1
+        self._save_all(data)
+
+    def get_blackjack_stats(
+        self, guild_id: str, user_id: str
+    ) -> Tuple[int, int, int, float]:
+        data = self._load_all()
+        user = data.get(guild_id, {}).get(user_id, {})
+        wins = int(user.get("bj_wins", 0) or 0)
+        losses = int(user.get("bj_losses", 0) or 0)
+        pushes = int(user.get("bj_pushes", 0) or 0)
+        total = wins + losses
+        rate = (wins / total * 100) if total > 0 else 0.0
+        return wins, losses, pushes, rate
 
 
 balance_service = BalanceService()
