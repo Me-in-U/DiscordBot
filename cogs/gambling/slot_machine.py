@@ -51,7 +51,8 @@ class SlotMachineView(discord.ui.View):
         self.message: discord.Message | None = None
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user.id != self.user_id:
+        # Compare as string to match stored self.user_id type
+        if str(interaction.user.id) != self.user_id:
             await interaction.response.send_message(
                 "이 슬롯 머신은 명령을 실행한 사용자만 사용할 수 있습니다!",
                 ephemeral=True,
