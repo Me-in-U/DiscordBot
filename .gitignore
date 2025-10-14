@@ -10,3 +10,6 @@ bin/ffmpeg.exe
 1557Counter.json
 gambling_balance.json
 panelMessageIds.json
+*.json
+*.bak
+channel_settings.json
