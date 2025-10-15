@@ -475,7 +475,15 @@
 	"10-13": ["국제 재난 위험 감소의 날 (International Day for Disaster Reduction)"],
 	"10-14": ["세계 표준의 날 (World Standards Day)", "세계 철새의 날 (World Migratory Bird Day)"],
 	"10-15": ["국제 농촌 여성의 날 (International Day of Rural Women)", "세계 손 씻기의 날 (Global Handwashing Day)"],
-	"10-16": ["세계 식량의 날 (World Food Day)"],
+	"10-16": [
+		"부마민주항쟁 기념일",
+		"세계 척추의 날(World Spine Day)",
+		"세계 식량의 날 (World Food Day)",
+		"국제 달 관측의 날(International Observe the Moon Night)",
+		"1923년 - 월트 디즈니 컴퍼니가 설립된 날",
+		"1996년 - 한국농구연맹(KBL) 창립",
+		"2025년 - 넥슨 니트로스튜디오의 게임 카트라이더: 드리프트가 서비스 약 2년 만에 서비스 종료, Pokémon LEGENDS Z-A가 출시"
+	],
 	"10-17": ["국제 빈곤 퇴치의 날 (International Day for the Eradication of Poverty)"],
 	"10-18": ["초콜릿 컵케이크의 날 (Chocolate Cupcake Day)"],
 	"10-20": ["세계 통계의 날 (World Statistics Day)"],
