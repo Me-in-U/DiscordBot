@@ -37,6 +37,7 @@ DISCORD_CLIENT.SPRING_AI_STYLE = "공격적"
 load_dotenv()
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 SONPANNO_GUILD_ID = int(os.getenv("SONPANNO_GUILD_ID"))
+SSAFY_GUILD_ID = int(os.getenv("SSAFY_GUILD_ID"))
 
 # 기타 변수
 SEOUL_TZ = timezone(timedelta(hours=9))  # 서울 시간대 설정 (UTC+9)
