@@ -43,12 +43,13 @@ class SlotMachineView(discord.ui.View):
         user_id: str,
         bet_amount: int,
     ) -> None:
-        super().__init__(timeout=90)
+        super().__init__(timeout=180)
         self.balance = balance
         self.guild_id = guild_id
         self.user_id = user_id
         self.bet_amount = bet_amount
         self.message: discord.Message | None = None
+        self._busy: bool = False
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         # Compare as string to match stored self.user_id type
@@ -75,12 +76,21 @@ class SlotMachineView(discord.ui.View):
         interaction: discord.Interaction,
         button: discord.ui.Button,
     ) -> None:
-        # 한 번만 스핀 가능: 스핀 후 버튼 비활성화
-        embed, _ = self._spin(interaction)
-        for child in self.children:
-            child.disabled = True
-        self.stop()
-        await interaction.response.edit_message(embed=embed, view=self)
+        # 중복 클릭/중첩 스핀 방지
+        if self._busy:
+            await interaction.response.send_message("⏳ 이전 스핀이 처리 중입니다...", ephemeral=True)
+            return
+        self._busy = True
+        try:
+            embed, _ = self._spin(interaction)
+            # 버튼은 유지하여 같은 임베드에서 계속 플레이 가능
+            if interaction.response.is_done():
+                await interaction.followup.edit_message(message_id=self.message.id, embed=embed, view=self)  # type: ignore[arg-type]
+            else:
+                await interaction.response.edit_message(embed=embed, view=self)
+            # 잔액 부족이어도 계속 같은 메시지에서 재도전 가능하게 둠
+        finally:
+            self._busy = False
 
     def _spin(self, interaction: discord.Interaction) -> tuple[discord.Embed, bool]:
         current = self.balance.get_balance(self.guild_id, self.user_id)
