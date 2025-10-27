@@ -494,7 +494,14 @@
 	"10-25": ["독도의 날", "스파게티의 날 (World Pasta Day)"],
 	"10-26": ["세계 호박의 날 (National Pumpkin Day)"],
 	"10-27": ["세계 시청각 유산의 날 (World Day for Audiovisual Heritage)"],
-	"10-28": ["국제 애니메이션의 날 (International Animation Day)"],
+	"10-28": [
+		"국제 애니메이션의 날 (International Animation Day)",
+		"1972년 에어버스 A300이 첫 비행에 성공",
+		"1986년 10.28 건국대학교 항쟁 시작",
+		"서울시민의 날",
+		"교정(矯正)의 날",
+		"최현우 마술사 생일"
+	],
 	"10-29": ["세계 뇌졸중의 날 (World Stroke Day)"],
 	"10-30": ["세계 트릭 오어 트릿의 날 (National Candy Corn Day)"],
 	"10-31": ["🎃 할로윈 (Halloween)", "세계 도시의 날 (World Cities Day)"],
