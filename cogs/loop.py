@@ -34,7 +34,7 @@ class LoopTasks(commands.Cog):
         # SSAFY 알림 태스크 시작
         self.ssafy_morning_check.start()
         self.ssafy_evening_check.start()
-        self.ssafy_lunch_check.start()
+        # self.ssafy_lunch_check.start()
         print("LoopTasks Cog : init 완료!")
 
     @commands.Cog.listener()
@@ -212,7 +212,9 @@ class LoopTasks(commands.Cog):
                 return
             channel = self.bot.get_channel(channel_id)
             if not channel:
-                print(f"SSAFY celebration 채널을 찾지 못했습니다. channel_id={channel_id}")
+                print(
+                    f"SSAFY celebration 채널을 찾지 못했습니다. channel_id={channel_id}"
+                )
                 return
             await channel.send("EDU SSAFY 출석체크는 하셨나요?")
         except Exception as e:
@@ -238,7 +240,9 @@ class LoopTasks(commands.Cog):
                 return
             channel = self.bot.get_channel(channel_id)
             if not channel:
-                print(f"SSAFY celebration 채널을 찾지 못했습니다. channel_id={channel_id}")
+                print(
+                    f"SSAFY celebration 채널을 찾지 못했습니다. channel_id={channel_id}"
+                )
                 return
             await channel.send("EDU SSAFY 퇴실체크 1분전")
         except Exception as e:
@@ -264,7 +268,9 @@ class LoopTasks(commands.Cog):
                 return
             channel = self.bot.get_channel(channel_id)
             if not channel:
-                print(f"SSAFY celebration 채널을 찾지 못했습니다. channel_id={channel_id}")
+                print(
+                    f"SSAFY celebration 채널을 찾지 못했습니다. channel_id={channel_id}"
+                )
                 return
             await channel.send("점심먹으러 갈 준비")
         except Exception as e:
