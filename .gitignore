@@ -8,3 +8,5 @@ mp3_to_text/voice.txt
 bin/ffmpeg.exe
 *.json
 *.bak
+test/converter/stt.txt
+test/converter/extract.mp3
