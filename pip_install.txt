@@ -1,2 +1,2 @@
-pip install PyNaCl discord.py[voice] python-dotenv openai-whisper google-api-python-client pytube holidays openai
+pip install PyNaCl discord.py[voice] python-dotenv openai-whisper google-api-python-client pytube holidays openai pyttsx3 discord-ext-voice-recv
 pip install -U yt-dlp
