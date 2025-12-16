@@ -4,6 +4,8 @@ import tempfile
 import wave
 import discord
 import traceback
+import time
+import numpy as np
 from discord.ext import commands
 from discord import app_commands
 import whisper
@@ -16,41 +18,82 @@ except ImportError:
     voice_recv = None
 
 
-class MultiUserSink(voice_recv.AudioSink if voice_recv else object):
-    def __init__(self):
-        self.user_files = {}  # user -> {filename, wave_file, bytes}
-        self.results = {}
+class StreamingSink(voice_recv.AudioSink if voice_recv else object):
+    def __init__(self, cog, command_user, vc):
+        self.cog = cog
+        self.command_user = command_user
+        self.vc = vc
+        self.user_buffers = {}  # user -> bytearray
+        self.user_silence_start = {}  # user -> timestamp
+        self.user_speaking = {}  # user -> bool
+
+        # VAD Constants
+        self.SILENCE_THRESHOLD = 1000  # Increased from 500 to reduce noise sensitivity
+        self.SILENCE_DURATION = 3.0  # Seconds of silence to trigger processing
+        self.MIN_SPEECH_DURATION = 1.0  # Increased from 0.5 to avoid short noises
 
     def wants_opus(self):
         return False
 
     def write(self, user, data):
-        if user not in self.user_files:
+        # Calculate RMS
+        pcm_data = np.frombuffer(data.pcm, dtype=np.int16).astype(np.float32)
+        rms = np.sqrt(np.mean(pcm_data**2))
+        now = time.time()
+
+        if user not in self.user_buffers:
+            self.user_buffers[user] = bytearray()
+            self.user_speaking[user] = False
+            self.user_silence_start[user] = now
+
+        # VAD Logic
+        if rms > self.SILENCE_THRESHOLD:
+            self.user_speaking[user] = True
+            self.user_silence_start[user] = now
+            self.user_buffers[user].extend(data.pcm)
+        else:
+            # Silence
+            if self.user_speaking[user]:
+                # Was speaking, now silent. Keep recording for a bit (buffer silence)
+                self.user_buffers[user].extend(data.pcm)
+
+                if now - self.user_silence_start[user] > self.SILENCE_DURATION:
+                    # Silence exceeded threshold -> End of sentence
+                    self.flush_user(user)
+            else:
+                # Was silent, still silent. Do nothing (or keep small buffer for context?)
+                # For simplicity, we ignore pure silence
+                pass
+
+    def flush_user(self, user):
+        buffer = self.user_buffers[user]
+        duration = len(buffer) / (48000 * 2 * 2)  # 48k, stereo, 16bit
+
+        if duration >= self.MIN_SPEECH_DURATION:
+            # Save to file
             f = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
-            f.close()  # Close handle so wave can open it
+            f.close()
 
-            wf = wave.open(f.name, "wb")
-            wf.setnchannels(2)
-            wf.setsampwidth(2)
-            wf.setframerate(48000)
+            with wave.open(f.name, "wb") as wf:
+                wf.setnchannels(2)
+                wf.setsampwidth(2)
+                wf.setframerate(48000)
+                wf.writeframes(buffer)
 
-            self.user_files[user] = {"filename": f.name, "file": wf, "bytes": 0}
-            print(f"[DEBUG] New stream for {user.name} ({user.id})")
+            print(f"[DEBUG] VAD triggered for {user.name}. Duration: {duration:.2f}s")
 
-        entry = self.user_files[user]
-        entry["file"].writeframes(data.pcm)
-        entry["bytes"] += len(data.pcm)
+            # Trigger processing
+            asyncio.run_coroutine_threadsafe(
+                self.cog.process_audio(f.name, user, self.command_user, self.vc),
+                self.cog.bot.loop,
+            )
+
+        # Reset state
+        self.user_buffers[user] = bytearray()
+        self.user_speaking[user] = False
 
     def cleanup(self):
-        if self.results:
-            return self.results
-
-        for user, entry in self.user_files.items():
-            entry["file"].close()
-            self.results[user] = entry["filename"]
-            print(f"[DEBUG] Closed stream for {user.name}. Bytes: {entry['bytes']}")
-        self.user_files = {}
-        return self.results
+        pass
 
 
 class VoiceChat(commands.Cog):
@@ -118,7 +161,7 @@ class VoiceChat(commands.Cog):
             vc = await channel.connect(cls=voice_recv.VoiceRecvClient)
 
         await interaction.response.send_message(
-            f"{channel.name}에서 대화를 시작합니다. 10초마다 STT 결과가 DM으로 전송됩니다.",
+            f"{channel.name}에서 대화를 시작합니다. 말을 멈추면 자동으로 STT 결과가 전송됩니다.",
             ephemeral=True,
         )
 
@@ -154,31 +197,13 @@ class VoiceChat(commands.Cog):
             while vc.is_connected():
                 print("[DEBUG] Starting recording cycle")
 
-                sink = MultiUserSink()
+                sink = StreamingSink(self, command_user, vc)
                 vc.listen(sink)
-                print("[DEBUG] vc.listen(sink) called")
+                print("[DEBUG] vc.listen(sink) called with VAD")
 
-                await asyncio.sleep(10)
-                print("[DEBUG] 10 seconds passed")
-
-                vc.stop_listening()
-                print("[DEBUG] vc.stop_listening() called")
-                # Wait for file to be closed/written
-                await asyncio.sleep(0.5)
-
-                # Process files
-                user_files = sink.cleanup()
-                if not user_files:
-                    print("[DEBUG] No audio recorded in this cycle.")
-
-                for speaker, filename in user_files.items():
-                    print(
-                        f"[DEBUG] Processing audio for speaker: {speaker.name}, file: {filename}"
-                    )
-                    # We pass command_user as the recipient of the DM
-                    self.bot.loop.create_task(
-                        self.process_audio(filename, speaker, command_user, vc)
-                    )
+                # Keep running until disconnected or cancelled
+                while vc.is_connected():
+                    await asyncio.sleep(1)
 
         except asyncio.CancelledError:
             print("[DEBUG] chat_loop cancelled")
@@ -207,6 +232,17 @@ class VoiceChat(commands.Cog):
             print(f"[DEBUG] Transcription result: '{text}'")
 
             if text.strip():
+                # Filter out hallucinations
+                hallucinations = [
+                    "한국어와 영어를 자연스럽게 섞어서 사용하는 대화입니다.",
+                    "MBC News",
+                    "Thank you for watching",
+                    "Subtitles by",
+                ]
+                if any(h in text for h in hallucinations):
+                    print(f"[DEBUG] Filtered hallucination: {text}")
+                    return
+
                 try:
                     await recipient.send(f"[{speaker.display_name}] STT: {text}")
                 except discord.Forbidden:
@@ -236,6 +272,8 @@ class VoiceChat(commands.Cog):
                     filepath,
                     language=None,
                     initial_prompt="한국어와 영어를 자연스럽게 섞어서 사용하는 대화입니다.",
+                    no_speech_threshold=0.6,
+                    logprob_threshold=-1.0,
                 ),
             )
         return result["text"]
