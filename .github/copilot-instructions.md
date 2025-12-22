@@ -1,46 +1,66 @@
-# Copilot guide for DiscordBot
+﻿# Copilot Instructions for DiscordBot
 
-This repo hosts a modular Discord bot built with `discord.py`. Use these pointers to hit the ground running.
+This repository hosts a modular Discord bot built with `discord.py`. Follow these instructions to understand the architecture, workflows, and conventions.
 
-## Architecture snapshot
+## Architecture Overview
 
-- Entry point: `bot.py` boots `commands.Bot`, loads every module under `cogs/`, and wires global state (`USER_MESSAGES`, Spring AI flags, `SETTING_DATA`, `PARTY_LIST`).
-- Message flow (`on_message` in `bot.py`): log message ➜ `func.youtube_summary.check_youtube_link` (offer summary button) ➜ `func.find1557.find1557` (detect “1557” text/image hits via GPT OCR) ➜ `func.spring_ai.spring_ai` (auto-reply when Spring AI mode on).
-- Background tasks live in `cogs/loop.py`: presence ticker, midnight reset + holiday/special-day announcements, weekly 1557 report, optional YouTube live checker driven by `settingData.json`.
-- Key Cogs (examples):
-  - `cogs/summarize.py` + `util/get_recent_messages.py` send today’s chat (limit 150) to GPT.
-  - `cogs/translation.py` showcases dropdown-driven translation with optional image attachments.
-  - `cogs/spring_ai.py` toggles Spring AI mode/style; the API bridge sits in `func/spring_ai.py` (per-style convoId persistence).
-  - `cogs/YoutubeCheckerCog.py` exposes a slash command to flip the live-check loop flag inside `settingData.json`.
-- External wrappers: `api/chatGPT.py` (OpenAI Responses API via prompt IDs), `api/riot.py` (Riot rank lookups), large `func/youtube_summary.py` (yt-dlp/FFmpeg download, Whisper STT fallback, GPT summary, YouTube comment summarization).
+- **Entry Point**: `bot.py` initializes `commands.Bot`, loads extensions dynamically from `cogs/`, and manages global state (`USER_MESSAGES`, `SETTING_DATA`, `PARTY_LIST`).
+- **Cogs System**:
+  - **Standard Cogs**: Single `.py` files in `cogs/` (e.g., `music.py`, `summarize.py`).
+  - **Package Cogs**: Directories in `cogs/` with `__init__.py` (e.g., `cogs/gambling/`). The `__init__.py` must expose the main Cog class.
+- **Voice & AI**:
+  - **Voice Chat**: `cogs/voice_chat.py` handles voice processing using `discord.ext.voice_recv` (audio sink), `whisper` (STT), and `pyttsx3` (TTS).
+  - **Spring AI**: `func/spring_ai.py` communicates with an external Spring backend for chat capabilities.
+  - **YouTube**: `func/youtube_summary.py` and `cogs/music.py` use `yt-dlp` for media handling.
 
-## Setup & workflows
+## Data & Configuration
 
-- Required `.env` keys: `DISCORD_TOKEN`, `SONPANNO_GUILD_ID`, `TEST_CHANNEL_ID`, `GUILD_ID`, `OPENAI_KEY`, `GOOGLE_API_KEY`, `RIOT_KEY`.
-- Dependencies: install from `pip_install.txt` (no `requirements.txt`).
-- Windows launch scripts:
-  - `_launchBot.ps1` / `_launchBot.bat`: activate `.venv` then run `python bot.py`.
-  - `_scheduler.ps1` ➜ `_autoPullAndLaunch.py`: cron-style loop doing `git stash/pull` and restarting `_launchBot.ps1` when updates arrive.
-- For media features, place `ffmpeg.exe` under `bin/`. Optional `cookies.txt` boosts yt-dlp reliability.
+- **Guild Configuration** (`channel_settings.json`):
+  - Stores guild-specific channel IDs (e.g., gambling channel, celebration channel).
+  - Managed via `util/channel_settings.py`. Always use this utility to read/write channel settings.
+- **Feature State** (`settingData.json`):
+  - Stores persistent state for specific features like Riot API data (`dailySoloRank`) or YouTube checkers.
+  - Path stored in `DISCORD_CLIENT.SETTING_DATA`.
+- **Environment**:
+  - `.env` file required. Keys: `DISCORD_TOKEN`, `OPENAI_KEY`, `GOOGLE_API_KEY`, `RIOT_KEY`, `SONPANNO_GUILD_ID`.
 
-## Conventions & extension tips
+## Key Components & Patterns
 
-- Cogs auto-load if they live in `cogs/` and expose `async def setup(bot): await bot.add_cog(...)`.
-- Slash commands use `discord.app_commands`; `bot.py` performs a global sync on startup (expect propagation delay).
-- Chat context is “today-only”: `load_recent_messages()` scans each guild channel (limit 100) and stores normalized entries in `USER_MESSAGES`; `LoopTasks.new_day_clear` resets nightly.
-- OpenAI usage pattern: call `custom_prompt_model(prompt={"id": ..., "version": ..., "variables": {...}}, image_content=...)`. Reuse prompt IDs already embedded in the repo unless product requirements change.
-- YouTube summary flow (`func/youtube_summary.py`):
-  1. Button UI asks for confirmation.
-  2. Try localized subtitles (ko → en → auto); fallback to MP3 download + Whisper transcription.
-  3. Send summary prompt and append comment digest via YouTube Data API.
-  4. Skip live/upcoming streams (`is_live_video`).
-- Spring AI auto-reply triggers only when `SPRING_AI_MODE` is true; toggled via `/ai` and `/ai성격`. Conversation IDs persist per tone.
+### 1. Gambling System (`cogs/gambling/`)
+- Implemented as a **Package Cog**.
+- `__init__.py` defines the `GamblingCommands` Cog and imports logic from sub-modules.
+- `services.py` (`balance_service`) manages user balances and transactions centrally.
+- **Pattern**: Split complex logic into separate files (`blackjack.py`, `slot_machine.py`) but expose commands through the single Cog class in `__init__.py`.
 
-## What to watch for
+### 2. Voice Processing (`cogs/voice_chat.py`)
+- Uses `StreamingSink` class inheriting from `voice_recv.AudioSink`.
+- Handles audio buffering, silence detection (VAD), and processing loop.
+- **Critical**: Ensure `voice_recv` is available. Handle audio data as PCM bytearrays.
 
-- Missing deps? cross-check `pip_install.txt` before editing README.
-- Slash command not visible immediately: global sync can take minutes; restart if schema changed.
-- Heavy jobs (YouTube, Whisper) are synchronous from the command handler—expect blocking if run often.
-- Tests under `test/` are ad-hoc scripts (e.g., `spring_ai_test.py`); there’s no pytest harness—run them manually if needed.
+### 3. Global State Management
+- `DISCORD_CLIENT.USER_MESSAGES`: Stores recent chat history for context-aware features.
+- `DISCORD_CLIENT.PARTY_LIST`: Tracks dynamic voice channels/categories.
+- Access global state via `self.bot` in Cogs.
 
-Unclear about prompt variables, new Cog scaffolding, or scheduled task patterns? Ask for specifics so we can extend these rules.
+## Developer Workflows
+
+- **Dependency Management**:
+  - Use `pip_install.txt` for dependencies.
+  - Run: `pip install -r pip_install.txt`
+- **Execution (Windows)**:
+  - Use `_launchBot.ps1` to activate the virtual environment and run the bot.
+  - `_scheduler.ps1` handles auto-updates and restarts.
+- **Testing**:
+  - Ad-hoc tests in `test/` directory (e.g., `spring_ai_test.py`).
+  - No formal unit test suite; rely on manual verification or script execution.
+
+## Coding Conventions
+
+- **Async/Await**:
+  - All I/O bound operations (API calls, database, file I/O) must be asynchronous.
+  - Use `aiohttp` for HTTP requests (see `func/spring_ai.py`).
+- **Path Handling**:
+  - Use `pathlib` or `os.path` with `BASE_DIR` (defined in `bot.py` or `util` files) to ensure cross-platform compatibility.
+- **Error Handling**:
+  - Log errors to console with tracebacks for debugging.
+  - Inform users of failures via Discord messages when appropriate.
