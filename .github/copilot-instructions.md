@@ -1,60 +1,66 @@
-# Copilot guide for DiscordBot
+﻿# Copilot Instructions for DiscordBot
 
-This repo hosts a modular Discord bot built with `discord.py`. Use these pointers to hit the ground running.
+This repository hosts a modular Discord bot built with `discord.py`. Follow these instructions to understand the architecture, workflows, and conventions.
 
-## Architecture snapshot
+## Architecture Overview
 
-- **Entry point**: `bot.py` initializes `commands.Bot`, loads extensions from `cogs/`, and manages global state (`USER_MESSAGES`, `SETTING_DATA`, `PARTY_LIST`).
+- **Entry Point**: `bot.py` initializes `commands.Bot`, loads extensions dynamically from `cogs/`, and manages global state (`USER_MESSAGES`, `SETTING_DATA`, `PARTY_LIST`).
 - **Cogs System**:
   - **Standard Cogs**: Single `.py` files in `cogs/` (e.g., `music.py`, `summarize.py`).
-  - **Package Cogs**: Directories in `cogs/` with `__init__.py` (e.g., `cogs/gambling/`). The `__init__.py` aggregates logic from sub-modules into a single Cog class.
-- **Message Flow**: `on_message` in `bot.py` logs messages -> `func.youtube_summary` (summary button) -> `func.find1557` (meme detection) -> `func.spring_ai` (auto-reply).
-- **Background Tasks**: `cogs/loop.py` handles scheduled tasks (midnight reset, presence ticker, holiday announcements).
+  - **Package Cogs**: Directories in `cogs/` with `__init__.py` (e.g., `cogs/gambling/`). The `__init__.py` must expose the main Cog class.
+- **Voice & AI**:
+  - **Voice Chat**: `cogs/voice_chat.py` handles voice processing using `discord.ext.voice_recv` (audio sink), `whisper` (STT), and `pyttsx3` (TTS).
+  - **Spring AI**: `func/spring_ai.py` communicates with an external Spring backend for chat capabilities.
+  - **YouTube**: `func/youtube_summary.py` and `cogs/music.py` use `yt-dlp` for media handling.
+
+## Data & Configuration
+
+- **Guild Configuration** (`channel_settings.json`):
+  - Stores guild-specific channel IDs (e.g., gambling channel, celebration channel).
+  - Managed via `util/channel_settings.py`. Always use this utility to read/write channel settings.
+- **Feature State** (`settingData.json`):
+  - Stores persistent state for specific features like Riot API data (`dailySoloRank`) or YouTube checkers.
+  - Path stored in `DISCORD_CLIENT.SETTING_DATA`.
+- **Environment**:
+  - `.env` file required. Keys: `DISCORD_TOKEN`, `OPENAI_KEY`, `GOOGLE_API_KEY`, `RIOT_KEY`, `SONPANNO_GUILD_ID`.
 
 ## Key Components & Patterns
 
-- **Gambling System** (`cogs/gambling/`):
-  - Implemented as a package. `__init__.py` defines the `GamblingCommands` Cog.
-  - Logic is split across files (`blackjack.py`, `slot_machine.py`) but exposed via the single Cog.
-  - Uses `services.py` for shared state/logic.
-- **Music System** (`cogs/music.py`):
-  - Monolithic Cog handling playback, queue, and UI panels.
-  - Uses `yt-dlp` for media extraction and `ffmpeg` for playback.
-- **AI Integration**:
-  - **Spring AI**: Toggles via `/ai`. Logic in `func/spring_ai.py` maintains conversation context per style.
-  - **YouTube Summary**: `func/youtube_summary.py` combines `yt-dlp` (audio), Whisper (STT), and GPT (summary).
-- **Global State**:
-  - `DISCORD_CLIENT.USER_MESSAGES`: Stores recent chat history (limit 100/channel) for context-aware AI features.
-  - `DISCORD_CLIENT.SETTING_DATA`: Path to `settingData.json` for persistent config.
+### 1. Gambling System (`cogs/gambling/`)
+- Implemented as a **Package Cog**.
+- `__init__.py` defines the `GamblingCommands` Cog and imports logic from sub-modules.
+- `services.py` (`balance_service`) manages user balances and transactions centrally.
+- **Pattern**: Split complex logic into separate files (`blackjack.py`, `slot_machine.py`) but expose commands through the single Cog class in `__init__.py`.
 
-## Setup & Workflows
+### 2. Voice Processing (`cogs/voice_chat.py`)
+- Uses `StreamingSink` class inheriting from `voice_recv.AudioSink`.
+- Handles audio buffering, silence detection (VAD), and processing loop.
+- **Critical**: Ensure `voice_recv` is available. Handle audio data as PCM bytearrays.
 
-- **Environment**:
-  - Keys in `.env`: `DISCORD_TOKEN`, `OPENAI_KEY`, `GOOGLE_API_KEY`, `RIOT_KEY`, `SONPANNO_GUILD_ID`.
-  - **Dependencies**: Use `pip_install.txt`, NOT `requirements.txt`.
+### 3. Global State Management
+- `DISCORD_CLIENT.USER_MESSAGES`: Stores recent chat history for context-aware features.
+- `DISCORD_CLIENT.PARTY_LIST`: Tracks dynamic voice channels/categories.
+- Access global state via `self.bot` in Cogs.
+
+## Developer Workflows
+
+- **Dependency Management**:
+  - Use `pip_install.txt` for dependencies.
+  - Run: `pip install -r pip_install.txt`
 - **Execution (Windows)**:
-  - `_launchBot.ps1`: Activates venv and runs `bot.py`.
-  - `_scheduler.ps1` -> `_autoPullAndLaunch.py`: Auto-update loop (git pull + restart).
+  - Use `_launchBot.ps1` to activate the virtual environment and run the bot.
+  - `_scheduler.ps1` handles auto-updates and restarts.
 - **Testing**:
-  - No formal test suite. Ad-hoc scripts in `test/` (e.g., `spring_ai_test.py`).
-  - Run tests manually: `python test/spring_ai_test.py`.
+  - Ad-hoc tests in `test/` directory (e.g., `spring_ai_test.py`).
+  - No formal unit test suite; rely on manual verification or script execution.
 
-## Development Guidelines
+## Coding Conventions
 
-- **Adding Commands**:
-  - Use `discord.app_commands` for slash commands.
-  - For new features, prefer creating a new Cog in `cogs/`.
-  - If complex, create a package in `cogs/` (like `gambling`).
-- **Data Persistence**:
-  - Use `settingData.json` for guild-specific settings (channel IDs, toggles).
-  - Use `util/channel_settings.py` helpers to read/write settings.
-- **Async/Sync**:
-  - Heavy operations (YouTube download, OpenAI calls) must not block the event loop.
-  - Ensure `await` is used for I/O bound tasks.
-
-## Common Files
-
-- `bot.py`: Main entry, Cog loader.
-- `cogs/loop.py`: Scheduled tasks.
-- `pip_install.txt`: Dependency list.
-- `settingData.json`: Configuration storage.
+- **Async/Await**:
+  - All I/O bound operations (API calls, database, file I/O) must be asynchronous.
+  - Use `aiohttp` for HTTP requests (see `func/spring_ai.py`).
+- **Path Handling**:
+  - Use `pathlib` or `os.path` with `BASE_DIR` (defined in `bot.py` or `util` files) to ensure cross-platform compatibility.
+- **Error Handling**:
+  - Log errors to console with tracebacks for debugging.
+  - Inform users of failures via Discord messages when appropriate.
