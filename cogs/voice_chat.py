@@ -58,7 +58,9 @@ class StreamingSink(voice_recv.AudioSink if voice_recv else object):
                 # Just started speaking. Prepend the pre-speech buffer
                 self.user_speaking[user] = True
                 # Prepend pre-speech buffer (chunks)
-                self.user_buffers[user].extend(b"".join(self.user_pre_speech_buffer[user]))
+                self.user_buffers[user].extend(
+                    b"".join(self.user_pre_speech_buffer[user])
+                )
                 self.user_pre_speech_buffer[user].clear()
 
             self.user_silence_start[user] = now
@@ -72,11 +74,15 @@ class StreamingSink(voice_recv.AudioSink if voice_recv else object):
                 # Check if silence exceeded threshold + post-roll duration
                 if now - self.user_silence_start[user] > self.SILENCE_DURATION:
                     # Trim tail to keep only POST_SPEECH_BUFFER_DURATION (0.2s)
-                    excess_time = (now - self.user_silence_start[user]) - self.POST_SPEECH_BUFFER_DURATION
+                    excess_time = (
+                        now - self.user_silence_start[user]
+                    ) - self.POST_SPEECH_BUFFER_DURATION
                     if excess_time > 0:
                         bytes_to_remove = int(excess_time * 48000 * 2 * 2)
                         if 0 < bytes_to_remove < len(self.user_buffers[user]):
-                            self.user_buffers[user] = self.user_buffers[user][:-bytes_to_remove]
+                            self.user_buffers[user] = self.user_buffers[user][
+                                :-bytes_to_remove
+                            ]
 
                     self.flush_user(user)
             else:
@@ -301,12 +307,21 @@ class VoiceChat(commands.Cog):
                 file_size = os.path.getsize(filepath)
                 duration = file_size / (48000 * 2 * 2)
 
-                hallucinations = ["자막", "자막 제공", "다음 영상", "한글자막 by", "감사합니다", "고맙습니다"]
+                hallucinations = [
+                    "자막",
+                    "자막 제공",
+                    "다음 영상",
+                    "한글자막 by",
+                    "감사합니다",
+                    "고맙습니다",
+                ]
                 is_short = duration < 1.2
                 has_keyword = any(h in text for h in hallucinations)
 
                 if is_short and has_keyword:
-                    print(f"[DEBUG] Filtered hallucination: {text} (Duration: {duration:.2f}s)")
+                    print(
+                        f"[DEBUG] Filtered hallucination: {text} (Duration: {duration:.2f}s)"
+                    )
                     return
 
                 # Add to queue instead of DM
@@ -350,18 +365,22 @@ class VoiceChat(commands.Cog):
                 vad_filter=True,
                 vad_parameters=dict(min_silence_duration_ms=500),
             )
-            
+
             segments_list = list(segments)
             if not segments_list:
                 return ""
 
             # 3. 결과 검증
             # segments의 no_speech_prob 평균값 사용
-            avg_no_speech_prob = sum(s.no_speech_prob for s in segments_list) / len(segments_list)
-            
+            avg_no_speech_prob = sum(s.no_speech_prob for s in segments_list) / len(
+                segments_list
+            )
+
             prob_threshold = 0.3 if info.duration < 0.7 else 0.6
             if avg_no_speech_prob > prob_threshold:
-                print(f"[DEBUG] Dropped: no_speech_prob {avg_no_speech_prob:.2f} > {prob_threshold}")
+                print(
+                    f"[DEBUG] Dropped: no_speech_prob {avg_no_speech_prob:.2f} > {prob_threshold}"
+                )
                 return ""
 
             return " ".join([segment.text for segment in segments_list])
