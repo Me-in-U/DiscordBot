@@ -31,10 +31,6 @@ class LoopTasks(commands.Cog):
         self._youtube = build("youtube", "v3", developerKey=api_key)
         self._last_live_id = None
         self.youtube_live_check.start()
-        # SSAFY 알림 태스크 시작
-        self.ssafy_morning_check.start()
-        self.ssafy_evening_check.start()
-        # self.ssafy_lunch_check.start()
         print("LoopTasks Cog : init 완료!")
 
     @commands.Cog.listener()
@@ -194,91 +190,6 @@ class LoopTasks(commands.Cog):
     @daily_lottery_task.before_loop
     async def before_daily_lottery_task(self):
         print("-------------주중 복주머니 대기중...---------------")
-        await self.bot.wait_until_ready()
-
-    # SSAFY 출석/퇴실 체크 알림
-    @tasks.loop(time=time(hour=8, minute=55, tzinfo=SEOUL_TZ))
-    async def ssafy_morning_check(self):
-        """월~금 오전 8:55 SSAFY 출석체크 안내를 'celebration' 채널에 보냅니다."""
-        now = datetime.now(SEOUL_TZ)
-        if now.weekday() > 4:  # 주말 제외
-            return
-        try:
-            from bot import SSAFY_GUILD_ID  # 지연 임포트로 순환 참조 방지
-
-            channel_id = get_channel(SSAFY_GUILD_ID, "celebration")
-            if not channel_id:
-                print("SSAFY 'celebration' 채널이 설정되어 있지 않습니다.")
-                return
-            channel = self.bot.get_channel(channel_id)
-            if not channel:
-                print(
-                    f"SSAFY celebration 채널을 찾지 못했습니다. channel_id={channel_id}"
-                )
-                return
-            await channel.send("EDU SSAFY 출석체크는 하셨나요?")
-        except Exception as e:
-            print(f"SSAFY 출석체크 알림 오류: {e}")
-
-    @ssafy_morning_check.before_loop
-    async def before_ssafy_morning_check(self):
-        print("-------------SSAFY 출석체크 알림 대기중...---------------")
-        await self.bot.wait_until_ready()
-
-    @tasks.loop(time=time(hour=17, minute=59, tzinfo=SEOUL_TZ))
-    async def ssafy_evening_check(self):
-        """월~금 오후 5:59 SSAFY 퇴실체크 안내를 'celebration' 채널에 보냅니다."""
-        now = datetime.now(SEOUL_TZ)
-        if now.weekday() > 4:  # 주말 제외
-            return
-        try:
-            from bot import SSAFY_GUILD_ID  # 지연 임포트로 순환 참조 방지
-
-            channel_id = get_channel(SSAFY_GUILD_ID, "celebration")
-            if not channel_id:
-                print("SSAFY 'celebration' 채널이 설정되어 있지 않습니다.")
-                return
-            channel = self.bot.get_channel(channel_id)
-            if not channel:
-                print(
-                    f"SSAFY celebration 채널을 찾지 못했습니다. channel_id={channel_id}"
-                )
-                return
-            await channel.send("EDU SSAFY 퇴실체크 1분전")
-        except Exception as e:
-            print(f"SSAFY 퇴실체크 알림 오류: {e}")
-
-    @ssafy_evening_check.before_loop
-    async def before_ssafy_evening_check(self):
-        print("-------------SSAFY 퇴실체크 알림 대기중...---------------")
-        await self.bot.wait_until_ready()
-
-    @tasks.loop(time=time(hour=12, minute=40, tzinfo=SEOUL_TZ))
-    async def ssafy_lunch_check(self):
-        """월~금 오후 12:40 SSAFY 점심 알림을 'celebration' 채널에 보냅니다."""
-        now = datetime.now(SEOUL_TZ)
-        if now.weekday() > 4:  # 주말 제외
-            return
-        try:
-            from bot import SSAFY_GUILD_ID  # 지연 임포트로 순환 참조 방지
-
-            channel_id = get_channel(SSAFY_GUILD_ID, "celebration")
-            if not channel_id:
-                print("SSAFY 'celebration' 채널이 설정되어 있지 않습니다.")
-                return
-            channel = self.bot.get_channel(channel_id)
-            if not channel:
-                print(
-                    f"SSAFY celebration 채널을 찾지 못했습니다. channel_id={channel_id}"
-                )
-                return
-            await channel.send("점심먹으러 갈 준비")
-        except Exception as e:
-            print(f"SSAFY 점심 알림 오류: {e}")
-
-    @ssafy_lunch_check.before_loop
-    async def before_ssafy_lunch_check(self):
-        print("-------------SSAFY 점심 알림 대기중...---------------")
         await self.bot.wait_until_ready()
 
     @tasks.loop(seconds=120)
