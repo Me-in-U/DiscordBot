@@ -189,7 +189,7 @@ class VoiceChat(commands.Cog):
             print("Whisper model loaded.")
 
     @app_commands.command(
-        name="창섭이랑대화",
+        name="대화",
         description="음성 채널에 봇을 초대하여 실시간 대화를 시작합니다.",
     )
     async def start_chat(self, interaction: discord.Interaction):
