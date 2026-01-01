@@ -20,8 +20,14 @@ def mp3_to_txt(mp3_file: str = None, txt_file: str = None):
 
     print(f"변환 시작: '{mp3_file}' -> '{txt_file}'")
 
-    # 2) Whisper 모델 로드 (tiny 모델, CPU)
-    model = whisper.load_model("tiny").to("cpu")
+    # 2) Whisper 모델 로드 (large 모델, GPU/CPU 자동 선택)
+    import torch
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    if device == "cpu":
+        print("⚠️ CUDA를 사용할 수 없어 CPU로 실행합니다. (속도가 느릴 수 있음)")
+
+    model = whisper.load_model("large-v3-turbo").to(device)
 
     # 3) MP3 → 텍스트 변환
     result = model.transcribe(mp3_file)
