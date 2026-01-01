@@ -270,7 +270,7 @@ class SchedulerCog(commands.Cog):
                 if item.get("type") == "recurring":
                     rtype = item.get("repeat_type", "?")
                     rval = item.get("repeat_value", "")
-                    type_str = f"반복({rtype})"
+                    type_str = f"반복({rtype} {rval})"
 
                 label = f"{i+1}. [{type_str}] {dt.strftime('%m-%d %H:%M')}"
                 description = (
