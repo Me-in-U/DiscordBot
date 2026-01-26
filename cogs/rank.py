@@ -9,39 +9,57 @@ from api.riot import get_rank_data
 from bot import SONPANNO_GUILD_ID, SEOUL_TZ
 
 
+from util.db import fetch_one, execute_query
+
+
 class RankCommands(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.game_name = None  # 게임 닉네임
         self.tag_line = None  # 게임 태그
         self.daily_rank_loop_enabled = False  # 일일 랭크 루프 상태
-        self.load_settings()  # 초기 설정 로드
-        # *Loop
+        # self.load_settings() calls inside cog_load
         self.update_rank_data.start()
         print("Rank Cog : init 로드 완료!")
+
+    async def cog_load(self):
+        await self.load_settings()
 
     @commands.Cog.listener()
     async def on_ready(self):
         """봇이 준비되었을 때 호출됩니다."""
         print("DISCORD_CLIENT -> RankCommands Cog : on ready!")
 
-    def load_settings(self):
-        """JSON 파일에서 초기 설정을 로드합니다."""
-        with open(self.bot.SETTING_DATA, "r", encoding="utf-8") as file:
-            settings = json.load(file)
-        self.game_name = settings["dailySoloRank"]["userData"].get("game_name", "")
-        self.tag_line = settings["dailySoloRank"]["userData"].get("tag_line", "")
-        self.daily_rank_loop_enabled = settings["dailySoloRank"].get("loop", False)
+    async def _get_full_settings(self):
+        query = (
+            "SELECT setting_value FROM setting_data WHERE setting_key = 'dailySoloRank'"
+        )
+        row = await fetch_one(query)
+        if row and row["setting_value"]:
+            val = row["setting_value"]
+            return json.loads(val) if isinstance(val, str) else val
+        return {}
 
-    def save_settings(self):
-        """현재 설정을 JSON 파일에 저장합니다."""
-        with open(self.bot.SETTING_DATA, "r", encoding="utf-8") as file:
-            settings = json.load(file)
-        settings["dailySoloRank"]["userData"]["game_name"] = self.game_name
-        settings["dailySoloRank"]["userData"]["tag_line"] = self.tag_line
-        settings["dailySoloRank"]["loop"] = self.daily_rank_loop_enabled
-        with open(self.bot.SETTING_DATA, "w", encoding="utf-8") as file:
-            json.dump(settings, file, ensure_ascii=False, indent=4)
+    async def load_settings(self):
+        """DB에서 초기 설정을 로드합니다."""
+        data = await self._get_full_settings()
+        if data:
+            self.game_name = data.get("userData", {}).get("game_name", "")
+            self.tag_line = data.get("userData", {}).get("tag_line", "")
+            self.daily_rank_loop_enabled = data.get("loop", False)
+
+    async def save_settings(self):
+        """현재 설정을 DB에 저장합니다."""
+        data = await self._get_full_settings()
+        if "userData" not in data:
+            data["userData"] = {}
+        data["userData"]["game_name"] = self.game_name
+        data["userData"]["tag_line"] = self.tag_line
+        data["loop"] = self.daily_rank_loop_enabled
+
+        query = "INSERT INTO setting_data (setting_key, setting_value) VALUES (%s, %s) ON DUPLICATE KEY UPDATE setting_value = %s"
+        json_str = json.dumps(data, ensure_ascii=False)
+        await execute_query(query, ("dailySoloRank", json_str, json_str))
 
     @tasks.loop(time=time(hour=0, minute=0, tzinfo=SEOUL_TZ))  # 매일 자정
     async def update_rank_data(self):
@@ -58,31 +76,29 @@ class RankCommands(commands.Cog):
                 )
                 today_rank_data = get_rank_data(self.game_name, self.tag_line, "solo")
 
-                # JSON 파일 로드 및 업데이트
-                with open(self.bot.SETTING_DATA, "r", encoding="utf-8") as file:
-                    settings = json.load(file)
-
-                yesterday_data = settings["dailySoloRank"]["yesterdayData"]
+                settings = await self._get_full_settings()
+                yesterday_data = settings.get("yesterdayData", {})
 
                 # 새로운 유저 확인
                 if (
-                    yesterday_data["game_name"] != today_rank_data["game_name"]
-                    or yesterday_data["tag_line"] != today_rank_data["tag_line"]
+                    yesterday_data.get("game_name") != today_rank_data["game_name"]
+                    or yesterday_data.get("tag_line") != today_rank_data["tag_line"]
                 ):
                     await target_channel.send("새로운 유저가 감지되었습니다!")
-                    settings["dailySoloRank"]["yesterdayData"] = today_rank_data
+                    settings["yesterdayData"] = today_rank_data
                     rank_update_message = self.print_rank_data(today_rank_data)
                 else:
                     # 어제 데이터를 업데이트
-                    settings["dailySoloRank"]["yesterdayData"] = today_rank_data
+                    settings["yesterdayData"] = today_rank_data
                     rank_update_message = self.print_rank_data(
                         today_rank_data, yesterday_data
                     )
                 await target_channel.send(rank_update_message)
 
-                # JSON 파일 저장
-                with open(self.bot.SETTING_DATA, "w", encoding="utf-8") as file:
-                    json.dump(settings, file, ensure_ascii=False, indent=4)
+                # DB 저장
+                query = "INSERT INTO setting_data (setting_key, setting_value) VALUES (%s, %s) ON DUPLICATE KEY UPDATE setting_value = %s"
+                json_str = json.dumps(settings, ensure_ascii=False)
+                await execute_query(query, ("dailySoloRank", json_str, json_str))
 
             except Exception as e:
                 await target_channel.send(
@@ -177,7 +193,7 @@ class RankCommands(commands.Cog):
             if status.lower() not in ["true", "false"]:
                 raise ValueError
             self.daily_rank_loop_enabled = status.lower() == "true"
-            self.save_settings()
+            await self.save_settings()
             await interaction.response.send_message(
                 f"✅ **루프 상태가 {'활성화' if self.daily_rank_loop_enabled else '비활성화'}로 변경되었습니다.**"
             )

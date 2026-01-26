@@ -10,3 +10,5 @@ bin/ffmpeg.exe
 *.bak
 test/converter/stt.txt
 test/converter/extract.mp3
+*.backup
+*.json

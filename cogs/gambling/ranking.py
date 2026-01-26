@@ -19,7 +19,7 @@ async def show_ranking(
         return
 
     guild_id = str(guild.id)
-    balances = balance.get_guild_balances(guild_id)
+    balances = await balance.get_guild_balances(guild_id)
     if not balances:
         await interaction.response.send_message(
             "💤 아직 잔액 데이터가 없습니다. /돈줘 로 시작해보세요!", ephemeral=True

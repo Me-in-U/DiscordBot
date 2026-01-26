@@ -17,19 +17,19 @@ async def grant_daily_money(
     guild_id = str(interaction.guild_id)
     user_id = str(interaction.user.id)
 
-    if not balance.can_use_daily(guild_id, user_id):
+    if not await balance.can_use_daily(guild_id, user_id):
         await interaction.response.send_message(
             "❌ 오늘은 이미 돈을 받았습니다. 내일 다시 시도해주세요!",
             ephemeral=True,
         )
         return
 
-    current = balance.get_balance(guild_id, user_id)
+    current = await balance.get_balance(guild_id, user_id)
     final_balance = current + DAILY_AMOUNT
-    balance.set_balance(guild_id, user_id, final_balance)
+    await balance.set_balance(guild_id, user_id, final_balance)
 
     today = datetime.now(SEOUL_TZ).date().isoformat()
-    balance.set_last_daily(guild_id, user_id, today)
+    await balance.set_last_daily(guild_id, user_id, today)
 
     embed = discord.Embed(
         title="💰 일일 보상",

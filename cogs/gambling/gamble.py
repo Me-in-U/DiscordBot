@@ -21,14 +21,14 @@ async def run_gamble(
         await interaction.response.send_message(BET_AMOUNT_REQUIRED, ephemeral=True)
         return
 
-    current = balance.get_balance(guild_id, user_id)
+    current = await balance.get_balance(guild_id, user_id)
     if current < bet_amount:
         await interaction.response.send_message(
             f"❌ 잔액 부족 (현재 {current:,}원)", ephemeral=True
         )
         return
 
-    balance.set_balance(guild_id, user_id, current - bet_amount)
+    await balance.set_balance(guild_id, user_id, current - bet_amount)
 
     win_chance = random.randint(30, 70)
     roll = random.randint(1, 100)
@@ -44,11 +44,11 @@ async def run_gamble(
         result_text = "💥 실패..."
         color = 0xE74C3C
 
-    after_bet = balance.get_balance(guild_id, user_id)
+    after_bet = await balance.get_balance(guild_id, user_id)
     final_balance = after_bet + prize
-    balance.set_balance(guild_id, user_id, final_balance)
-    balance.add_result(guild_id, user_id, is_win)
-    wins, losses, rate = balance.get_stats(guild_id, user_id)
+    await balance.set_balance(guild_id, user_id, final_balance)
+    await balance.add_result(guild_id, user_id, is_win)
+    wins, losses, rate = await balance.get_stats(guild_id, user_id)
 
     embed = discord.Embed(
         title="🎰 도박 결과",

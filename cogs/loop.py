@@ -15,6 +15,7 @@ from bot import (
     load_recent_messages,
 )
 from util.channel_settings import get_channels_by_purpose, get_channel
+from util.db import fetch_all, fetch_one, execute_query
 from func.find1557 import clearCount
 
 SPECIAL_DAYS_FILE = "special_days.json"
@@ -63,7 +64,7 @@ class LoopTasks(commands.Cog):
     @tasks.loop(time=time(hour=0, minute=0, tzinfo=SEOUL_TZ))  # 매일 자정
     async def new_day_clear(self):
         """매일 자정에 user_messages를 초기화하고, 기념일 및 공휴일 정보를 알림."""
-        celebration_channels = get_channels_by_purpose("celebration")
+        celebration_channels = await get_channels_by_purpose("celebration")
 
         channel_map: dict[int, discord.abc.Messageable] = {}
 
@@ -88,15 +89,14 @@ class LoopTasks(commands.Cog):
         if today in holiday_kr:
             holiday_list.append(f"🇰🇷 한국 공휴일: {holiday_kr[today]}")
 
-        # JSON 파일에서 기념일 데이터 불러오기
+        # DB에서 기념일 데이터 불러오기
         try:
-            with open(SPECIAL_DAYS_FILE, "r", encoding="utf-8") as file:
-                special_days = json.load(file)
-
-            if today_str in special_days:
-                holiday_list.extend(special_days[today_str])
+            query = "SELECT event_name FROM special_days WHERE day_key = %s"
+            rows = await fetch_all(query, (today_str,))
+            if rows:
+                holiday_list.extend([r["event_name"] for r in rows])
         except Exception as e:
-            print(f"❌ 기념일 JSON 파일을 불러오는 중 오류 발생: {e}")
+            print(f"❌ 기념일 DB 불러오는 중 오류 발생: {e}")
 
         # 메시지 출력
         message = "📢 새로운 하루가 시작됩니다."
@@ -125,20 +125,13 @@ class LoopTasks(commands.Cog):
             return
 
         # JSON 파일 로드, 비어 있거나 손상된 경우 빈 dict로
+        # DB 로드
         try:
-            with open("1557Counter.json", "r", encoding="utf-8") as f:
-                content = f.read().strip()
-                data = json.loads(content) if content else {}
-        except json.JSONDecodeError:
-            print(
-                "1557Counter.json이 비어 있거나 손상되었습니다. 빈 데이터로 초기화합니다."
-            )
-            data = {}
-        except FileNotFoundError:
-            print("1557Counter.json을 찾을 수 없습니다. 새로 생성합니다.")
-            data = {}
+            query = "SELECT user_id, count FROM counter_1557"
+            rows = await fetch_all(query)
+            data = {row["user_id"]: row["count"] for row in rows}
         except Exception as e:
-            print(f"1557Counter.json 로드 중 알 수 없는 오류: {e}")
+            print(f"1557Counter DB 로드 중 오류 발생: {e}")
             data = {}
 
         if not data:
@@ -153,54 +146,66 @@ class LoopTasks(commands.Cog):
         print(f"[{now}] 주간 1557 카운트 보고 완료.")
 
         # 카운트 초기화
-        clearCount()
-
+        await clearCount()
 
     @tasks.loop(seconds=120)
     async def youtube_live_check(self):
         """60초마다 특정 채널의 LIVE 시작 여부를 Discord에 알립니다."""
-        # 설정 파일에서 loop 활성화 여부 및 채널 ID 로드
-        with open(self.bot.SETTING_DATA, "r", encoding="utf-8") as f:
-            settings = json.load(f)
-        cfg = settings["youtubeLiveChecker"]
-        if not cfg.get("loop", False):
-            return  # loop 비활성화 상태면 동작 안 함
-
-        channel_id = cfg.get("youtubeChannelId")
+        key = "youtubeLiveChecker"
         try:
-            res = (
-                self._youtube.search()
-                .list(
-                    part="snippet",
-                    channelId=channel_id,
-                    eventType="live",
-                    type="video",
-                    maxResults=1,
-                )
-                .execute()
-            )
-            items = res.get("items", [])
-            vid = items[0]["id"]["videoId"] if items else None
-        except HttpError as e:
-            print(f"Youtube API 에러: {e}")
-            return
+            query = "SELECT setting_value FROM setting_data WHERE setting_key = %s"
+            row = await fetch_one(query, (key,))
+            if not row or not row["setting_value"]:
+                return
 
-        target = self.bot.get_channel(SONPANNO_GUILD_ID)
-        # test_target = self.bot.get_channel(TEST_CHANNEL_ID)  # 정의되지 않으면 주석 처리
-        if vid and vid != self._last_live_id:
-            await target.send(
-                f"📺 **메이플스토리 LIVE 시작!** ▶ https://youtu.be/{vid}"
+            cfg = (
+                json.loads(row["setting_value"])
+                if isinstance(row["setting_value"], str)
+                else row["setting_value"]
             )
-            self._last_live_id = vid
-            # 알림 후 loop 비활성화
-            cfg["loop"] = False
-            with open(self.bot.SETTING_DATA, "w", encoding="utf-8") as f:
-                json.dump(settings, f, ensure_ascii=False, indent=4)
-            self.youtube_live_check.stop()
-        else:
-            # if test_target:
-            #     await test_target.send("❌ 현재 LIVE가 없습니다.")
-            self._last_live_id = None
+
+            if not cfg.get("loop", False):
+                return  # loop 비활성화 상태면 동작 안 함
+
+            channel_id = cfg.get("youtubeChannelId")
+            try:
+                res = (
+                    self._youtube.search()
+                    .list(
+                        part="snippet",
+                        channelId=channel_id,
+                        eventType="live",
+                        type="video",
+                        maxResults=1,
+                    )
+                    .execute()
+                )
+                items = res.get("items", [])
+                vid = items[0]["id"]["videoId"] if items else None
+            except HttpError as e:
+                print(f"Youtube API 에러: {e}")
+                return
+
+            target = self.bot.get_channel(SONPANNO_GUILD_ID)
+
+            if vid and vid != self._last_live_id:
+                await target.send(
+                    f"📺 **메이플스토리 LIVE 시작!** ▶ https://youtu.be/{vid}"
+                )
+                self._last_live_id = vid
+                # 알림 후 loop 비활성화
+                cfg["loop"] = False
+
+                # DB 저장
+                json_str = json.dumps(cfg, ensure_ascii=False)
+                q2 = "INSERT INTO setting_data (setting_key, setting_value) VALUES (%s, %s) ON DUPLICATE KEY UPDATE setting_value = %s"
+                await execute_query(q2, (key, json_str, json_str))
+
+                self.youtube_live_check.stop()
+            else:
+                self._last_live_id = None
+        except Exception as e:
+            print(f"Loop error: {e}")
 
     @youtube_live_check.before_loop
     async def before_youtube_live_check(self):

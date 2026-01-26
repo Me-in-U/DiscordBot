@@ -178,8 +178,8 @@ class BlackjackView(discord.ui.View):
         self.just_shuffled: bool = False  # 이어하기로 새 덱을 쓴 경우 안내용
 
         # 초기 베팅 차감 및 배분
-        self._reserve_bet(self.current_bet)
-        self._initial_deal()
+        # self._reserve_bet(self.current_bet) -> start()에서 수행
+        # self._initial_deal() -> start()에서 수행
 
     # ---------- 공용 유틸 ----------
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
@@ -216,7 +216,7 @@ class BlackjackView(discord.ui.View):
             await self._finish(interaction)
             return
         await interaction.response.edit_message(
-            embed=self._build_embed(reveal_dealer=False), view=self
+            embed=await self._build_embed(reveal_dealer=False), view=self
         )
 
     @discord.ui.button(label="Stand", style=discord.ButtonStyle.secondary)
@@ -247,14 +247,14 @@ class BlackjackView(discord.ui.View):
             )
             return
         # 추가 베팅 가능 여부 확인
-        current = self.balance.get_balance(self.guild_id, self.user_id)
+        current = await self.balance.get_balance(self.guild_id, self.user_id)
         if current < self.base_bet:
             await interaction.response.send_message(
                 "❌ 잔액이 부족하여 더블다운을 할 수 없습니다.", ephemeral=True
             )
             return
         # 추가 베팅 차감 및 한 장만 받고 바로 스탠드
-        self._reserve_bet(self.base_bet)
+        await self._reserve_bet(self.base_bet)
         self.current_bet += self.base_bet
         self.can_double = False
         self.player.append(self._draw())
@@ -273,7 +273,7 @@ class BlackjackView(discord.ui.View):
             )
             return
         # 동일 배팅금액으로 남은 덱으로 새 라운드 시작
-        current = self.balance.get_balance(self.guild_id, self.user_id)
+        current = await self.balance.get_balance(self.guild_id, self.user_id)
         if current < self.base_bet:
             await interaction.response.send_message(
                 "❌ 잔액 부족으로 다시 시작할 수 없습니다.", ephemeral=True
@@ -294,7 +294,7 @@ class BlackjackView(discord.ui.View):
         self.current_bet = self.base_bet
         self.can_double = True
 
-        self._reserve_bet(self.current_bet)
+        await self._reserve_bet(self.current_bet)
         self._initial_deal()
 
         # 버튼들 상태 복구
@@ -306,7 +306,7 @@ class BlackjackView(discord.ui.View):
                     child.disabled = False
 
         await interaction.response.edit_message(
-            embed=self._build_embed(reveal_dealer=False), view=self
+            embed=await self._build_embed(reveal_dealer=False), view=self
         )
 
     # ---------- 내부 로직 ----------
@@ -317,14 +317,18 @@ class BlackjackView(discord.ui.View):
         self.player.append(self._draw())
         self.dealer.append(self._draw())
 
+    async def start(self) -> None:
+        await self._reserve_bet(self.current_bet)
+        self._initial_deal()
+
     def _draw(self) -> Card:
         if not self.deck:
             self.deck = build_deck(self.num_decks)
         return self.deck.pop()
 
-    def _reserve_bet(self, amount: int) -> None:
-        current = self.balance.get_balance(self.guild_id, self.user_id)
-        self.balance.set_balance(self.guild_id, self.user_id, current - amount)
+    async def _reserve_bet(self, amount: int) -> None:
+        current = await self.balance.get_balance(self.guild_id, self.user_id)
+        await self.balance.set_balance(self.guild_id, self.user_id, current - amount)
 
     async def _dealer_play(self) -> None:
         # 딜러는 17 이상이 되기 전까지 카드를 받는다 (Soft 17에서는 정지)
@@ -355,15 +359,14 @@ class BlackjackView(discord.ui.View):
             dealer_bj=dealer_bj,
         )
         # 승/패/무 기록 (블랙잭 전용)
-        if record in {"win", "lose", "push"}:
-            self.balance.add_blackjack_result(self.guild_id, self.user_id, record)
+        await self.balance.add_blackjack_result(self.guild_id, self.user_id, record)
 
         # 정산 반영
-        current = self.balance.get_balance(self.guild_id, self.user_id)
-        self.balance.set_balance(self.guild_id, self.user_id, current + prize)
+        current = await self.balance.get_balance(self.guild_id, self.user_id)
+        await self.balance.set_balance(self.guild_id, self.user_id, current + prize)
 
         await interaction.response.edit_message(
-            embed=self._build_embed(
+            embed=await self._build_embed(
                 reveal_dealer=True, final_outcome=outcome, prize=prize
             ),
             view=self,
@@ -401,7 +404,7 @@ class BlackjackView(discord.ui.View):
             return 0, "패배", "lose"
         return self.current_bet, "무승부", "push"
 
-    def _build_embed(
+    async def _build_embed(
         self,
         *,
         reveal_dealer: bool,
@@ -440,7 +443,7 @@ class BlackjackView(discord.ui.View):
         embed.add_field(name=d_title, value=d_hand_txt, inline=False)
 
         # 잔액/배팅/배당 안내
-        current = self.balance.get_balance(self.guild_id, self.user_id)
+        current = await self.balance.get_balance(self.guild_id, self.user_id)
         info_lines = [
             f"배팅: {self.current_bet:,}원",
             f"현재 잔액: {current:,}원",
@@ -457,7 +460,7 @@ class BlackjackView(discord.ui.View):
             net = prize - self.current_bet
             info_lines.append(f"이번 판 수령액: {prize:,}원 (순이익 {net:+,}원)")
             # 라운드 종료시에만 블랙잭 전용 전적을 보여준다
-            bj_w, bj_l, bj_p, bj_rate = self.balance.get_blackjack_stats(
+            bj_w, bj_l, bj_p, bj_rate = await self.balance.get_blackjack_stats(
                 self.guild_id, self.user_id
             )
             info_lines.append(
@@ -510,8 +513,7 @@ async def run_blackjack(
     if bet_amount <= 0:
         await interaction.response.send_message(BET_AMOUNT_REQUIRED, ephemeral=True)
         return
-
-    current = balance.get_balance(guild_id, user_id)
+    current = await balance.get_balance(guild_id, user_id)
     if current < bet_amount:
         await interaction.response.send_message(
             f"❌ 잔액 부족 (현재 {current:,}원)", ephemeral=True
@@ -525,8 +527,10 @@ async def run_blackjack(
         bet_amount=bet_amount,
         num_decks=1,
     )
+    await view.start()
+
     await interaction.response.send_message(
-        embed=view._build_embed(reveal_dealer=False), view=view
+        embed=await view._build_embed(reveal_dealer=False), view=view
     )
     view.message = await interaction.original_response()
 

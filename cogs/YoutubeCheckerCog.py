@@ -1,5 +1,5 @@
 import json
-
+from util.db import execute_query, fetch_one
 from discord import app_commands
 from discord.ext import commands
 
@@ -19,60 +19,45 @@ class YoutubeCheckerCog(commands.Cog):
         ]
     )
     async def toggle_live_checker(self, interaction, action: app_commands.Choice[str]):
-        # 1) 설정 파일 경로 로깅
-        path = self.bot.SETTING_DATA
-        print(f"[유튜브체커] SETTING_DATA path = {path}")
-
-        # 2) 파일 로드
+        key = "youtubeLiveChecker"
         try:
-            with open(path, "r", encoding="utf-8") as f:
-                settings = json.load(f)
-        except Exception as e:
-            print(f"[유튜브체커] 설정 파일 로드 실패: {e}")
+            # DB 로드
+            query = "SELECT setting_value FROM setting_data WHERE setting_key = %s"
+            row = await fetch_one(query, (key,))
+            val = {}
+            if row and row["setting_value"]:
+                val = (
+                    json.loads(row["setting_value"])
+                    if isinstance(row["setting_value"], str)
+                    else row["setting_value"]
+                )
+
+            # 값 변경
+            val["loop"] = action.value == "on"
+            status = "켜졌습니다" if action.value == "on" else "꺼졌습니다"
+
+            # DB 저장
+            json_str = json.dumps(val, ensure_ascii=False)
+            q2 = "INSERT INTO setting_data (setting_key, setting_value) VALUES (%s, %s) ON DUPLICATE KEY UPDATE setting_value = %s"
+            await execute_query(q2, (key, json_str, json_str))
+
+            # Cog 제어
+            cog = self.bot.get_cog("LoopTasks")
+            if cog:
+                loop_task = cog.youtube_live_check
+                if action.value == "on":
+                    if not loop_task.is_running():
+                        loop_task.start()
+                else:
+                    if loop_task.is_running():
+                        loop_task.stop()
+
+            # 사용자 응답
             await interaction.response.send_message(
-                "⚠ 설정 파일을 읽을 수 없습니다.", ephemeral=True
+                f"✅ YouTube 라이브 체크가 **{status}**.", ephemeral=True
             )
-            return
-
-        # 3) loop 값 변경
-        settings["youtubeLiveChecker"]["loop"] = action.value == "on"
-        status = "켜졌습니다" if action.value == "on" else "꺼졌습니다"
-
-        # 4) 변경된 settings 로깅
-        print(f"[유튜브체커] 변경 후 settings = {settings['youtubeLiveChecker']}")
-
-        # 5) 파일 저장
-        try:
-            with open(path, "w", encoding="utf-8") as f:
-                json.dump(settings, f, ensure_ascii=False, indent=4)
-            print("[유튜브체커] 설정 파일 저장 완료")
         except Exception as e:
-            print(f"[유튜브체커] 설정 파일 저장 실패: {e}")
-            await interaction.response.send_message(
-                "⚠ 설정 파일을 쓸 수 없습니다.", ephemeral=True
-            )
-            return
-
-        # 6) 루프 start/stop
-        # Cog 내에서
-        cog = self.bot.get_cog("LoopTasks")
-        loop_task = cog.youtube_live_check
-
-        if action.value == "on":
-            settings["youtubeLiveChecker"]["loop"] = True
-            if not loop_task.is_running():
-                loop_task.start()
-            msg = "✅ YouTube 라이브 체크가 **켜졌습니다**."
-        else:
-            settings["youtubeLiveChecker"]["loop"] = False
-            if loop_task.is_running():
-                loop_task.stop()
-            msg = "❌ YouTube 라이브 체크가 **꺼졌습니다**."
-
-        # 7) 사용자 응답
-        await interaction.response.send_message(
-            f"✅ YouTube 라이브 체크가 **{status}**.", ephemeral=True
-        )
+            await interaction.response.send_message(f"오류: {e}", ephemeral=True)
 
 
 async def setup(bot: commands.Bot):

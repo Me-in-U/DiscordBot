@@ -62,7 +62,7 @@ class GamblingCommands(commands.Cog):
         if guild_id is None:
             return True
 
-        allowed_channel_id = get_channel(guild_id, "gamble")
+        allowed_channel_id = await get_channel(guild_id, "gamble")
         if allowed_channel_id is None:
             return True
 

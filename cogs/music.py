@@ -18,6 +18,7 @@ from discord import Embed, Message, Object, TextChannel, app_commands
 from discord.ext import commands
 from discord.ui import Button, View, button
 from discord.utils import utcnow
+from util.db import execute_query, fetch_all
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -671,8 +672,7 @@ class MusicCog(commands.Cog):
         # 백그라운드 태스크 레퍼런스 보관(조기 GC 방지)
         self._bg_tasks: set[asyncio.Task] = set()
         # 패널 메시지 ID 저장 로드
-        self._panel_store_path = os.path.join(os.getcwd(), "panelMessageIds.json")
-        self._panel_ids: dict[str, int] = self._load_panel_ids()
+        self._panel_ids: dict[str, int] = {}
         # 음악 채널 일반 채팅 자동삭제 경고 쿨다운 관리
         self._last_warn: dict[int, float] = {}
         self._warn_cooldown = 10.0  # 초
@@ -680,32 +680,30 @@ class MusicCog(commands.Cog):
         self._purged_guilds: set[int] = set()
 
     # === 패널 ID 저장/로드 유틸 ===
-    def _load_panel_ids(self) -> dict[str, int]:
+    async def cog_load(self):
+        self._panel_ids = await self._load_panel_ids()
+
+    async def _load_panel_ids(self) -> dict[str, int]:
         try:
-            if not os.path.exists(self._panel_store_path):
-                return {}
-            with open(self._panel_store_path, "r", encoding="utf-8") as f:
-                data = _json.load(f)
-            if isinstance(data, dict):
-                # ensure int values
-                cleaned = {}
-                for k, v in data.items():
-                    try:
-                        cleaned[str(k)] = int(v)
-                    except Exception:
-                        continue
-                return cleaned
-            return {}
+            query = "SELECT guild_id, message_id FROM panel_messages"
+            rows = await fetch_all(query)
+            res = {}
+            for r in rows:
+                res[str(r["guild_id"])] = int(r["message_id"])
+            return res
         except Exception as e:
-            print(f"[WARN] 패널 ID 로드 실패: {e}")
+            print(f"[WARN] 패널 ID DB 로드 실패: {e}")
             return {}
 
-    def _save_panel_ids(self):
-        try:
-            with open(self._panel_store_path, "w", encoding="utf-8") as f:
-                _json.dump(self._panel_ids, f, ensure_ascii=False, indent=2)
-        except Exception as e:
-            print(f"[WARN] 패널 ID 저장 실패: {e}")
+    async def _set_panel_id(self, guild_id, message_id):
+        self._panel_ids[str(guild_id)] = int(message_id)
+        query = "INSERT INTO panel_messages (guild_id, message_id) VALUES (%s, %s) ON DUPLICATE KEY UPDATE message_id = %s"
+        await execute_query(query, (str(guild_id), str(message_id), str(message_id)))
+
+    async def _del_panel_id(self, guild_id):
+        self._panel_ids.pop(str(guild_id), None)
+        query = "DELETE FROM panel_messages WHERE guild_id = %s"
+        await execute_query(query, (str(guild_id),))
 
     def _spawn_bg(self, coro: "Coroutine[Any, Any, Any]") -> asyncio.Task:
         """백그라운드 태스크를 등록하고 레퍼런스를 보관한다."""
@@ -828,8 +826,7 @@ class MusicCog(commands.Cog):
                 # 새로 만든 경우 저장
                 if state.control_channel and state.control_channel.guild:
                     gid = str(state.control_channel.guild.id)
-                    self._panel_ids[gid] = state.control_msg.id
-                    self._save_panel_ids()
+                    await self._set_panel_id(gid, state.control_msg.id)
                 return
             await state.control_msg.edit(embed=embed, view=view)
         except discord.HTTPException as e:
@@ -840,8 +837,7 @@ class MusicCog(commands.Cog):
                 )
                 if state.control_channel and state.control_channel.guild:
                     gid = str(state.control_channel.guild.id)
-                    self._panel_ids[gid] = state.control_msg.id
-                    self._save_panel_ids()
+                    await self._set_panel_id(gid, state.control_msg.id)
             else:
                 print(f"[WARN] 패널 업데이트 실패: {e}")
 
@@ -1050,8 +1046,7 @@ class MusicCog(commands.Cog):
             except Exception as e:
                 print(f"[INFO] 저장된 패널 ID fetch 실패 -> fallback: {e}")
                 # 실패 시 dict에서 제거
-                self._panel_ids.pop(gid_key, None)
-                self._save_panel_ids()
+                await self._del_panel_id(gid_key)
 
         if not fetched:
             # 2) 히스토리 스캔
@@ -1062,8 +1057,7 @@ class MusicCog(commands.Cog):
                         print("[기존 임베드 발견]")
                         state.control_msg = control_msg
                         # 발견 즉시 ID 저장
-                        self._panel_ids[gid_key] = control_msg.id
-                        self._save_panel_ids()
+                        await self._set_panel_id(gid_key, control_msg.id)
                         await self._edit_msg(state, embed, state.control_view)
                         fetched = True
                         break
@@ -1077,7 +1071,7 @@ class MusicCog(commands.Cog):
             embed=embed, view=state.control_view
         )
         self._panel_ids[gid_key] = state.control_msg.id
-        self._save_panel_ids()
+        await self._set_panel_id(gid_key, state.control_msg.id)
 
     # === 부팅 직후 음악 채널 정리 ===
     async def _purge_music_channel_extras(self, guild: discord.Guild, limit: int = 500):

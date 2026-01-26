@@ -32,16 +32,16 @@ async def execute_transfer(
         )
         return
 
-    sender_balance = balance.get_balance(guild_id, sender_id)
+    sender_balance = await balance.get_balance(guild_id, sender_id)
     if sender_balance < amount:
         await interaction.response.send_message(
             f"❌ 잔액 부족 (현재 {sender_balance:,}원)", ephemeral=True
         )
         return
 
-    receiver_balance = balance.get_balance(guild_id, receiver_id)
-    balance.set_balance(guild_id, sender_id, sender_balance - amount)
-    balance.set_balance(guild_id, receiver_id, receiver_balance + amount)
+    receiver_balance = await balance.get_balance(guild_id, receiver_id)
+    await balance.set_balance(guild_id, sender_id, sender_balance - amount)
+    await balance.set_balance(guild_id, receiver_id, receiver_balance + amount)
 
     embed = discord.Embed(
         title="💸 송금 완료",

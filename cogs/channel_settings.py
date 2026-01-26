@@ -58,12 +58,12 @@ class ChannelSettings(commands.Cog):
             return
 
         guild_id = int(interaction.guild_id)
-        set_channel(guild_id, purpose.value, channel.id if channel else None)
+        await set_channel(guild_id, purpose.value, channel.id if channel else None)
 
         action = "해제" if channel is None else "설정"
         channel_text = "설정 해제" if channel is None else channel.mention
 
-        summary = get_settings_for_guild(guild_id)
+        summary = await get_settings_for_guild(guild_id)
         celebration = summary.get("celebration")
         gamble = summary.get("gamble")
 
@@ -103,7 +103,7 @@ class ChannelSettings(commands.Cog):
             )
             return
 
-        summary = get_settings_for_guild(int(interaction.guild_id))
+        summary = await get_settings_for_guild(int(interaction.guild_id))
         celebration = summary.get("celebration")
         gamble = summary.get("gamble")
 

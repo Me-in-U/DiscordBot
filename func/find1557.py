@@ -1,21 +1,7 @@
 import json
 import os
-
 from api.chatGPT import custom_prompt_model
-
-COUNTER_FILE = "1557Counter.json"
-
-
-def _load_counts():
-    if not os.path.isfile(COUNTER_FILE):
-        return {}
-    with open(COUNTER_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
-
-
-def _save_counts(data):
-    with open(COUNTER_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+from util.db import execute_query
 
 
 def count1557(ocr_text: str) -> int:
@@ -33,23 +19,24 @@ def count1557(ocr_text: str) -> int:
     return 0
 
 
-def userCount(author, count):
+async def userCount(author, count):
     """
     OCR 또는 이미지에서 1557이 검출된 작성자의 weeklyCount를 1 증가시킵니다.
     author.id (또는 author.name) 를 키로 사용합니다.
     """
-    counts = _load_counts()
-    key = str(author.id)  # 또는 author.name
-    counts.setdefault(key, 0)
-    counts[key] += count
-    _save_counts(counts)
+    key = str(author.id)
+    query = """
+    INSERT INTO counter_1557 (user_id, count) VALUES (%s, %s)
+    ON DUPLICATE KEY UPDATE count = count + %s
+    """
+    await execute_query(query, (key, count, count))
 
 
-def clearCount():
+async def clearCount():
     """
     모든 사용자의 카운트를 0으로 초기화합니다.
     """
-    _save_counts({})
+    await execute_query("DELETE FROM counter_1557")
 
 
 async def find1557(message):
@@ -61,7 +48,7 @@ async def find1557(message):
     else:
         count = count1557(message.content)
         if count > 0:
-            userCount(message.author, count)
+            await userCount(message.author, count)
             await message.channel.send(f"1557 {count}세트 발견", delete_after=2)
             print(f"1557 발견{count}개")
             return
@@ -98,6 +85,6 @@ async def find1557(message):
             count = count1557(response["imageToText"])
             if count:
                 await message.channel.send(f"1557 {count}세트 발견", delete_after=2)
-                userCount(message.author, count)
+                await userCount(message.author, count)
                 print(f"1557 {count}세트 발견")
                 return

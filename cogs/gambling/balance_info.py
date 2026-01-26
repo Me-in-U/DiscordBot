@@ -11,7 +11,7 @@ async def show_balance(
 ) -> None:
     guild_id = str(interaction.guild_id)
     user_id = str(interaction.user.id)
-    current = balance.get_balance(guild_id, user_id)
+    current = await balance.get_balance(guild_id, user_id)
 
     embed = discord.Embed(
         title="💵 잔액 조회",
