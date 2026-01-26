@@ -68,3 +68,44 @@ async def fetch_all(query, args=None):
         async with conn.cursor(aiomysql.DictCursor) as cur:
             await cur.execute(query, args)
             return await cur.fetchall()
+
+
+async def create_tables():
+    """Creates necessary tables if they do not exist."""
+    queries = [
+        """
+        CREATE TABLE IF NOT EXISTS guild (
+            guild_id VARCHAR(20) PRIMARY KEY,
+            guild_name VARCHAR(100)
+        ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS user (
+            user_id VARCHAR(20) PRIMARY KEY,
+            username VARCHAR(100)
+        ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+        """,
+    ]
+    pool = await get_db_pool()
+    async with pool.acquire() as conn:
+        async with conn.cursor() as cur:
+            for query in queries:
+                await cur.execute(query)
+
+
+async def upsert_guild(guild_id, guild_name):
+    query = """
+    INSERT INTO guild (guild_id, guild_name)
+    VALUES (%s, %s)
+    ON DUPLICATE KEY UPDATE guild_name = VALUES(guild_name)
+    """
+    await execute_query(query, (str(guild_id), guild_name))
+
+
+async def upsert_user(user_id, username):
+    query = """
+    INSERT INTO user (user_id, username)
+    VALUES (%s, %s)
+    ON DUPLICATE KEY UPDATE username = VALUES(username)
+    """
+    await execute_query(query, (str(user_id), username))

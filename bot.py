@@ -10,6 +10,7 @@ from func.find1557 import find1557
 from func.spring_ai import spring_ai
 from func.youtube_summary import check_youtube_link
 from util.get_recent_messages import get_recent_messages
+from util.db import create_tables, upsert_guild, upsert_user
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -101,6 +102,23 @@ async def load_variable():
     print("[최근 메시지, 파티] 로드 완료\n")
 
 
+async def update_db_info():
+    """Update guild and user info in DB on startup."""
+    print("---------------- DB 정보 업데이트 시작 ----------------")
+    await create_tables()
+
+    for guild in DISCORD_CLIENT.guilds:
+        await upsert_guild(guild.id, guild.name)
+
+        # 멤버 정보 업데이트
+        for member in guild.members:
+            # 유저의 닉네임(display_name) 사용
+            name = member.display_name
+            await upsert_user(member.id, name)
+
+    print("---------------- DB 정보 업데이트 완료 ----------------\n")
+
+
 #! client.event
 @DISCORD_CLIENT.event
 async def on_ready():
@@ -109,6 +127,7 @@ async def on_ready():
     """
     # 파티 목록 등 기타 초기화
     await load_variable()
+    await update_db_info()
 
     # 슬래시 커맨드 등록(동기화)
     # 로드된 Cog 정보 출력
