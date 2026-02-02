@@ -698,12 +698,12 @@ class MusicCog(commands.Cog):
     async def _set_panel_id(self, guild_id, message_id):
         self._panel_ids[str(guild_id)] = int(message_id)
         query = "INSERT INTO panel_messages (guild_id, message_id) VALUES (%s, %s) ON DUPLICATE KEY UPDATE message_id = %s"
-        await execute_query(query, (str(guild_id), str(message_id), str(message_id)))
+        await execute_query(query, (int(guild_id), int(message_id), int(message_id)))
 
     async def _del_panel_id(self, guild_id):
         self._panel_ids.pop(str(guild_id), None)
         query = "DELETE FROM panel_messages WHERE guild_id = %s"
-        await execute_query(query, (str(guild_id),))
+        await execute_query(query, (int(guild_id),))
 
     def _spawn_bg(self, coro: "Coroutine[Any, Any, Any]") -> asyncio.Task:
         """백그라운드 태스크를 등록하고 레퍼런스를 보관한다."""

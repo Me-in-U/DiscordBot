@@ -5,7 +5,7 @@ from .db import execute_query, fetch_one, fetch_all
 
 async def get_channel(guild_id: int, purpose: str) -> Optional[int]:
     query = "SELECT channel_id FROM channel_settings WHERE guild_id = %s AND channel_type = %s"
-    row = await fetch_one(query, (str(guild_id), purpose))
+    row = await fetch_one(query, (int(guild_id), purpose))
     if row:
         return int(row["channel_id"])
     return None
@@ -14,7 +14,7 @@ async def get_channel(guild_id: int, purpose: str) -> Optional[int]:
 async def set_channel(guild_id: int, purpose: str, channel_id: Optional[int]) -> None:
     if channel_id is None:
         query = "DELETE FROM channel_settings WHERE guild_id = %s AND channel_type = %s"
-        await execute_query(query, (str(guild_id), purpose))
+        await execute_query(query, (int(guild_id), purpose))
     else:
         # Check if exists to update or insert (MySQL UPSERT)
         query = """
@@ -22,7 +22,7 @@ async def set_channel(guild_id: int, purpose: str, channel_id: Optional[int]) ->
             VALUES (%s, %s, %s)
             ON DUPLICATE KEY UPDATE channel_id = VALUES(channel_id)
         """
-        await execute_query(query, (str(guild_id), purpose, str(channel_id)))
+        await execute_query(query, (int(guild_id), purpose, int(channel_id)))
 
 
 async def get_channels_by_purpose(purpose: str) -> Dict[int, int]:
@@ -39,5 +39,5 @@ async def get_channels_by_purpose(purpose: str) -> Dict[int, int]:
 
 async def get_settings_for_guild(guild_id: int) -> Dict[str, int]:
     query = "SELECT channel_type, channel_id FROM channel_settings WHERE guild_id = %s"
-    rows = await fetch_all(query, (str(guild_id),))
+    rows = await fetch_all(query, (int(guild_id),))
     return {row["channel_type"]: int(row["channel_id"]) for row in rows}

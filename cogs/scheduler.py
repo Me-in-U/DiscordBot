@@ -83,9 +83,9 @@ class SchedulerCog(commands.Cog):
                 query,
                 (
                     uid,
-                    str(interaction.guild_id),
-                    str(interaction.channel_id),
-                    str(interaction.user.id),
+                    int(interaction.guild_id),
+                    int(interaction.channel_id),
+                    int(interaction.user.id),
                     target_dt,
                     message,
                     now,
@@ -142,9 +142,9 @@ class SchedulerCog(commands.Cog):
             query,
             (
                 uid,
-                str(interaction.guild_id),
-                str(interaction.channel_id),
-                str(interaction.user.id),
+                int(interaction.guild_id),
+                int(interaction.channel_id),
+                int(interaction.user.id),
                 trigger_time,
                 message,
                 now,
@@ -158,7 +158,7 @@ class SchedulerCog(commands.Cog):
     async def list_reservations(self, interaction: discord.Interaction):
         query = "SELECT * FROM scheduled_messages WHERE guild_id = %s AND user_id = %s ORDER BY trigger_time"
         rows = await fetch_all(
-            query, (str(interaction.guild_id), str(interaction.user.id))
+            query, (int(interaction.guild_id), int(interaction.user.id))
         )
         if not rows:
             await interaction.response.send_message("📭 예약 없음", ephemeral=True)

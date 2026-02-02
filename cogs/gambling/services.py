@@ -16,7 +16,7 @@ class BalanceService:
         query = (
             "SELECT balance FROM gambling_balances WHERE guild_id = %s AND user_id = %s"
         )
-        row = await fetch_one(query, (str(guild_id), str(user_id)))
+        row = await fetch_one(query, (int(guild_id), int(user_id)))
         return row["balance"] if row else 0
 
     async def set_balance(self, guild_id: str, user_id: str, amount: int) -> None:
@@ -24,7 +24,7 @@ class BalanceService:
             INSERT INTO gambling_balances (guild_id, user_id, balance) VALUES (%s, %s, %s)
             ON DUPLICATE KEY UPDATE balance = VALUES(balance)
         """
-        await execute_query(query, (str(guild_id), str(user_id), amount))
+        await execute_query(query, (int(guild_id), int(user_id), amount))
 
     async def add_result(self, guild_id: str, user_id: str, is_win: bool) -> None:
         col = "wins" if is_win else "losses"
@@ -32,11 +32,11 @@ class BalanceService:
             INSERT INTO gambling_balances (guild_id, user_id, {col}) VALUES (%s, %s, 1)
             ON DUPLICATE KEY UPDATE {col} = {col} + 1
         """
-        await execute_query(query, (str(guild_id), str(user_id)))
+        await execute_query(query, (int(guild_id), int(user_id)))
 
     async def get_stats(self, guild_id: str, user_id: str) -> Tuple[int, int, float]:
         query = "SELECT wins, losses FROM gambling_balances WHERE guild_id = %s AND user_id = %s"
-        row = await fetch_one(query, (str(guild_id), str(user_id)))
+        row = await fetch_one(query, (int(guild_id), int(user_id)))
         wins = row["wins"] if row else 0
         losses = row["losses"] if row else 0
         total = wins + losses
@@ -45,7 +45,7 @@ class BalanceService:
 
     async def get_last_daily(self, guild_id: str, user_id: str) -> str | None:
         query = "SELECT last_daily FROM gambling_balances WHERE guild_id = %s AND user_id = %s"
-        row = await fetch_one(query, (str(guild_id), str(user_id)))
+        row = await fetch_one(query, (int(guild_id), int(user_id)))
         if row and row["last_daily"]:
             return str(row["last_daily"])
         return None
@@ -55,7 +55,7 @@ class BalanceService:
             INSERT INTO gambling_balances (guild_id, user_id, last_daily) VALUES (%s, %s, %s)
             ON DUPLICATE KEY UPDATE last_daily = VALUES(last_daily)
         """
-        await execute_query(query, (str(guild_id), str(user_id), date_str))
+        await execute_query(query, (int(guild_id), int(user_id), date_str))
 
     async def can_use_daily(self, guild_id: str, user_id: str) -> bool:
         last = await self.get_last_daily(guild_id, user_id)
@@ -67,7 +67,7 @@ class BalanceService:
     async def get_guild_balances(self, guild_id: str) -> Dict[str, dict]:
         # Needed for ranking
         query = "SELECT * FROM gambling_balances WHERE guild_id = %s"
-        rows = await fetch_all(query, (str(guild_id),))
+        rows = await fetch_all(query, (int(guild_id),))
         result = {}
         for row in rows:
             uid = row["user_id"]
@@ -97,13 +97,13 @@ class BalanceService:
             INSERT INTO gambling_balances (guild_id, user_id, {col}) VALUES (%s, %s, 1)
             ON DUPLICATE KEY UPDATE {col} = {col} + 1
         """
-        await execute_query(query, (str(guild_id), str(user_id)))
+        await execute_query(query, (int(guild_id), int(user_id)))
 
     async def get_blackjack_stats(
         self, guild_id: str, user_id: str
     ) -> Tuple[int, int, int, float]:
         query = "SELECT bj_wins, bj_losses, bj_pushes FROM gambling_balances WHERE guild_id = %s AND user_id = %s"
-        row = await fetch_one(query, (str(guild_id), str(user_id)))
+        row = await fetch_one(query, (int(guild_id), int(user_id)))
         wins = row["bj_wins"] if row else 0
         losses = row["bj_losses"] if row else 0
         pushes = row["bj_pushes"] if row else 0

@@ -24,7 +24,7 @@ async def userCount(author, count):
     OCR 또는 이미지에서 1557이 검출된 작성자의 weeklyCount를 1 증가시킵니다.
     author.id (또는 author.name) 를 키로 사용합니다.
     """
-    key = str(author.id)
+    key = int(author.id)
     query = """
     INSERT INTO counter_1557 (user_id, count) VALUES (%s, %s)
     ON DUPLICATE KEY UPDATE count = count + %s
