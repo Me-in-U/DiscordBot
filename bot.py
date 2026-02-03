@@ -105,18 +105,26 @@ async def load_variable():
 async def update_db_info():
     """Update guild and user info in DB on startup."""
     print("---------------- DB 정보 업데이트 시작 ----------------")
-    await create_tables()
+    try:
+        await create_tables()
 
-    for guild in DISCORD_CLIENT.guilds:
-        await upsert_guild(guild.id, guild.name)
+        for guild in DISCORD_CLIENT.guilds:
+            await upsert_guild(guild.id, guild.name)
 
-        # 멤버 정보 업데이트
-        for member in guild.members:
-            # 유저의 닉네임(display_name) 사용
-            name = member.display_name
-            await upsert_user(member.id, name)
+            # 멤버 정보 로드 (대규모 서버 대응)
+            if not guild.chunked:
+                await guild.chunk()
 
-    print("---------------- DB 정보 업데이트 완료 ----------------\n")
+            # 멤버 정보 업데이트
+            print(f"[{guild.name}] 멤버 {len(guild.members)}명 정보 업데이트...")
+            for member in guild.members:
+                # 유저의 닉네임(display_name) 사용
+                name = member.display_name
+                await upsert_user(member.id, name)
+
+        print("---------------- DB 정보 업데이트 완료 ----------------\n")
+    except Exception as e:
+        print(f"[DB 업데이트 오류] {e}")
 
 
 #! client.event
@@ -150,6 +158,29 @@ async def on_ready():
     weekday = ["월", "화", "수", "목", "금", "토", "일"]
     print(f"오늘은 {weekday[r]}요일입니다.")
     print(f"현재 시간: {datetime.now(SEOUL_TZ).strftime('%Y-%m-%d %H:%M:%S')}")
+
+
+@DISCORD_CLIENT.event
+async def on_member_join(member):
+    """
+    새로운 멤버 입장 시 DB 업데이트
+    """
+    try:
+        await upsert_user(member.id, member.display_name)
+    except Exception as e:
+        print(f"[on_member_join 오류] {e}")
+
+
+@DISCORD_CLIENT.event
+async def on_member_update(before, after):
+    """
+    멤버 정보 변경 시(닉네임 등) DB 업데이트
+    """
+    try:
+        if before.display_name != after.display_name:
+            await upsert_user(after.id, after.display_name)
+    except Exception as e:
+        print(f"[on_member_update 오류] {e}")
 
 
 @DISCORD_CLIENT.event

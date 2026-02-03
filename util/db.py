@@ -80,7 +80,7 @@ async def create_tables():
         ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
         """,
         """
-        CREATE TABLE IF NOT EXISTS user (
+        CREATE TABLE IF NOT EXISTS discord_user (
             user_id BIGINT UNSIGNED PRIMARY KEY,
             username VARCHAR(100)
         ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -157,7 +157,7 @@ async def create_tables():
 
             # Ensure column types are BIGINT UNSIGNED for FK compatibility with backend
             await _ensure_bigint_unsigned(conn, "guild", "guild_id")
-            await _ensure_bigint_unsigned(conn, "user", "user_id")
+            await _ensure_bigint_unsigned(conn, "discord_user", "user_id")
             await _ensure_bigint_unsigned(conn, "channel_settings", "guild_id")
             await _ensure_bigint_unsigned(conn, "channel_settings", "channel_id")
             await _ensure_bigint_unsigned(conn, "gambling_balances", "guild_id")
@@ -182,7 +182,7 @@ async def upsert_guild(guild_id, guild_name):
 
 async def upsert_user(user_id, username):
     query = """
-    INSERT INTO user (user_id, username)
+    INSERT INTO discord_user (user_id, username)
     VALUES (%s, %s)
     ON DUPLICATE KEY UPDATE username = VALUES(username)
     """
