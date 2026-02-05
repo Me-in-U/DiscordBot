@@ -146,7 +146,8 @@ async def summarize_comments_with_gpt(comments: list) -> str:
     가져온 댓글들을 1줄로 요약합니다.
     """
     comments_text = "\n".join(comments)
-    response_text = custom_prompt_model(
+    response_text = await asyncio.to_thread(
+        custom_prompt_model,
         prompt={
             "id": "pmpt_68abfada6cc8819392effc146b3a39730a3a8fd787c57011",
             "version": "8",
@@ -400,35 +401,38 @@ async def youtube_to_mp3(url: str) -> None:
     유튜브 영상을 다운로드(mp4) 한 뒤, mp3로 변환
     """
     try:
-        ffmpeg_exec = _detect_ffmpeg_executable()
-        # yt-dlp를 사용하여 오디오만 다운로드 후 mp3로 변환
-        cookies_path = os.path.join(os.getcwd(), "cookies.txt")
-        ydl_opts = {
-            "format": "bestaudio/best",
-            "outtmpl": "youtube_audio",  # 베이스 파일명
-            "postprocessors": [
-                {
-                    "key": "FFmpegExtractAudio",
-                    "preferredcodec": "mp3",
-                    "preferredquality": "320",
-                }
-            ],
-            "ffmpeg_location": (
-                os.path.dirname(ffmpeg_exec) if ffmpeg_exec != "ffmpeg" else None
-            ),
-            "http_headers": HEADERS,
-            "noplaylist": True,
-            "no_warnings": True,
-            "quiet": True,
-            "logger": YTDL_LOGGER,
-            "extractor_retries": 2,
-            "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
-            "source_address": "0.0.0.0",
-        }
-        if os.path.exists(cookies_path):
-            ydl_opts["cookiefile"] = cookies_path
-        with YoutubeDL({k: v for k, v in ydl_opts.items() if v is not None}) as ydl:
-            ydl.download([url])
+        def _download_with_ytdlp():
+            ffmpeg_exec = _detect_ffmpeg_executable()
+            # yt-dlp를 사용하여 오디오만 다운로드 후 mp3로 변환
+            cookies_path = os.path.join(os.getcwd(), "cookies.txt")
+            ydl_opts = {
+                "format": "bestaudio/best",
+                "outtmpl": "youtube_audio",  # 베이스 파일명
+                "postprocessors": [
+                    {
+                        "key": "FFmpegExtractAudio",
+                        "preferredcodec": "mp3",
+                        "preferredquality": "320",
+                    }
+                ],
+                "ffmpeg_location": (
+                    os.path.dirname(ffmpeg_exec) if ffmpeg_exec != "ffmpeg" else None
+                ),
+                "http_headers": HEADERS,
+                "noplaylist": True,
+                "no_warnings": True,
+                "quiet": True,
+                "logger": YTDL_LOGGER,
+                "extractor_retries": 2,
+                "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
+                "source_address": "0.0.0.0",
+            }
+            if os.path.exists(cookies_path):
+                ydl_opts["cookiefile"] = cookies_path
+            with YoutubeDL({k: v for k, v in ydl_opts.items() if v is not None}) as ydl:
+                ydl.download([url])
+
+        await asyncio.to_thread(_download_with_ytdlp)
 
         # 파일 쓰기 완료 후 확인
         if os.path.exists("youtube_audio.mp3"):
@@ -447,26 +451,29 @@ async def youtube_to_mp3(url: str) -> None:
             if not audio_url:
                 raise RuntimeError("오디오 스트림 URL을 찾지 못했습니다.")
             # ffmpeg로 직접 mp3 변환
-            header_str = _build_headers_str(HEADERS)
-            cmd = [
-                _detect_ffmpeg_executable(),
-                "-y",
-                "-hide_banner",
-                "-nostats",
-                "-loglevel",
-                "error",
-                "-headers",
-                header_str,
-                "-i",
-                audio_url,
-                "-vn",
-                "-acodec",
-                "libmp3lame",
-                "-b:a",
-                "320k",
-                "youtube_audio.mp3",
-            ]
-            subprocess.run(cmd, check=True)
+            def _run_ffmpeg():
+                header_str = _build_headers_str(HEADERS)
+                cmd = [
+                    _detect_ffmpeg_executable(),
+                    "-y",
+                    "-hide_banner",
+                    "-nostats",
+                    "-loglevel",
+                    "error",
+                    "-headers",
+                    header_str,
+                    "-i",
+                    audio_url,
+                    "-vn",
+                    "-acodec",
+                    "libmp3lame",
+                    "-b:a",
+                    "320k",
+                    "youtube_audio.mp3",
+                ]
+                subprocess.run(cmd, check=True)
+
+            await asyncio.to_thread(_run_ffmpeg)
             if os.path.exists("youtube_audio.mp3"):
                 print("MP3 파일이 생성되었습니다.(ffmpeg)")
             else:
@@ -482,29 +489,33 @@ async def speech_to_text(audio_path: str) -> str:
     """
     whisper로 mp3 -> 텍스트(STT) 변환
     """
-    full_path = os.path.abspath(audio_path)
+    def _run_stt():
+        full_path = os.path.abspath(audio_path)
 
-    # 파일 존재 여부 확인
-    if not os.path.exists(full_path):
-        raise FileNotFoundError(
-            f"whisper로 stt를 위한 '{full_path}' 파일을 찾을 수 없습니다."
-        )
+        # 파일 존재 여부 확인
+        if not os.path.exists(full_path):
+            raise FileNotFoundError(
+                f"whisper로 stt를 위한 '{full_path}' 파일을 찾을 수 없습니다."
+            )
 
-    print("경로", full_path)
-    model = whisper.load_model("tiny").to("cpu")
-    result = model.transcribe(full_path)
-    # print("result", result)
-    print("result:text -> \n", result["text"])
-    return result["text"]
+        print("경로", full_path)
+        model = whisper.load_model("tiny").to("cpu")
+        result = model.transcribe(full_path)
+        # print("result", result)
+        print("result:text -> \n", result["text"])
+        return result["text"]
+
+    return await asyncio.to_thread(_run_stt)
 
 
 async def summarize_text_with_gpt(youtube_text: str) -> str:
-    response_text = custom_prompt_model(
+    response_text = await asyncio.to_thread(
+        custom_prompt_model,
         prompt={
             "id": "pmpt_68ac079c0d1081958393a758f0b6f4cc01c6576daa0b0eb7",
             "version": "4",
             "variables": {"youtube_text": youtube_text},
-        }
+        },
     )
     return response_text
 
@@ -521,18 +532,20 @@ async def process_youtube_link(url: str) -> str:
             raise ValueError("영상 ID를 추출하지 못했습니다.")
 
         # 라이브 영상이면 요약 진행하지 않음
-        if is_live_video(video_id):
+        if await asyncio.to_thread(is_live_video, video_id):
             raise ValueError("라이브(또는 예정) 방송은 요약을 진행할 수 없습니다.")
 
         # ! 자막 다운로드 시도 (한글 -> 영어)
-        subtitle_path = download_youtube_subtitles(
-            url, primary_lang="ko", fallback_lang="en"
+        subtitle_path = await asyncio.to_thread(
+            download_youtube_subtitles, url, primary_lang="ko", fallback_lang="en"
         )
 
         if subtitle_path:
             print("자막이 확인되었습니다. 자막을 사용합니다.")
             # 자막 파일 내용을 읽어 텍스트로 변환
-            subtitles_text = read_subtitles_file(subtitle_path)
+            subtitles_text = await asyncio.to_thread(
+                read_subtitles_file, subtitle_path
+            )
             if not subtitles_text.strip():
                 print("자막 파일이 비어 있습니다. STT로 진행합니다.")
                 raise ValueError("자막 파일이 비어 있습니다.")
@@ -548,7 +561,9 @@ async def process_youtube_link(url: str) -> str:
         # !댓글 가져오기 및 요약 추가
         video_id = extract_video_id(url)
         if video_id:
-            comments = fetch_youtube_comments(video_id, max_comments=40)
+            comments = await asyncio.to_thread(
+                fetch_youtube_comments, video_id, max_comments=40
+            )
             if comments:
                 comments_summary = await summarize_comments_with_gpt(comments)
                 summary_text += "\n\n**[댓글 요약]**\n" + comments_summary

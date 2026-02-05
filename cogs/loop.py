@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 from datetime import datetime, time
@@ -169,19 +170,22 @@ class LoopTasks(commands.Cog):
 
             channel_id = cfg.get("youtubeChannelId")
             try:
-                res = (
-                    self._youtube.search()
-                    .list(
-                        part="snippet",
-                        channelId=channel_id,
-                        eventType="live",
-                        type="video",
-                        maxResults=1,
+                def _fetch_live_video_id():
+                    res = (
+                        self._youtube.search()
+                        .list(
+                            part="snippet",
+                            channelId=channel_id,
+                            eventType="live",
+                            type="video",
+                            maxResults=1,
+                        )
+                        .execute()
                     )
-                    .execute()
-                )
-                items = res.get("items", [])
-                vid = items[0]["id"]["videoId"] if items else None
+                    items = res.get("items", [])
+                    return items[0]["id"]["videoId"] if items else None
+
+                vid = await asyncio.to_thread(_fetch_live_video_id)
             except HttpError as e:
                 print(f"Youtube API 에러: {e}")
                 return

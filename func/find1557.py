@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 from api.chatGPT import custom_prompt_model
@@ -67,7 +68,8 @@ async def find1557(message):
             },
         ]
         try:
-            response = custom_prompt_model(
+            response = await asyncio.to_thread(
+                custom_prompt_model,
                 image_content=image_content,
                 prompt={
                     "id": "pmpt_68ad1661f57c8190b18ab6adfaa69c4d0c4d98e2fa43e7fa",

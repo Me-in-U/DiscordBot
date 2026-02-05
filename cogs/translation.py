@@ -85,7 +85,8 @@ class TranslationSelectView(discord.ui.View):
             ]
 
         try:
-            result_message = custom_prompt_model(
+            result_message = await asyncio.to_thread(
+                custom_prompt_model,
                 image_content=image_content,
                 prompt={
                     "id": "pmpt_68ac23cf2e6c81969b355cc2d2ab11600ddeea74b62910b3",
@@ -170,7 +171,8 @@ class TranslationCommands(commands.Cog):
                     },
                 ]
             try:
-                translated_message = custom_prompt_model(
+                translated_message = await asyncio.to_thread(
+                    custom_prompt_model,
                     image_content=image_content,
                     prompt={
                         "id": "pmpt_68ac23cf2e6c81969b355cc2d2ab11600ddeea74b62910b3",

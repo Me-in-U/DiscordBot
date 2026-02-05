@@ -1,3 +1,4 @@
+import asyncio
 from datetime import time
 import json
 
@@ -74,7 +75,9 @@ class RankCommands(commands.Cog):
                 await target_channel.send(
                     "📢 새로운 하루가 시작됩니다. 일일 솔랭 정보 출력"
                 )
-                today_rank_data = get_rank_data(self.game_name, self.tag_line, "solo")
+                today_rank_data = await asyncio.to_thread(
+                    get_rank_data, self.game_name, self.tag_line, "solo"
+                )
 
                 settings = await self._get_full_settings()
                 yesterday_data = settings.get("yesterdayData", {})
@@ -117,7 +120,9 @@ class RankCommands(commands.Cog):
     ):
         """솔로 랭크 정보를 출력합니다."""
         try:
-            rank_data = get_rank_data(game_name, tag_line, "solo")
+            rank_data = await asyncio.to_thread(
+                get_rank_data, game_name, tag_line, "solo"
+            )
             await interaction.response.send_message(self.print_rank_data(rank_data))
         except ValueError:
             await interaction.response.send_message(
@@ -136,7 +141,9 @@ class RankCommands(commands.Cog):
     ):
         """자유 랭크 정보를 출력합니다."""
         try:
-            rank_data = get_rank_data(game_name, tag_line, "flex")
+            rank_data = await asyncio.to_thread(
+                get_rank_data, game_name, tag_line, "flex"
+            )
             await interaction.response.send_message(self.print_rank_data(rank_data))
         except ValueError:
             await interaction.response.send_message(

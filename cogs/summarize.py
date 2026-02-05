@@ -1,3 +1,5 @@
+import asyncio
+
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -40,7 +42,8 @@ class SummarizeCommands(commands.Cog):
 
         # ChatGPT에 메시지 전달
         try:
-            response = custom_prompt_model(
+            response = await asyncio.to_thread(
+                custom_prompt_model,
                 prompt={
                     "id": "pmpt_68ac08b66784819785d89655eaaaa7470bc0cc5deddb37d9",
                     "version": "3",
@@ -50,7 +53,7 @@ class SummarizeCommands(commands.Cog):
                         ),
                         "additional_requests": request_message,
                     },
-                }
+                },
             )
         except Exception as e:
             response = f"Error: {e}"

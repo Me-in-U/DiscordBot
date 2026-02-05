@@ -83,7 +83,8 @@ class InterpretSelectView(discord.ui.View):
             ]
 
         try:
-            result_message = custom_prompt_model(
+            result_message = await asyncio.to_thread(
+                custom_prompt_model,
                 image_content=image_content,
                 prompt={
                     "id": "pmpt_68abf98a25b481938994e409ffd1ecf20db1ff235be9e7ab",
@@ -164,7 +165,8 @@ class InterpretCommands(commands.Cog):
                     }
                 ]
             try:
-                interpreted = custom_prompt_model(
+                interpreted = await asyncio.to_thread(
+                    custom_prompt_model,
                     image_content=image_content,
                     prompt={
                         "id": "pmpt_68abf98a25b481938994e409ffd1ecf20db1ff235be9e7ab",

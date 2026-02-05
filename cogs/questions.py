@@ -1,3 +1,5 @@
+import asyncio
+
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -55,7 +57,8 @@ class QuestionCommands(commands.Cog):
             ]
 
         try:
-            response = custom_prompt_model(
+            response = await asyncio.to_thread(
+                custom_prompt_model,
                 image_content=image_content,
                 prompt={
                     "id": "pmpt_68ac254fa8008190861e8f3f686556d50c6160cd272b9aca",
@@ -117,7 +120,8 @@ class QuestionCommands(commands.Cog):
             ]
 
         try:
-            response = custom_prompt_model(
+            response = await asyncio.to_thread(
+                custom_prompt_model,
                 image_content=image_content,
                 prompt={
                     "id": "pmpt_68acfa93ac6481959537fcb1853c883307d25e6bf62ef36c",
