@@ -47,9 +47,12 @@ async def find1557(message):
     if message.attachments:
         image_url = message.attachments[0].url
     else:
+        # 일반 텍스트 메시지 안에 1557 조합이 몇 세트 있는지 계산
         count = count1557(message.content)
         if count > 0:
+            # 감지된 세트 수만큼 작성자의 누적 카운트를 DB에 반영
             await userCount(message.author, count)
+            # 계산된 1557 세트 수를 현재 디스코드 채널에 바로 안내
             await message.channel.send(f"1557 {count}세트 발견", delete_after=2)
             print(f"1557 발견{count}개")
             return
@@ -82,10 +85,12 @@ async def find1557(message):
             return
         response = json.loads(response)
         print("구조화된 응답:", response)
-        # 만약 true라면
+        # 이미지 OCR 결과에 1557이 존재한다고 판별된 경우
         if response["exist"]:
+            # OCR로 추출된 문자열 기준으로 1557 세트 수를 다시 계산
             count = count1557(response["imageToText"])
             if count:
+                # 이미지에서 찾은 세트 수를 디스코드 채팅으로 알리고 DB 카운트도 올림
                 await message.channel.send(f"1557 {count}세트 발견", delete_after=2)
                 await userCount(message.author, count)
                 print(f"1557 {count}세트 발견")

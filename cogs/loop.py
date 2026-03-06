@@ -102,7 +102,7 @@ class LoopTasks(commands.Cog):
         # 메시지 출력
         message = "📢 새로운 하루가 시작됩니다."
         if holiday_list:
-            message += "\n### 기념일\n- " + "\n- ".join(holiday_list)
+            message += "\n### 기념일 및 사건\n- " + "\n- ".join(holiday_list)
 
         for channel in channel_map.values():
             await channel.send(message)
