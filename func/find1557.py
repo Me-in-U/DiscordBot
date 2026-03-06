@@ -93,5 +93,5 @@ async def find1557(message):
                 # 이미지에서 찾은 세트 수를 디스코드 채팅으로 알리고 DB 카운트도 올림
                 await message.channel.send(f"1557 {count}세트 발견", delete_after=2)
                 await userCount(message.author, count)
-                print(f"1557 {count}세트 발견")
+                # print(f"1557 {count}세트 발견")
                 return
