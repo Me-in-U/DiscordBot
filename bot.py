@@ -7,7 +7,6 @@ from discord.ext import commands
 from dotenv import load_dotenv
 
 from func.find1557 import find1557
-from func.spring_ai import spring_ai
 from func.youtube_summary import check_youtube_link
 from util.get_recent_messages import get_recent_messages
 from util.db import create_tables, upsert_guild, upsert_user
@@ -26,13 +25,6 @@ DISCORD_CLIENT.SETTING_DATA = os.path.join(
     BASE_DIR, "settingData.json"
 )  # settingData 파일 이름
 DISCORD_CLIENT.PARTY_LIST = {}
-
-# Spring AI
-DISCORD_CLIENT.CONV_ID_AGGRESSIVE = None
-DISCORD_CLIENT.CONV_ID_FRIENDLY = None
-DISCORD_CLIENT.CONV_ID = None
-DISCORD_CLIENT.SPRING_AI_MODE = False
-DISCORD_CLIENT.SPRING_AI_STYLE = "공격적"
 
 # 환경 변수를 .env 파일에서 로딩
 load_dotenv()
@@ -284,9 +276,6 @@ async def on_message(message):
     except Exception as e:
         # 1557 처리 중 예외는 전체 흐름을 막지 않도록 로깅만 수행
         print(f"[1557 처리 오류] {e}")
-
-    # !스프링 AI
-    await spring_ai(DISCORD_CLIENT, message)
 
 
 #! client.command
