@@ -53,7 +53,8 @@ async def find1557(message):
             # 감지된 세트 수만큼 작성자의 누적 카운트를 DB에 반영
             await userCount(message.author, count)
             # 계산된 1557 세트 수를 현재 디스코드 채널에 바로 안내
-            await message.channel.send(f"1557 {count}세트 발견", delete_after=2)
+            # 걸리적 거려서 제거함
+            # await message.channel.send(f"1557 {count}세트 발견", delete_after=2)
             print(f"1557 발견{count}개")
             return
 
