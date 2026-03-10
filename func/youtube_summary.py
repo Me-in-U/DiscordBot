@@ -1,11 +1,14 @@
 # def_youtube_summary.py
 import asyncio
 import glob
+import json
 import os
 import re
+from dataclasses import dataclass, field
+from urllib.parse import parse_qs, urlparse, urlunparse
 
-import discord
 import aiohttp
+import discord
 import subprocess
 import whisper
 from dotenv import load_dotenv
@@ -15,17 +18,20 @@ from yt_dlp import YoutubeDL
 
 
 # request_gpt.py 에 정의된 함수들 임포트
-from api.chatGPT import custom_prompt_model
+from api.chatGPT import custom_prompt_model, generate_text_model
 
 load_dotenv()
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 if not GOOGLE_API_KEY:
     raise EnvironmentError("GOOGLE_API_KEY 환경 변수가 설정되지 않았습니다.")
-# 유튜브 링크 정규식 (간단 예시)
-YOUTUBE_PATTERN = re.compile(
-    r"(https?://)?(www\.)?(youtube\.com|youtu\.be)/(watch\?v=|live/)?[\w\-\_]+"
+
+YOUTUBE_URL_PATTERN = re.compile(
+    r"(?P<url>(?:https?://)?(?:www\.)?(?:youtube\.com|youtu\.be)/[^\s<>()\[\]{}]+)"
 )
+YOUTUBE_HOSTS = {"youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be"}
+YOUTUBE_POST_KIND = "post"
+YOUTUBE_VIDEO_KIND = "video"
 
 # 공통 HTTP 헤더 (YouTube 우회에 도움)
 HEADERS = {
@@ -54,6 +60,17 @@ class _SilentYTDLLogger:
 YTDL_LOGGER = _SilentYTDLLogger()
 
 
+@dataclass(slots=True)
+class YouTubePostInfo:
+    post_id: str
+    url: str
+    author: str = ""
+    published_time: str = ""
+    like_count: str = ""
+    text: str = ""
+    attachment_urls: list[str] = field(default_factory=list)
+
+
 def _detect_ffmpeg_executable() -> str:
     """bin/ffmpeg.exe가 있으면 우선 사용, 없으면 시스템 PATH의 ffmpeg 사용"""
     local = os.path.join(os.getcwd(), "bin", "ffmpeg.exe")
@@ -68,7 +85,7 @@ def _build_headers_str(headers: dict) -> str:
 
 async def _fetch_stream_info(page_url: str) -> tuple[str, dict]:
     """YouTube 페이지에서 ytInitialPlayerResponse를 파싱해 최고 비트레이트 오디오 URL을 얻는다."""
-    async with aiohttp.ClientSession(headers=HEADERS) as session:
+    async with aiohttp.ClientSession(headers=HEADERS, trust_env=False) as session:
         async with session.get(page_url) as resp:
             text = await resp.text()
     m = re.search(r"ytInitialPlayerResponse\s*=\s*(\{[^;]+\});", text)
@@ -90,11 +107,215 @@ async def _fetch_stream_info(page_url: str) -> tuple[str, dict]:
     }
 
 
-# --- 영상 ID 추출 함수 추가 ---
+def _strip_wrapping_punctuation(url: str) -> str:
+    return url.strip().lstrip("<(").rstrip(">.,!?)]}\"'")
+
+
+def _ensure_https_scheme(url: str) -> str:
+    if re.match(r"^http://", url, flags=re.IGNORECASE):
+        return re.sub(r"^http://", "https://", url, count=1, flags=re.IGNORECASE)
+    if not re.match(r"^https?://", url, flags=re.IGNORECASE):
+        return f"https://{url}"
+    return url
+
+
+def _normalize_thumbnail_url(url: str) -> str:
+    if url.startswith("//"):
+        return f"https:{url}"
+    return url
+
+
+def _get_text_from_runs(data: dict | None) -> str:
+    if not isinstance(data, dict):
+        return ""
+    simple_text = data.get("simpleText")
+    if isinstance(simple_text, str):
+        return simple_text.strip()
+
+    parts = []
+    for run in data.get("runs", []):
+        text = run.get("text")
+        if isinstance(text, str):
+            parts.append(text)
+    return "".join(parts).strip()
+
+
+def _get_vote_count_text(vote_count: dict | None) -> str:
+    text = _get_text_from_runs(vote_count)
+    if text:
+        return text
+
+    accessibility = (vote_count or {}).get("accessibility", {})
+    accessibility_data = accessibility.get("accessibilityData", {})
+    return str(accessibility_data.get("label", "")).strip()
+
+
+def _find_first_key_value(data, target_key: str):
+    stack = [data]
+    while stack:
+        current = stack.pop()
+        if isinstance(current, dict):
+            if target_key in current:
+                return current[target_key]
+            stack.extend(current.values())
+        elif isinstance(current, list):
+            stack.extend(current)
+    return None
+
+
+def _extract_json_object_after(text: str, marker: str) -> dict:
+    marker_index = text.find(marker)
+    if marker_index == -1:
+        raise ValueError(f"{marker} marker not found")
+
+    start_index = text.find("{", marker_index)
+    if start_index == -1:
+        raise ValueError(f"{marker} JSON start not found")
+
+    depth = 0
+    in_string = False
+    escaped = False
+
+    for index in range(start_index, len(text)):
+        char = text[index]
+
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+            continue
+
+        if char == '"':
+            in_string = True
+        elif char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return json.loads(text[start_index : index + 1])
+
+    raise ValueError(f"{marker} JSON end not found")
+
+
+def _best_thumbnail_url(thumbnails: list[dict]) -> str:
+    valid_thumbnails = [thumb for thumb in thumbnails if thumb.get("url")]
+    if not valid_thumbnails:
+        return ""
+
+    best = max(
+        valid_thumbnails,
+        key=lambda thumb: thumb.get("width", 0) * thumb.get("height", 0),
+    )
+    return _normalize_thumbnail_url(best["url"])
+
+
+def _collect_attachment_urls(attachment) -> list[str]:
+    if not attachment:
+        return []
+
+    urls = []
+    seen = set()
+    stack = [attachment]
+
+    while stack:
+        current = stack.pop()
+        if isinstance(current, dict):
+            thumbnails = current.get("thumbnails")
+            if isinstance(thumbnails, list):
+                thumbnail_url = _best_thumbnail_url(thumbnails)
+                if thumbnail_url and thumbnail_url not in seen:
+                    seen.add(thumbnail_url)
+                    urls.append(thumbnail_url)
+            stack.extend(current.values())
+        elif isinstance(current, list):
+            stack.extend(current)
+
+    return urls
+
+
+def parse_youtube_post_html(html: str, url: str) -> YouTubePostInfo:
+    initial_data = _extract_json_object_after(html, "var ytInitialData = ")
+    post_data = _find_first_key_value(initial_data, "backstagePostRenderer")
+    if not isinstance(post_data, dict):
+        raise ValueError("유튜브 게시물 정보를 찾지 못했습니다.")
+
+    return YouTubePostInfo(
+        post_id=post_data.get("postId") or extract_post_id(url),
+        url=url,
+        author=_get_text_from_runs(post_data.get("authorText")),
+        published_time=_get_text_from_runs(post_data.get("publishedTimeText")),
+        like_count=_get_vote_count_text(post_data.get("voteCount")),
+        text=_get_text_from_runs(post_data.get("contentText")),
+        attachment_urls=_collect_attachment_urls(post_data.get("backstageAttachment")),
+    )
+
+
+def get_youtube_link_kind(url: str) -> str | None:
+    normalized_url = _ensure_https_scheme(_strip_wrapping_punctuation(url))
+    parsed = urlparse(normalized_url)
+    host = parsed.netloc.lower()
+
+    if host not in YOUTUBE_HOSTS:
+        return None
+
+    path = parsed.path or ""
+    if host == "youtu.be":
+        return YOUTUBE_VIDEO_KIND if path.strip("/") else None
+
+    if path.startswith("/post/"):
+        return YOUTUBE_POST_KIND
+
+    if path == "/watch" and parse_qs(parsed.query).get("v"):
+        return YOUTUBE_VIDEO_KIND
+
+    if path.startswith("/live/") or path.startswith("/shorts/"):
+        return YOUTUBE_VIDEO_KIND
+
+    return None
+
+
+def get_youtube_prompt_text(link_kind: str) -> str:
+    if link_kind == YOUTUBE_POST_KIND:
+        return "유튜브 게시물 요약을 진행하시겠습니까?"
+    return "유튜브 영상 요약을 진행하시겠습니까?"
+
+
+def get_youtube_summary_title(link_kind: str) -> str:
+    if link_kind == YOUTUBE_POST_KIND:
+        return "**[게시물 요약]**"
+    return "**[영상 3줄 요약]**"
+
+
 def extract_video_id(url: str) -> str:
-    match = re.search(r"(?:v=|youtu\.be/|live/)([\w\-]+)", url)
-    if match:
-        return match.group(1)
+    normalized_url = normalize_youtube_link(url)
+    parsed = urlparse(normalized_url)
+    host = parsed.netloc.lower()
+    path = parsed.path or ""
+
+    if host == "youtu.be":
+        return path.strip("/").split("/", 1)[0]
+
+    if path == "/watch":
+        return parse_qs(parsed.query).get("v", [""])[0]
+
+    if path.startswith("/live/"):
+        return path.split("/live/", 1)[1].split("/", 1)[0]
+
+    if path.startswith("/shorts/"):
+        return path.split("/shorts/", 1)[1].split("/", 1)[0]
+
+    return ""
+
+
+def extract_post_id(url: str) -> str:
+    normalized_url = _ensure_https_scheme(_strip_wrapping_punctuation(url))
+    parsed = urlparse(normalized_url)
+    path = parsed.path or ""
+    if path.startswith("/post/"):
+        return path.split("/post/", 1)[1].split("/", 1)[0]
     return ""
 
 
@@ -159,9 +380,10 @@ async def summarize_comments_with_gpt(comments: list) -> str:
 
 # --- Discord UI: 요약 진행 여부 확인용 View ---
 class YouTubeSummaryView(discord.ui.View):
-    def __init__(self, youtube_url: str):
+    def __init__(self, youtube_url: str, link_kind: str):
         super().__init__(timeout=300)
         self.youtube_url = youtube_url
+        self.link_kind = link_kind
         self.original_message: discord.Message = None  # 나중에 할당됨
 
     @discord.ui.button(label="요약하기", style=discord.ButtonStyle.primary)
@@ -183,7 +405,8 @@ class YouTubeSummaryView(discord.ui.View):
 
             # 4) 원본 메시지를 최종 결과로 교체
             await self.original_message.edit(
-                content=f"**[영상 3줄 요약]**\n{summary_result}", view=None  # 버튼 제거
+                content=f"{get_youtube_summary_title(self.link_kind)}\n{summary_result}",
+                view=None,
             )
 
         except Exception as e:
@@ -218,47 +441,58 @@ class YouTubeSummaryView(discord.ui.View):
 
 
 async def check_youtube_link(message):
-    if is_youtube_link(message.content):
-        youtube_url = extract_youtube_link(message.content)
-        if youtube_url:
-            view = YouTubeSummaryView(youtube_url)
-            # "유튜브 영상 요약을 진행하시겠습니까?" 메시지를 채널에 1개만 보냄
-            sent_msg = await message.reply(
-                content="유튜브 영상 요약을 진행하시겠습니까?", view=view
-            )
-            # View 내부에서 원본 메시지를 수정하기 위해 메시지 객체를 저장
-            view.original_message = sent_msg
+    youtube_url = extract_youtube_link(message.content)
+    if youtube_url:
+        link_kind = get_youtube_link_kind(youtube_url) or YOUTUBE_VIDEO_KIND
+        view = YouTubeSummaryView(youtube_url, link_kind)
+        sent_msg = await message.reply(
+            content=get_youtube_prompt_text(link_kind), view=view
+        )
+        view.original_message = sent_msg
 
 
 def is_youtube_link(text: str) -> bool:
     """
     메시지 텍스트에서 유튜브 링크가 있는지 간단히 판별
     """
-    return bool(YOUTUBE_PATTERN.search(text))
+    return bool(extract_youtube_link(text))
 
 
 def normalize_youtube_link(url: str) -> str:
     """
     유튜브 쇼츠 링크를 일반 유튜브 영상 링크로 변환
     """
-    if "youtube.com/shorts/" in url:
-        # 쇼츠 링크를 일반 영상 링크로 변환
-        url = url.replace("youtube.com/shorts/", "youtube.com/watch?v=")
-        print("쇼츠 -> 일반영상 변환환 주소", url)
-        return url
-    print("일반 영상 주소", url)
-    return url
+    cleaned_url = _ensure_https_scheme(_strip_wrapping_punctuation(url))
+    parsed = urlparse(cleaned_url)
+    path = parsed.path or ""
+
+    if path.startswith("/shorts/"):
+        video_id = path.split("/shorts/", 1)[1].split("/", 1)[0]
+        normalized = urlunparse(
+            (
+                parsed.scheme,
+                parsed.netloc,
+                "/watch",
+                "",
+                f"v={video_id}",
+                "",
+            )
+        )
+        print("쇼츠 -> 일반영상 변환 주소", normalized)
+        return normalized
+
+    print("일반 유튜브 주소", cleaned_url)
+    return cleaned_url
 
 
 def extract_youtube_link(link: str) -> str:
     """
     메시지(텍스트)에서 유튜브 링크를 추출
     """
-    # 쇼츠 링크를 일반 링크로 변환
-    link = normalize_youtube_link(link)
-    match = YOUTUBE_PATTERN.search(link)
-    if match:
-        return match.group()
+    for match in YOUTUBE_URL_PATTERN.finditer(link):
+        candidate_url = normalize_youtube_link(match.group("url"))
+        if get_youtube_link_kind(candidate_url):
+            return candidate_url
     return ""
 
 
@@ -520,7 +754,64 @@ async def summarize_text_with_gpt(youtube_text: str) -> str:
     return response_text
 
 
-async def process_youtube_link(url: str) -> str:
+def build_youtube_post_summary_input(post_info: YouTubePostInfo) -> str:
+    lines = [
+        f"게시물 링크: {post_info.url}",
+        f"작성자: {post_info.author or '알 수 없음'}",
+        f"게시 시각: {post_info.published_time or '알 수 없음'}",
+        f"좋아요: {post_info.like_count or '알 수 없음'}",
+        "",
+        "[본문]",
+        post_info.text or "(본문 없음)",
+    ]
+
+    if post_info.attachment_urls:
+        lines.extend(
+            [
+                "",
+                f"[첨부 이미지 수] {len(post_info.attachment_urls)}",
+                *post_info.attachment_urls[:4],
+            ]
+        )
+
+    return "\n".join(lines).strip()
+
+
+async def fetch_youtube_post(url: str) -> YouTubePostInfo:
+    normalized_url = normalize_youtube_link(url)
+    async with aiohttp.ClientSession(headers=HEADERS, trust_env=False) as session:
+        async with session.get(normalized_url) as response:
+            response.raise_for_status()
+            html = await response.text()
+
+    return await asyncio.to_thread(parse_youtube_post_html, html, normalized_url)
+
+
+async def summarize_youtube_post_with_gpt(post_info: YouTubePostInfo) -> str:
+    instructions = (
+        "당신은 유튜브 커뮤니티 게시물을 한국어로 요약하는 도우미다. "
+        "중요 사실만 추려서 `- ` 로 시작하는 불릿 3개로만 답하고, "
+        "원문에 없는 추측이나 과장을 하지 마라."
+    )
+    post_input = build_youtube_post_summary_input(post_info)
+    return await asyncio.to_thread(
+        generate_text_model,
+        post_input,
+        instructions,
+        "gpt-5-mini",
+        400,
+    )
+
+
+async def process_youtube_post_link(url: str) -> str:
+    post_info = await fetch_youtube_post(url)
+    if not post_info.text and not post_info.attachment_urls:
+        raise ValueError("게시물 본문을 추출하지 못했습니다.")
+
+    return await summarize_youtube_post_with_gpt(post_info)
+
+
+async def process_youtube_video_link(url: str) -> str:
     """
     1) 자막 다운로드 (한글 -> 영어) -> 2) (자막 없으면) MP3/STT -> 3) GPT 요약
     """
@@ -579,3 +870,10 @@ async def process_youtube_link(url: str) -> str:
             print("MP3 파일 삭제 완료.")
 
     return summary_text.strip()
+
+
+async def process_youtube_link(url: str) -> str:
+    link_kind = get_youtube_link_kind(url)
+    if link_kind == YOUTUBE_POST_KIND:
+        return await process_youtube_post_link(url)
+    return await process_youtube_video_link(url)
