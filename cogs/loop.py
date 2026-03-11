@@ -4,7 +4,6 @@ import os
 from datetime import datetime, time
 
 import discord
-import holidays
 from discord.ext import commands, tasks
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
@@ -15,11 +14,9 @@ from bot import (
     SEOUL_TZ,
     load_recent_messages,
 )
-from util.channel_settings import get_channels_by_purpose, get_channel
+from util.celebration import refresh_celebration_messages
 from util.db import fetch_all, fetch_one, execute_query
 from func.find1557 import clearCount
-
-SPECIAL_DAYS_FILE = "special_days.json"
 
 
 class LoopTasks(commands.Cog):
@@ -65,52 +62,24 @@ class LoopTasks(commands.Cog):
     @tasks.loop(time=time(hour=0, minute=0, tzinfo=SEOUL_TZ))  # 매일 자정
     async def new_day_clear(self):
         """매일 자정에 user_messages를 초기화하고, 기념일 및 공휴일 정보를 알림."""
-        celebration_channels = await get_channels_by_purpose("celebration")
+        results = await refresh_celebration_messages(self.bot)
+        success_count = 0
+        for result in results:
+            if result.status == "ok":
+                success_count += 1
+                continue
+            print(
+                f"기념일 공지 갱신 실패: guild={result.guild_id} "
+                f"channel={result.channel_id} error={result.error}"
+            )
 
-        channel_map: dict[int, discord.abc.Messageable] = {}
-
-        for guild_id, channel_id in celebration_channels.items():
-            channel = self.bot.get_channel(channel_id)
-            if channel:
-                channel_map[channel.id] = channel
-            else:
-                print(
-                    f"기념일 채널을 찾을 수 없습니다. guild={guild_id} channel={channel_id}"
-                )
-
-        if not channel_map:
-            return
-
-        today = datetime.now().date()
-        today_str = today.strftime("%m-%d")
-
-        # 한국 공휴일 정보 가져오기
-        holiday_kr = holidays.Korea()
-        holiday_list = []
-        if today in holiday_kr:
-            holiday_list.append(f"🇰🇷 한국 공휴일: {holiday_kr[today]}")
-
-        # DB에서 기념일 데이터 불러오기
-        try:
-            query = "SELECT event_name FROM special_days WHERE day_key = %s"
-            rows = await fetch_all(query, (today_str,))
-            if rows:
-                holiday_list.extend([r["event_name"] for r in rows])
-        except Exception as e:
-            print(f"❌ 기념일 DB 불러오는 중 오류 발생: {e}")
-
-        # 메시지 출력
-        message = "📢 새로운 하루가 시작됩니다."
-        if holiday_list:
-            message += "\n### 기념일 및 사건\n- " + "\n- ".join(holiday_list)
-
-        for channel in channel_map.values():
-            await channel.send(message)
+        if success_count:
+            print(f"[{datetime.now(SEOUL_TZ)}] 기념일 공지 {success_count}개 채널 갱신 완료.")
 
         # 유저 메시지 초기화 및 리로드
         self.bot.USER_MESSAGES = {}
         await load_recent_messages()
-        print(f"[{datetime.now()}] user_messages 초기화 완료.")
+        print(f"[{datetime.now(SEOUL_TZ)}] user_messages 초기화 완료.")
 
     @tasks.loop(time=time(hour=0, minute=1, tzinfo=SEOUL_TZ))  # 매일 자정 실행
     async def weekly_1557_report(self):

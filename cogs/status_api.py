@@ -1,3 +1,4 @@
+import json
 import os
 import time
 from datetime import datetime, timezone
@@ -5,17 +6,27 @@ from datetime import datetime, timezone
 from aiohttp import web
 from discord.ext import commands
 
+from util.celebration import refresh_celebration_messages
+
 
 class StatusApi(commands.Cog):
+    CELEBRATION_UPDATE_PATH = "/celebration/update"
+
     def __init__(self, bot):
         self.bot = bot
         self.start_time = time.time()
         # 기본 포트는 1557으로 설정, .env 등에서 API_PORT로 변경 가능
         self.port = int(os.getenv("API_PORT", 1557))
         # 미들웨어 등록: Host 헤더 검사
-        self.app = web.Application(middlewares=[self.host_check_middleware])
+        self.app = web.Application(
+            middlewares=[self.host_check_middleware, self.api_key_middleware]
+        )
         self.app.router.add_get("/health", self.health_handler)
         self.app.router.add_get("/", self.index_handler)
+        self.app.router.add_post(
+            self.CELEBRATION_UPDATE_PATH,
+            self.celebration_update_handler,
+        )
         self.runner = None
         self.site = None
 
@@ -32,6 +43,24 @@ class StatusApi(commands.Cog):
 
         if hostname not in allowed_domains:
             return web.Response(status=403, text="Forbidden: Invalid Host")
+
+        return await handler(request)
+
+    @web.middleware
+    async def api_key_middleware(self, request, handler):
+        if request.path != self.CELEBRATION_UPDATE_PATH:
+            return await handler(request)
+
+        expected_key = os.getenv("CELEBRATION_UPDATE_API_KEY")
+        if not expected_key:
+            return web.json_response(
+                {"error": "CELEBRATION_UPDATE_API_KEY is not configured."},
+                status=500,
+            )
+
+        provided_key = request.headers.get("X-API-Key")
+        if provided_key != expected_key:
+            return web.json_response({"error": "Unauthorized"}, status=401)
 
         return await handler(request)
 
@@ -65,6 +94,54 @@ class StatusApi(commands.Cog):
             "bot_name": str(self.bot.user) if self.bot.user else "Unknown",
         }
         return web.json_response(data)
+
+    async def celebration_update_handler(self, request):
+        """기념일 공지를 수정하거나, 없으면 새로 전송합니다."""
+        if not self.bot.is_ready():
+            return web.json_response({"error": "Bot is not ready yet."}, status=503)
+
+        payload: dict[str, object] = {}
+        raw_body = await request.text()
+        if raw_body.strip():
+            try:
+                parsed = json.loads(raw_body)
+            except json.JSONDecodeError:
+                return web.json_response({"error": "Invalid JSON body."}, status=400)
+            if not isinstance(parsed, dict):
+                return web.json_response(
+                    {"error": "JSON body must be an object."},
+                    status=400,
+                )
+            payload = parsed
+
+        guild_value = payload.get("guild_id", request.query.get("guild_id"))
+        guild_id = None
+        if guild_value not in (None, ""):
+            try:
+                guild_id = int(guild_value)
+            except (TypeError, ValueError):
+                return web.json_response(
+                    {"error": "guild_id must be an integer."},
+                    status=400,
+                )
+
+        results = await refresh_celebration_messages(self.bot, guild_id=guild_id)
+        success_count = sum(1 for result in results if result.status == "ok")
+        error_count = len(results) - success_count
+
+        data = {
+            "ok": error_count == 0,
+            "updated_count": success_count,
+            "error_count": error_count,
+            "results": [result.to_dict() for result in results],
+            "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+        }
+
+        if guild_id is not None and success_count == 0:
+            return web.json_response(data, status=404)
+
+        status_code = 200 if error_count == 0 else 207
+        return web.json_response(data, status=status_code)
 
     async def cog_load(self):
         """Cog가 로드될 때 웹 서버 시작"""
