@@ -1,6 +1,7 @@
 # ── 수정본: voice.mp3 를 voice.txt 로 변환하는 독립 스크립트 ──
 import os
-import whisper
+
+from faster_whisper import WhisperModel
 
 
 def mp3_to_txt(mp3_file: str = None, txt_file: str = None):
@@ -20,18 +21,25 @@ def mp3_to_txt(mp3_file: str = None, txt_file: str = None):
 
     print(f"변환 시작: '{mp3_file}' -> '{txt_file}'")
 
-    # 2) Whisper 모델 로드 (large 모델, GPU/CPU 자동 선택)
-    import torch
-
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    if device == "cpu":
+    # 2) faster-whisper 모델 로드 (GPU 우선, 실패 시 CPU fallback)
+    try:
+        model = WhisperModel(
+            "deepdml/faster-whisper-large-v3-turbo-ct2",
+            device="cuda",
+            compute_type="float16",
+        )
+    except Exception:
         print("⚠️ CUDA를 사용할 수 없어 CPU로 실행합니다. (속도가 느릴 수 있음)")
-
-    model = whisper.load_model("large-v3-turbo").to(device)
+        model = WhisperModel("tiny", device="cpu", compute_type="int8")
 
     # 3) MP3 → 텍스트 변환
-    result = model.transcribe(mp3_file)
-    text = result["text"].strip()
+    segments, _info = model.transcribe(
+        mp3_file,
+        language="ko",
+        condition_on_previous_text=False,
+        vad_filter=True,
+    )
+    text = " ".join(segment.text.strip() for segment in segments if segment.text)
 
     # 4) 결과를 파일로 저장
     with open(txt_file, "w", encoding="utf-8") as f:

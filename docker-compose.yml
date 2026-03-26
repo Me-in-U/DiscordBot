@@ -1,0 +1,25 @@
+name: bot
+
+services:
+  discord-bot:
+    build:
+      context: .
+    container_name: discord-bot-shin
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - BOT_DATA_DIR=/app/data
+      - API_PORT=1557
+    ports:
+      - "127.0.0.1:1557:1557"
+    volumes:
+      - E:\docker_data\discord-data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-H", "Host: host.docker.internal", "http://127.0.0.1:1557/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    labels:
+      - bot.display_name=discord bot 神

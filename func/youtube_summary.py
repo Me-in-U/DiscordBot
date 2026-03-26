@@ -10,18 +10,20 @@ from urllib.parse import parse_qs, urlparse, urlunparse
 import aiohttp
 import discord
 import subprocess
-import whisper
 from dotenv import load_dotenv
+from faster_whisper import WhisperModel
 from googleapiclient.discovery import build
 from pytube.exceptions import VideoUnavailable
 from yt_dlp import YoutubeDL
+from util.env_utils import getenv_clean, sanitize_environment
 
 
 # request_gpt.py 에 정의된 함수들 임포트
 from api.chatGPT import custom_prompt_model, generate_text_model
 
 load_dotenv()
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+sanitize_environment()
+GOOGLE_API_KEY = getenv_clean("GOOGLE_API_KEY")
 
 if not GOOGLE_API_KEY:
     raise EnvironmentError("GOOGLE_API_KEY 환경 변수가 설정되지 않았습니다.")
@@ -721,23 +723,29 @@ async def youtube_to_mp3(url: str) -> None:
 
 async def speech_to_text(audio_path: str) -> str:
     """
-    whisper로 mp3 -> 텍스트(STT) 변환
+    faster-whisper로 mp3 -> 텍스트(STT) 변환
     """
+
     def _run_stt():
         full_path = os.path.abspath(audio_path)
 
         # 파일 존재 여부 확인
         if not os.path.exists(full_path):
             raise FileNotFoundError(
-                f"whisper로 stt를 위한 '{full_path}' 파일을 찾을 수 없습니다."
+                f"STT를 위한 '{full_path}' 파일을 찾을 수 없습니다."
             )
 
         print("경로", full_path)
-        model = whisper.load_model("tiny").to("cpu")
-        result = model.transcribe(full_path)
-        # print("result", result)
-        print("result:text -> \n", result["text"])
-        return result["text"]
+        model = WhisperModel("tiny", device="cpu", compute_type="int8")
+        segments, _info = model.transcribe(
+            full_path,
+            language="ko",
+            condition_on_previous_text=False,
+            vad_filter=True,
+        )
+        text = " ".join(segment.text.strip() for segment in segments if segment.text)
+        print("result:text -> \n", text)
+        return text
 
     return await asyncio.to_thread(_run_stt)
 

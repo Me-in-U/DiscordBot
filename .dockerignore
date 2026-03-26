@@ -1,0 +1,16 @@
+.git
+.github
+.venv
+.vscode
+__pycache__/
+*/__pycache__/
+test/
+.env
+.deploy-logs/
+youtube_audio.mp3
+youtube_subtitles*.vtt
+*.pyc
+*.pyo
+*.pyd
+*.log
+data/

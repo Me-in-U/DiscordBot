@@ -3,10 +3,12 @@ import os
 
 from dotenv import load_dotenv
 from openai import OpenAI
+from util.env_utils import getenv_clean, sanitize_environment
 
 # 환경 변수를 .env 파일에서 로딩
 load_dotenv()
-OPENAI_KEY = os.getenv("OPENAI_KEY")
+sanitize_environment()
+OPENAI_KEY = getenv_clean("OPENAI_KEY")
 
 if not OPENAI_KEY:
     raise EnvironmentError("OPENAI_KEY 환경 변수가 설정되지 않았습니다.")

@@ -16,6 +16,7 @@ from bot import (
 )
 from util.celebration import refresh_celebration_messages
 from util.db import fetch_all, fetch_one, execute_query
+from util.env_utils import getenv_clean
 from func.find1557 import clearCount
 
 
@@ -25,7 +26,7 @@ class LoopTasks(commands.Cog):
         self.presence_update_task.start()
         self.new_day_clear.start()
         self.weekly_1557_report.start()
-        api_key = os.getenv("GOOGLE_API_KEY")
+        api_key = getenv_clean("GOOGLE_API_KEY")
         self._youtube = build("youtube", "v3", developerKey=api_key)
         self._last_live_id = None
         self.youtube_live_check.start()

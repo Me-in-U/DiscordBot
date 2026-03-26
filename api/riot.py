@@ -2,9 +2,11 @@ import os
 
 import requests
 from dotenv import load_dotenv
+from util.env_utils import getenv_clean, sanitize_environment
 
 load_dotenv()
-RIOT_KEY = os.getenv("RIOT_KEY")
+sanitize_environment()
+RIOT_KEY = getenv_clean("RIOT_KEY")
 
 if not RIOT_KEY:
     raise EnvironmentError("RIOT_KEY 환경 변수가 설정되지 않았습니다.")

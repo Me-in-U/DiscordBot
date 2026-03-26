@@ -7,6 +7,7 @@ from aiohttp import web
 from discord.ext import commands
 
 from util.celebration import refresh_celebration_messages
+from util.env_utils import getenv_clean
 
 
 class StatusApi(commands.Cog):
@@ -16,7 +17,7 @@ class StatusApi(commands.Cog):
         self.bot = bot
         self.start_time = time.time()
         # 기본 포트는 1557으로 설정, .env 등에서 API_PORT로 변경 가능
-        self.port = int(os.getenv("API_PORT", 1557))
+        self.port = int(getenv_clean("API_PORT", "1557"))
         # 미들웨어 등록: Host 헤더 검사
         self.app = web.Application(
             middlewares=[self.host_check_middleware, self.api_key_middleware]
@@ -37,9 +38,13 @@ class StatusApi(commands.Cog):
         host = request.host
         hostname = host.split(":")[0]  # 포트 번호 제거
 
-        allowed_domains = ["bot.ios.kr"]
-        # 로컬 테스트가 필요하다면 아래 주석을 해제하세요
-        # allowed_domains.extend(["localhost", "127.0.0.1"])
+        allowed_domains = [
+            "bot.ios.kr",
+            "localhost",
+            "127.0.0.1",
+            "host.docker.internal",
+            "discord-bot",
+        ]
 
         if hostname not in allowed_domains:
             return web.Response(status=403, text="Forbidden: Invalid Host")
@@ -51,7 +56,7 @@ class StatusApi(commands.Cog):
         if request.path != self.CELEBRATION_UPDATE_PATH:
             return await handler(request)
 
-        expected_key = os.getenv("CELEBRATION_UPDATE_API_KEY")
+        expected_key = getenv_clean("CELEBRATION_UPDATE_API_KEY")
         if not expected_key:
             return web.json_response(
                 {"error": "CELEBRATION_UPDATE_API_KEY is not configured."},

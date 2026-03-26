@@ -2,10 +2,12 @@ import os
 import aiomysql
 import asyncio
 from dotenv import load_dotenv
+from util.env_utils import getenv_clean, sanitize_environment
 
 load_dotenv()
+sanitize_environment()
 
-DB_HOST_FULL = os.getenv("DB_HOST", "localhost:3306")
+DB_HOST_FULL = getenv_clean("DB_HOST", "localhost:3306")
 if ":" in DB_HOST_FULL:
     DB_HOST, DB_PORT = DB_HOST_FULL.split(":")
     DB_PORT = int(DB_PORT)
@@ -13,9 +15,9 @@ else:
     DB_HOST = DB_HOST_FULL
     DB_PORT = 3306
 
-DB_USER = os.getenv("DB_USERNAME")
-DB_PASSWORD = os.getenv("DB_PASSWORD")
-DB_NAME = os.getenv("DB_DATABASE")
+DB_USER = getenv_clean("DB_USERNAME")
+DB_PASSWORD = getenv_clean("DB_PASSWORD")
+DB_NAME = getenv_clean("DB_DATABASE")
 
 pool = None
 

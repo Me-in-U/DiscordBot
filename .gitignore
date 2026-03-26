@@ -12,3 +12,5 @@ test/converter/stt.txt
 test/converter/extract.mp3
 *.backup
 *.json
+.deploy-logs/
+data/

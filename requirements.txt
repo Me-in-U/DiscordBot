@@ -1,0 +1,14 @@
+PyNaCl
+aiomysql
+aiohttp
+cryptography
+discord-ext-voice-recv
+discord.py[voice]
+faster-whisper
+google-api-python-client
+holidays
+openai
+python-dotenv
+pytube
+pyttsx3
+yt-dlp
