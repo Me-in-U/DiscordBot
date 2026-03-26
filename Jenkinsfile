@@ -85,7 +85,7 @@ def notifyN8n(scriptContext, String status) {
 
 pipeline {
   agent {
-    label 'controlcenter-docker'
+    label 'discordbot-docker'
   }
 
   options {

@@ -1,4 +1,4 @@
-﻿# Copilot Instructions for DiscordBot
+# Copilot Instructions for DiscordBot
 
 This repository hosts a modular Discord bot built with `discord.py`. Follow these instructions to understand the architecture, workflows, and conventions.
 
