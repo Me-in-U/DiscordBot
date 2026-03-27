@@ -11,7 +11,6 @@ from func.youtube_summary import check_youtube_link
 from util.get_recent_messages import get_recent_messages
 from util.db import create_tables, upsert_guild, upsert_user
 from util.env_utils import getenv_clean, sanitize_environment
-from util.runtime_paths import data_file_path
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -23,7 +22,6 @@ intents.voice_states = True
 DISCORD_CLIENT = commands.Bot(command_prefix="/", intents=intents)
 DISCORD_CLIENT.remove_command("help")
 DISCORD_CLIENT.USER_MESSAGES = {}  # 길드별 -> 유저별 -> 메시지 리스트
-DISCORD_CLIENT.SETTING_DATA = data_file_path("settingData.json")  # settingData 파일 이름
 DISCORD_CLIENT.PARTY_LIST = {}
 
 # 환경 변수를 .env 파일에서 로딩

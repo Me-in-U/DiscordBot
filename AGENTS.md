@@ -4,7 +4,7 @@ This repository hosts a modular Discord bot built with `discord.py`. Follow thes
 
 ## Architecture Overview
 
-- **Entry Point**: `bot.py` initializes `commands.Bot`, loads extensions dynamically from `cogs/`, and manages global state (`USER_MESSAGES`, `SETTING_DATA`, `PARTY_LIST`).
+- **Entry Point**: `bot.py` initializes `commands.Bot`, loads extensions dynamically from `cogs/`, and manages global state (`USER_MESSAGES`, `PARTY_LIST`).
 - **Cogs System**:
   - **Standard Cogs**: Single `.py` files in `cogs/` (e.g., `music.py`, `summarize.py`).
   - **Package Cogs**: Directories in `cogs/` with `__init__.py` (e.g., `cogs/gambling/`). The `__init__.py` must expose the main Cog class.
@@ -15,12 +15,12 @@ This repository hosts a modular Discord bot built with `discord.py`. Follow thes
 
 ## Data & Configuration
 
-- **Guild Configuration** (`channel_settings.json`):
+- **Guild Configuration** (`channel_settings` table):
   - Stores guild-specific channel IDs (e.g., gambling channel, celebration channel).
   - Managed via `util/channel_settings.py`. Always use this utility to read/write channel settings.
-- **Feature State** (`settingData.json`):
+- **Feature State** (`setting_data` table):
   - Stores persistent state for specific features like Riot API data (`dailySoloRank`) or YouTube checkers.
-  - Path stored in `DISCORD_CLIENT.SETTING_DATA`.
+  - Access through DB helpers in `util/db.py`, not local JSON files.
 - **Environment**:
   - `.env` file required. Keys: `DISCORD_TOKEN`, `OPENAI_KEY`, `GOOGLE_API_KEY`, `RIOT_KEY`, `SONPANNO_GUILD_ID`.
 
@@ -49,7 +49,7 @@ This repository hosts a modular Discord bot built with `discord.py`. Follow thes
   - Run: `pip install -r pip_install.txt`
 - **Execution (Windows)**:
   - Use `_launchBot.ps1` to activate the virtual environment and run the bot.
-  - `_scheduler.ps1` handles auto-updates and restarts.
+  - If PowerShell is inconvenient, `_launchBot.bat` provides the same local entry point.
 - **Testing**:
   - Ad-hoc tests in `test/` directory (e.g., `spring_ai_test.py`).
   - No formal unit test suite; rely on manual verification or script execution.

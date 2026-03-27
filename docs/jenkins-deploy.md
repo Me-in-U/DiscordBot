@@ -84,12 +84,9 @@ docker compose --env-file .env up -d --no-build discord-bot
 curl -H "Host: host.docker.internal" http://127.0.0.1:1557/health
 ```
 
-## 레거시 실행 스크립트
+## 로컬 실행 스크립트
 
-- `_autoPullAndLaunch.py`
-- `_launchBot.bat`
 - `_launchBot.ps1`
-- `_scheduler.bat`
-- `_scheduler.ps1`
+- `_launchBot.bat`
 
-위 스크립트는 수동 실행용 레거시로만 남기고 자동배포 경로에서는 사용하지 않는다.
+위 스크립트는 로컬 개발/수동 실행용 진입점이다. 자동배포 경로에서는 사용하지 않는다.

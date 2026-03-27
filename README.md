@@ -119,6 +119,8 @@ pip install -r requirements.txt
 python bot.py
 ```
 
+Windows에서는 `_launchBot.ps1` 또는 `_launchBot.bat`로 같은 로컬 실행 경로를 사용할 수 있습니다.
+
 ## 🔌 외부 API
 
 - `POST /celebration/update`

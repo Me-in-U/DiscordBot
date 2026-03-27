@@ -84,7 +84,7 @@ class LoopTasks(commands.Cog):
 
     @tasks.loop(time=time(hour=0, minute=1, tzinfo=SEOUL_TZ))  # 매일 자정 실행
     async def weekly_1557_report(self):
-        """매주 월요일 00:00에 1557Counter.json의 사용자별 카운트를 출력."""
+        """매주 월요일 00:00에 DB의 사용자별 1557 카운트를 출력."""
         now = datetime.now(SEOUL_TZ)
         r = now.weekday()
         if r != 0:  # 0=월요일
@@ -95,7 +95,6 @@ class LoopTasks(commands.Cog):
             print("대상 채널을 찾을 수 없습니다.")
             return
 
-        # JSON 파일 로드, 비어 있거나 손상된 경우 빈 dict로
         # DB 로드
         try:
             query = "SELECT user_id, count FROM counter_1557"
