@@ -20,7 +20,7 @@ ECOS_LANGUAGE: Final = "kr"
 ECOS_FORMAT: Final = "json"
 ECOS_MAX_ROWS: Final = 100
 DEFAULT_LOOKBACK_DAYS: Final = 30
-MAX_LOOKBACK_DAYS: Final = 90
+MAX_LOOKBACK_DAYS: Final = 365
 SEOUL_TZ: Final = timezone(timedelta(hours=9))
 REQUEST_TIMEOUT: Final = aiohttp.ClientTimeout(total=15)
 

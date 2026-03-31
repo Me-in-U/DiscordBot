@@ -138,7 +138,8 @@ class ExchangeRateCommands(commands.Cog):
             value=(
                 f"최근 {quote.requested_days}일 추이 "
                 f"({len(quote.chart_points)}개 발표일)\n"
-                "파란선: 실제 환율 / 주황 점선: 추세선"
+                "파란선: 실제 환율 / 주황 점선: 추세선\n"
+                "초록점: 최저 / 빨간점: 최고 / 보라점: 현재"
             ),
             inline=False,
         )
@@ -154,6 +155,9 @@ class ExchangeRateCommands(commands.Cog):
     def _render_chart(self, quote: ExchangeQuote) -> BytesIO:
         dates = [point.point_date for point in quote.chart_points]
         values = [point.rate for point in quote.chart_points]
+        min_index = min(range(len(values)), key=values.__getitem__)
+        max_index = max(range(len(values)), key=values.__getitem__)
+        current_index = len(values) - 1
         latest_value = values[-1]
 
         fig, ax = plt.subplots(figsize=(8.8, 4.8))
@@ -162,10 +166,9 @@ class ExchangeRateCommands(commands.Cog):
             values,
             color="#2563EB",
             linewidth=2.2,
-            marker="o",
-            markersize=4.5,
             label="Rate",
         )
+        ax.scatter(dates, values, color="#93C5FD", s=24, zorder=2)
 
         if len(values) >= 2:
             x_index = np.arange(len(values))
@@ -180,7 +183,30 @@ class ExchangeRateCommands(commands.Cog):
                 label="Trend",
             )
 
-        ax.scatter(dates[-1], latest_value, color="#DC2626", s=60, zorder=3)
+        ax.scatter(
+            dates[min_index],
+            values[min_index],
+            color="#10B981",
+            s=72,
+            zorder=4,
+            label="Low",
+        )
+        ax.scatter(
+            dates[max_index],
+            values[max_index],
+            color="#EF4444",
+            s=72,
+            zorder=4,
+            label="High",
+        )
+        ax.scatter(
+            dates[current_index],
+            values[current_index],
+            color="#8B5CF6",
+            s=76,
+            zorder=5,
+            label="Current",
+        )
         ax.annotate(
             self._format_rate(latest_value),
             xy=(dates[-1], latest_value),
@@ -218,14 +244,14 @@ class ExchangeRateCommands(commands.Cog):
     @app_commands.describe(
         기준통화="기준 통화 (예: 달러, USD)",
         대상통화="대상 통화 (예: 원, KRW)",
-        기간="그래프 기간 (일 단위, 기본 30일, 최대 90일)",
+        기간="그래프 기간 (일 단위, 기본 30일, 최대 365일)",
     )
     async def exchange_rate(
         self,
         interaction: discord.Interaction,
         기준통화: str,
         대상통화: str,
-        기간: app_commands.Range[int, 1, 90] | None = None,
+        기간: app_commands.Range[int, 1, 365] | None = None,
     ):
         await interaction.response.defer(thinking=True)
 
