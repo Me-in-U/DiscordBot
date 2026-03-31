@@ -7,6 +7,7 @@ discord.py[voice]
 faster-whisper
 google-api-python-client
 holidays
+matplotlib
 openai
 python-dotenv
 pytube
