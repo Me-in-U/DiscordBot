@@ -115,6 +115,18 @@ class ExchangeRateCommands(commands.Cog):
             return f"📈 최근 구간은 상승 추세입니다. ({change_rate:+.2f}%)"
         return f"📉 최근 구간은 하락 추세입니다. ({change_rate:+.2f}%)"
 
+    @staticmethod
+    def _exponential_moving_average(values: list[float], window: int) -> np.ndarray | None:
+        if len(values) < 2:
+            return None
+        series = np.array(values, dtype=float)
+        alpha = 2 / (window + 1)
+        ema = np.empty_like(series)
+        ema[0] = series[0]
+        for index in range(1, len(series)):
+            ema[index] = alpha * series[index] + (1 - alpha) * ema[index - 1]
+        return ema
+
     def _build_embed(self, quote: ExchangeQuote) -> discord.Embed:
         rate_text = (
             f"{self._currency_icon(quote.base.code)} "
@@ -138,7 +150,8 @@ class ExchangeRateCommands(commands.Cog):
             value=(
                 f"최근 {quote.requested_days}일 추이 "
                 f"({len(quote.chart_points)}개 발표일)\n"
-                "파란선: 실제 환율 / 주황 점선: 추세선\n"
+                "파란선: 실제 환율\n"
+                "초록선: EMA 7 / 주황선: EMA 30 / 분홍선: EMA 90\n"
                 "초록점: 최저 / 빨간점: 최고 / 보라점: 현재"
             ),
             inline=False,
@@ -170,17 +183,22 @@ class ExchangeRateCommands(commands.Cog):
         )
         ax.scatter(dates, values, color="#93C5FD", s=24, zorder=2)
 
-        if len(values) >= 2:
-            x_index = np.arange(len(values))
-            trend_values = np.poly1d(np.polyfit(x_index, values, 1))(x_index)
+        moving_average_specs = [
+            (7, "#10B981", "EMA 7"),
+            (30, "#F59E0B", "EMA 30"),
+            (90, "#EC4899", "EMA 90"),
+        ]
+        for window, color, label in moving_average_specs:
+            moving_average = self._exponential_moving_average(values, window)
+            if moving_average is None:
+                continue
             ax.plot(
                 dates,
-                trend_values,
-                color="#F59E0B",
+                moving_average,
+                color=color,
                 linewidth=2,
-                linestyle="--",
                 alpha=0.95,
-                label="Trend",
+                label=label,
             )
 
         ax.scatter(
