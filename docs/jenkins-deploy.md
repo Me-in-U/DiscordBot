@@ -20,6 +20,7 @@
 - Docker service name: `discord-bot`
 - 실제 컨테이너 이름: `discord-bot-shin`
 - 표시용 운영 이름: `discord bot 神`
+- 컨테이너 메모리 제한: `500m`
 
 참고:
 - Docker 컨테이너 이름은 공백과 특수 문자를 허용하지 않으므로 실제 `container_name` 은 `discord-bot-shin` 으로 사용한다.

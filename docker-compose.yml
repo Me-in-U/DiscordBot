@@ -9,6 +9,7 @@ services:
         DEPS_IMAGE: ${DEPS_IMAGE:-bot-discord-bot-deps:latest}
     container_name: discord-bot-shin
     restart: unless-stopped
+    mem_limit: 500m
     env_file:
       - .env
     environment:
