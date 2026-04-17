@@ -5,6 +5,11 @@ from discord import app_commands
 from discord.ext import commands
 
 from api.chatGPT import custom_prompt_model
+from func.youtube_summary import (
+    find_latest_youtube_link_in_channel,
+    get_youtube_summary_title,
+    process_youtube_link,
+)
 from util.get_recent_messages import get_recent_messages
 
 
@@ -18,11 +23,11 @@ class SummarizeCommands(commands.Cog):
         """봇이 준비되었을 때 호출됩니다."""
         print("DISCORD_CLIENT -> SummarizeCommands Cog : on ready!")
 
-    @app_commands.command(name="요약", description="채팅 내용을 요약합니다.")
+    @app_commands.command(name="대화요약", description="최근 채팅 내용을 요약합니다.")
     @app_commands.describe(
         추가_요청="추가로 원하는 요약 사항이 있으면 입력하세요. (선택)"
     )
-    async def summary(
+    async def conversation_summary(
         self, interaction: discord.Interaction, 추가_요청: str | None = None
     ):
         """
@@ -61,6 +66,37 @@ class SummarizeCommands(commands.Cog):
         # 응답 출력
         sent_msg = await interaction.original_response()
         await sent_msg.edit(content=response)
+
+    @app_commands.command(
+        name="요약",
+        description="현재 채널의 가장 최근 유튜브 링크를 찾아 바로 요약합니다.",
+    )
+    async def youtube_summary(self, interaction: discord.Interaction):
+        await interaction.response.defer(thinking=True)
+
+        if interaction.channel is None:
+            await interaction.edit_original_response(
+                content="**현재 채널 정보를 확인할 수 없습니다.**"
+            )
+            return
+
+        latest_link = await find_latest_youtube_link_in_channel(interaction.channel)
+        if not latest_link:
+            await interaction.edit_original_response(
+                content="**이 채널에서 최근 유튜브 링크를 찾지 못했습니다.**"
+            )
+            return
+
+        youtube_url, link_kind = latest_link
+        try:
+            summary_result = await process_youtube_link(youtube_url)
+        except Exception as e:
+            await interaction.edit_original_response(content=f"오류가 발생했습니다: {e}")
+            return
+
+        await interaction.edit_original_response(
+            content=f"{get_youtube_summary_title(link_kind)}\n{summary_result}"
+        )
 
 
 async def setup(bot):

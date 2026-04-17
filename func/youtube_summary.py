@@ -291,6 +291,27 @@ def get_youtube_summary_title(link_kind: str) -> str:
     return "**[영상 3줄 요약]**"
 
 
+def find_latest_youtube_link_in_messages(messages) -> tuple[str, str] | None:
+    for message in messages:
+        content = getattr(message, "content", "") or ""
+        youtube_url = extract_youtube_link(content)
+        if youtube_url:
+            link_kind = get_youtube_link_kind(youtube_url) or YOUTUBE_VIDEO_KIND
+            return youtube_url, link_kind
+    return None
+
+
+async def find_latest_youtube_link_in_channel(
+    channel, limit: int = 100
+) -> tuple[str, str] | None:
+    history = getattr(channel, "history", None)
+    if history is None:
+        return None
+
+    messages = [message async for message in channel.history(limit=limit)]
+    return find_latest_youtube_link_in_messages(messages)
+
+
 def extract_video_id(url: str) -> str:
     normalized_url = normalize_youtube_link(url)
     parsed = urlparse(normalized_url)

@@ -10,6 +10,7 @@ from func.youtube_summary import (  # noqa: E402
     YOUTUBE_VIDEO_KIND,
     build_youtube_post_summary_input,
     extract_youtube_link,
+    find_latest_youtube_link_in_messages,
     get_youtube_link_kind,
     parse_youtube_post_html,
 )
@@ -95,6 +96,24 @@ def _build_post_html() -> str:
 
 
 class YouTubePostSummaryTests(unittest.TestCase):
+    def test_finds_latest_youtube_link_from_recent_messages(self):
+        class DummyMessage:
+            def __init__(self, content: str):
+                self.content = content
+
+        latest_link = find_latest_youtube_link_in_messages(
+            [
+                DummyMessage("잡담"),
+                DummyMessage("https://youtu.be/dQw4w9WgXcQ"),
+                DummyMessage("https://www.youtube.com/watch?v=oldvideo"),
+            ]
+        )
+
+        self.assertEqual(
+            latest_link,
+            ("https://youtu.be/dQw4w9WgXcQ", YOUTUBE_VIDEO_KIND),
+        )
+
     def test_extracts_post_link_without_truncating(self):
         text = "요약해줘 http://youtube.com/post/UgkxPKcqyh9pHXg0oezn8QHB7gsESwj-NRTQ"
         self.assertEqual(
