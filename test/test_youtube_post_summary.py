@@ -9,8 +9,10 @@ from func.youtube_summary import (  # noqa: E402
     YOUTUBE_POST_KIND,
     YOUTUBE_VIDEO_KIND,
     build_youtube_post_summary_input,
+    extract_youtube_links,
     extract_youtube_link,
     find_latest_youtube_link_in_messages,
+    find_recent_youtube_links_in_messages,
     get_youtube_link_kind,
     parse_youtube_post_html,
 )
@@ -131,6 +133,45 @@ class YouTubePostSummaryTests(unittest.TestCase):
         self.assertEqual(
             get_youtube_link_kind("https://www.youtube.com/watch?v=dQw4w9WgXcQ"),
             YOUTUBE_VIDEO_KIND,
+        )
+
+    def test_extracts_multiple_youtube_links_from_single_message(self):
+        text = (
+            "첫 번째 https://youtu.be/dQw4w9WgXcQ "
+            "두 번째 https://www.youtube.com/watch?v=oHg5SJYRHA0"
+        )
+        self.assertEqual(
+            extract_youtube_links(text),
+            [
+                "https://youtu.be/dQw4w9WgXcQ",
+                "https://www.youtube.com/watch?v=oHg5SJYRHA0",
+            ],
+        )
+
+    def test_finds_recent_youtube_links_without_duplicates(self):
+        class DummyMessage:
+            def __init__(self, content: str):
+                self.content = content
+
+        recent_links = find_recent_youtube_links_in_messages(
+            [
+                DummyMessage(
+                    "최신 링크 https://youtu.be/newvideo https://youtu.be/anothernew"
+                ),
+                DummyMessage("중복 링크 https://youtu.be/newvideo"),
+                DummyMessage("게시물 https://youtube.com/post/UgkxTestPost"),
+                DummyMessage("예전 링크 https://www.youtube.com/watch?v=oldvideo"),
+            ],
+            max_links=3,
+        )
+
+        self.assertEqual(
+            recent_links,
+            [
+                ("https://youtu.be/newvideo", YOUTUBE_VIDEO_KIND),
+                ("https://youtu.be/anothernew", YOUTUBE_VIDEO_KIND),
+                ("https://youtube.com/post/UgkxTestPost", YOUTUBE_POST_KIND),
+            ],
         )
 
     def test_parses_youtube_post_html(self):

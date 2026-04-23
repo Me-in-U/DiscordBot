@@ -73,6 +73,13 @@ class YouTubePostInfo:
     attachment_urls: list[str] = field(default_factory=list)
 
 
+@dataclass(slots=True)
+class YouTubeLinkCandidate:
+    url: str
+    link_kind: str
+    title: str = ""
+
+
 def _detect_ffmpeg_executable() -> str:
     """bin/ffmpeg.exe가 있으면 우선 사용, 없으면 시스템 PATH의 ffmpeg 사용"""
     local = os.path.join(os.getcwd(), "bin", "ffmpeg.exe")
@@ -125,6 +132,13 @@ def _normalize_thumbnail_url(url: str) -> str:
     if url.startswith("//"):
         return f"https:{url}"
     return url
+
+
+def _truncate_display_text(text: str, max_length: int = 80) -> str:
+    normalized = " ".join((text or "").split())
+    if len(normalized) <= max_length:
+        return normalized
+    return normalized[: max_length - 3].rstrip() + "..."
 
 
 def _get_text_from_runs(data: dict | None) -> str:
@@ -291,14 +305,31 @@ def get_youtube_summary_title(link_kind: str) -> str:
     return "**[영상 3줄 요약]**"
 
 
-def find_latest_youtube_link_in_messages(messages) -> tuple[str, str] | None:
+def find_recent_youtube_links_in_messages(
+    messages, max_links: int = 10
+) -> list[tuple[str, str]]:
+    found_links: list[tuple[str, str]] = []
+    seen_urls: set[str] = set()
+
     for message in messages:
         content = getattr(message, "content", "") or ""
-        youtube_url = extract_youtube_link(content)
-        if youtube_url:
+        for youtube_url in extract_youtube_links(content):
+            if youtube_url in seen_urls:
+                continue
+
+            seen_urls.add(youtube_url)
             link_kind = get_youtube_link_kind(youtube_url) or YOUTUBE_VIDEO_KIND
-            return youtube_url, link_kind
-    return None
+            found_links.append((youtube_url, link_kind))
+
+            if len(found_links) >= max_links:
+                return found_links
+
+    return found_links
+
+
+def find_latest_youtube_link_in_messages(messages) -> tuple[str, str] | None:
+    recent_links = find_recent_youtube_links_in_messages(messages, max_links=1)
+    return recent_links[0] if recent_links else None
 
 
 async def find_latest_youtube_link_in_channel(
@@ -308,8 +339,107 @@ async def find_latest_youtube_link_in_channel(
     if history is None:
         return None
 
-    messages = [message async for message in channel.history(limit=limit)]
-    return find_latest_youtube_link_in_messages(messages)
+    recent_links = await find_recent_youtube_links_in_channel(
+        channel, max_links=1, history_limit=limit
+    )
+    return recent_links[0] if recent_links else None
+
+
+async def find_recent_youtube_links_in_channel(
+    channel, max_links: int = 10, history_limit: int = 200
+) -> list[tuple[str, str]]:
+    history = getattr(channel, "history", None)
+    if history is None:
+        return []
+
+    found_links: list[tuple[str, str]] = []
+    seen_urls: set[str] = set()
+
+    async for message in channel.history(limit=history_limit):
+        content = getattr(message, "content", "") or ""
+        for youtube_url in extract_youtube_links(content):
+            if youtube_url in seen_urls:
+                continue
+
+            seen_urls.add(youtube_url)
+            link_kind = get_youtube_link_kind(youtube_url) or YOUTUBE_VIDEO_KIND
+            found_links.append((youtube_url, link_kind))
+
+            if len(found_links) >= max_links:
+                return found_links
+
+    return found_links
+
+
+def _build_youtube_link_title_fallback(url: str, link_kind: str) -> str:
+    if link_kind == YOUTUBE_POST_KIND:
+        post_id = extract_post_id(url) or url
+        return f"[게시물] {post_id}"
+
+    video_id = extract_video_id(url) or url
+    return f"[영상] {video_id}"
+
+
+def _fetch_youtube_video_title(video_id: str) -> str:
+    if not video_id:
+        raise ValueError("유효한 유튜브 영상 ID가 없습니다.")
+
+    youtube = build("youtube", "v3", developerKey=GOOGLE_API_KEY)
+    response = youtube.videos().list(part="snippet", id=video_id).execute()
+    items = response.get("items", [])
+    if not items:
+        raise ValueError("유튜브 영상 정보를 찾지 못했습니다.")
+
+    title = str(items[0].get("snippet", {}).get("title", "")).strip()
+    if not title:
+        raise ValueError("유튜브 영상 제목이 비어 있습니다.")
+    return title
+
+
+async def get_youtube_link_title(url: str, link_kind: str) -> str:
+    try:
+        if link_kind == YOUTUBE_POST_KIND:
+            post_info = await fetch_youtube_post(url)
+            preview = _truncate_display_text(
+                post_info.text or post_info.author or post_info.post_id,
+                max_length=70,
+            )
+            if post_info.author and preview and preview != post_info.author:
+                return _truncate_display_text(
+                    f"[게시물] {post_info.author}: {preview}",
+                    max_length=100,
+                )
+            if preview:
+                return _truncate_display_text(
+                    f"[게시물] {preview}",
+                    max_length=100,
+                )
+            return _build_youtube_link_title_fallback(url, link_kind)
+
+        video_id = extract_video_id(url)
+        title = await asyncio.to_thread(_fetch_youtube_video_title, video_id)
+        return title or _build_youtube_link_title_fallback(url, link_kind)
+    except Exception as e:
+        print(f"YouTube 제목 조회 실패: {url} ({e})")
+        return _build_youtube_link_title_fallback(url, link_kind)
+
+
+async def get_recent_youtube_links_with_titles(
+    channel, max_links: int = 10, history_limit: int = 200
+) -> list[YouTubeLinkCandidate]:
+    recent_links = await find_recent_youtube_links_in_channel(
+        channel, max_links=max_links, history_limit=history_limit
+    )
+    if not recent_links:
+        return []
+
+    titles = await asyncio.gather(
+        *(get_youtube_link_title(url, link_kind) for url, link_kind in recent_links)
+    )
+    return [
+        YouTubeLinkCandidate(url=url, link_kind=link_kind, title=title)
+        for (url, link_kind), title in zip(recent_links, titles, strict=False)
+    ]
 
 
 def extract_video_id(url: str) -> str:
@@ -512,11 +642,20 @@ def extract_youtube_link(link: str) -> str:
     """
     메시지(텍스트)에서 유튜브 링크를 추출
     """
+    youtube_links = extract_youtube_links(link)
+    return youtube_links[0] if youtube_links else ""
+
+
+def extract_youtube_links(link: str) -> list[str]:
+    """
+    메시지(텍스트)에서 유튜브 링크를 모두 추출
+    """
+    youtube_links: list[str] = []
     for match in YOUTUBE_URL_PATTERN.finditer(link):
         candidate_url = normalize_youtube_link(match.group("url"))
         if get_youtube_link_kind(candidate_url):
-            return candidate_url
-    return ""
+            youtube_links.append(candidate_url)
+    return youtube_links
 
 
 def download_youtube_subtitles(
