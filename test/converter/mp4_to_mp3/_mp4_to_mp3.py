@@ -74,9 +74,9 @@ def convert_mp4_to_mp3(mp4_path: str, mp3_path: str = None):
 
 
 if __name__ == "__main__":
-    # 커맨드라인 실행 예시: python test/mp4_to_mp3.py video.mp4
+    # 커맨드라인 실행 예시: python test/converter/mp4_to_mp3/_mp4_to_mp3.py video.mp4
     if len(sys.argv) > 1:
         input_file = sys.argv[1]
         convert_mp4_to_mp3(input_file)
     else:
-        print("사용법: python mp4_to_mp3.py <mp4_파일_경로>")
+        print("사용법: python test/converter/mp4_to_mp3/_mp4_to_mp3.py <mp4_파일_경로>")
