@@ -16,6 +16,8 @@ services:
       - API_PORT=1557
     ports:
       - "127.0.0.1:1557:1557"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     healthcheck:
       test: ["CMD", "curl", "-fsS", "-H", "Host: host.docker.internal", "http://127.0.0.1:1557/health"]
       interval: 30s
