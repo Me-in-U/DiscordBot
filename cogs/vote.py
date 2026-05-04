@@ -169,6 +169,7 @@ class VoteCog(commands.Cog):
         content="콤마(,)로 구분된 투표 항목들",
         count="투표를 종료할 목표 참여 인원 (1~100)",
     )
+    @app_commands.rename(content="항목", count="인원")
     async def vote_command(
         self, interaction: discord.Interaction, content: str, count: int
     ):

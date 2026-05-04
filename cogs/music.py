@@ -1652,6 +1652,7 @@ class MusicCog(commands.Cog):
         print(f"[음악] Panel updated in 길드: {interaction.guild}")
 
     @app_commands.command(name="재생", description="유튜브 URL을 재생합니다.")
+    @app_commands.rename(url="검색어")
     @app_commands.describe(url="재생할 유튜브 URL 혹은 검색어")
     async def 재생(self, interaction: discord.Interaction, url: str):
         await self._play(interaction, url)

@@ -5,6 +5,68 @@ from discord import app_commands
 from discord.ext import commands
 
 from api.chatGPT import custom_prompt_model
+from util.message_context import build_message_action_target
+
+
+TRANSLATION_PROMPT_ID = "pmpt_68ac23cf2e6c81969b355cc2d2ab11600ddeea74b62910b3"
+
+
+def _build_image_content(image_url: str | None):
+    if not image_url:
+        return None
+
+    return [
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "input_image",
+                    "image_url": image_url,
+                }
+            ],
+        },
+    ]
+
+
+async def translate_target(
+    target_message: str,
+    image_url: str | None,
+    prompt_version: str = "4",
+) -> str:
+    normalized_message = target_message.strip()
+    if image_url and not normalized_message:
+        normalized_message = "첨부 이미지의 텍스트나 내용을 한국어로 번역해줘."
+
+    try:
+        return await asyncio.to_thread(
+            custom_prompt_model,
+            image_content=_build_image_content(image_url),
+            prompt={
+                "id": TRANSLATION_PROMPT_ID,
+                "version": prompt_version,
+                "variables": {"target_message": normalized_message},
+            },
+        )
+    except Exception as e:
+        return f"Error: {e}"
+
+
+@app_commands.context_menu(name="메시지 번역")
+async def translate_message_context_menu(
+    interaction: discord.Interaction,
+    message: discord.Message,
+) -> None:
+    target = build_message_action_target(message)
+    if not target.has_input:
+        await interaction.response.send_message(
+            "번역할 텍스트나 이미지가 없습니다.",
+            ephemeral=True,
+        )
+        return
+
+    await interaction.response.defer(thinking=True)
+    translated_message = await translate_target(target.text, target.image_url)
+    await interaction.followup.send(translated_message)
 
 
 class TranslationSelect(discord.ui.Select):
@@ -69,33 +131,7 @@ class TranslationSelectView(discord.ui.View):
         target_message = self.selected_message.get("content", "")
         image_url = self.selected_message.get("image_url")
 
-        # ChatGPT 요청 메시지 구성
-        image_content = None
-        if image_url:
-            image_content = [
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "input_image",
-                            "image_url": image_url,
-                        }
-                    ],
-                },
-            ]
-
-        try:
-            result_message = await asyncio.to_thread(
-                custom_prompt_model,
-                image_content=image_content,
-                prompt={
-                    "id": "pmpt_68ac23cf2e6c81969b355cc2d2ab11600ddeea74b62910b3",
-                    "version": "4",
-                    "variables": {"target_message": target_message},
-                },
-            )
-        except Exception as e:
-            result_message = f"Error: {e}"
+        result_message = await translate_target(target_message, image_url)
 
         # 원본 메시지를 번역 결과로 덮어쓰기
         if isinstance(self.original_message, discord.Message):
@@ -143,6 +179,7 @@ class TranslationCommands(commands.Cog):
         name="번역",
         description="텍스트를 바로 번역하거나, 지정하지 않으면 최근 채팅 중 선택하여 번역합니다.",
     )
+    @app_commands.rename(text="텍스트", image="이미지")
     @app_commands.describe(
         text="번역할 텍스트를 입력하세요. (선택)",
         image="번역할 이미지를 첨부하세요. (선택)",
@@ -154,34 +191,14 @@ class TranslationCommands(commands.Cog):
         image: discord.Attachment | None = None,
     ):
         await interaction.response.defer(thinking=True)
-        if text:
-            target_message = text.strip()
+        if text or image:
+            target_message = text.strip() if text else ""
             image_url = image.url if image else None
-            image_content = None
-            if image_url:
-                image_content = [
-                    {
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "input_image",
-                                "image_url": image_url,
-                            }
-                        ],
-                    },
-                ]
-            try:
-                translated_message = await asyncio.to_thread(
-                    custom_prompt_model,
-                    image_content=image_content,
-                    prompt={
-                        "id": "pmpt_68ac23cf2e6c81969b355cc2d2ab11600ddeea74b62910b3",
-                        "version": "3",
-                        "variables": {"target_message": target_message},
-                    },
-                )
-            except Exception as e:
-                translated_message = f"Error: {e}"
+            translated_message = await translate_target(
+                target_message,
+                image_url,
+                prompt_version="3",
+            )
 
             await interaction.followup.send(translated_message)
         else:
@@ -217,4 +234,8 @@ class TranslationCommands(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(TranslationCommands(bot))
+    try:
+        bot.tree.add_command(translate_message_context_menu)
+    except app_commands.CommandAlreadyRegistered:
+        pass
     print("TranslationCommands Cog : setup 완료!")

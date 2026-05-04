@@ -115,6 +115,7 @@ class RankCommands(commands.Cog):
     @app_commands.describe(
         game_name="라이엇 게임 닉네임(예: RiotUser)", tag_line="태그라인(예: 1234)"
     )
+    @app_commands.rename(game_name="닉네임", tag_line="태그")
     async def print_solo_rank(
         self, interaction: discord.Interaction, game_name: str, tag_line: str
     ):
@@ -136,6 +137,7 @@ class RankCommands(commands.Cog):
     @app_commands.describe(
         game_name="라이엇 게임 닉네임(예: RiotUser)", tag_line="태그라인(예: 1234)"
     )
+    @app_commands.rename(game_name="닉네임", tag_line="태그")
     async def print_flex_rank(
         self, interaction: discord.Interaction, game_name: str, tag_line: str
     ):
@@ -170,6 +172,7 @@ class RankCommands(commands.Cog):
     @app_commands.describe(
         text="닉네임#태그 형식으로 입력해주세요. 예: 라이엇유저#1234"
     )
+    @app_commands.rename(text="닉네임태그")
     async def update_daily_rank(self, interaction: discord.Interaction, text: str):
         """자정 솔랭 닉네임#태그를 업데이트합니다."""
         try:
@@ -194,6 +197,7 @@ class RankCommands(commands.Cog):
         description="자정 루프 상태를 변경합니다. 예: /일일랭크루프 true/false",
     )
     @app_commands.describe(status="true 또는 false로 입력하세요.")
+    @app_commands.rename(status="상태")
     async def toggle_daily_loop(self, interaction: discord.Interaction, status: str):
         """자정 루프 상태를 변경합니다."""
         try:

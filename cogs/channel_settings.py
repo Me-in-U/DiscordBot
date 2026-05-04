@@ -24,6 +24,7 @@ class ChannelSettings(commands.Cog):
         purpose="설정할 기능 타입을 선택하세요.",
         channel="동작할 채널 (비워두면 설정을 해제합니다)",
     )
+    @app_commands.rename(purpose="기능", channel="채널")
     @app_commands.choices(
         purpose=[
             app_commands.Choice(name="기념일", value="celebration"),

@@ -18,6 +18,7 @@ class YoutubeCheckerCog(commands.Cog):
             app_commands.Choice(name="끄기", value="off"),
         ]
     )
+    @app_commands.rename(action="동작")
     async def toggle_live_checker(self, interaction, action: app_commands.Choice[str]):
         key = "youtubeLiveChecker"
         try:

@@ -5,6 +5,68 @@ from discord import app_commands
 from discord.ext import commands
 
 from api.chatGPT import custom_prompt_model
+from util.message_context import build_message_action_target
+
+
+INTERPRET_PROMPT_ID = "pmpt_68abf98a25b481938994e409ffd1ecf20db1ff235be9e7ab"
+
+
+def _build_image_content(image_url: str | None):
+    if not image_url:
+        return None
+
+    return [
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "input_image",
+                    "image_url": image_url,
+                }
+            ],
+        },
+    ]
+
+
+async def interpret_target(
+    question: str,
+    image_url: str | None,
+    prompt_version: str = "7",
+) -> str:
+    normalized_question = question.strip()
+    if image_url and not normalized_question:
+        normalized_question = "첨부 이미지를 해석해줘."
+
+    try:
+        return await asyncio.to_thread(
+            custom_prompt_model,
+            image_content=_build_image_content(image_url),
+            prompt={
+                "id": INTERPRET_PROMPT_ID,
+                "version": prompt_version,
+                "variables": {"question": normalized_question},
+            },
+        )
+    except Exception as e:
+        return f"Error: {e}"
+
+
+@app_commands.context_menu(name="메시지 해석")
+async def interpret_message_context_menu(
+    interaction: discord.Interaction,
+    message: discord.Message,
+) -> None:
+    target = build_message_action_target(message)
+    if not target.has_input:
+        await interaction.response.send_message(
+            "해석할 텍스트나 이미지가 없습니다.",
+            ephemeral=True,
+        )
+        return
+
+    await interaction.response.defer(thinking=True)
+    interpreted = await interpret_target(target.text, target.image_url)
+    await interaction.followup.send(interpreted)
 
 
 class InterpretSelect(discord.ui.Select):
@@ -68,32 +130,7 @@ class InterpretSelectView(discord.ui.View):
         target_message = self.selected_message.get("content", "")
         image_url = self.selected_message.get("image_url")
 
-        image_content = None
-        if image_url:
-            image_content = [
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "input_image",
-                            "image_url": image_url,
-                        }
-                    ],
-                },
-            ]
-
-        try:
-            result_message = await asyncio.to_thread(
-                custom_prompt_model,
-                image_content=image_content,
-                prompt={
-                    "id": "pmpt_68abf98a25b481938994e409ffd1ecf20db1ff235be9e7ab",
-                    "version": "7",
-                    "variables": {"question": target_message},
-                },
-            )
-        except Exception as e:
-            result_message = f"Error: {e}"
+        result_message = await interpret_target(target_message, image_url)
 
         # 원본 메시지를 번역 결과로 덮어쓰기
         if isinstance(self.original_message, discord.Message):
@@ -141,6 +178,7 @@ class InterpretCommands(commands.Cog):
         name="해석",
         description="텍스트를 입력하면 바로 해석, 미입력 시 최근 채팅을 선택하여 해석합니다.",
     )
+    @app_commands.rename(text="텍스트", image="이미지")
     @app_commands.describe(text="해석할 텍스트 (선택)")
     @app_commands.describe(image="(선택) 함께 보낼 이미지")
     async def interpret(
@@ -151,31 +189,11 @@ class InterpretCommands(commands.Cog):
     ):
         if text:
             image_url = image.url if image else None
-            image_content = None
-            if image_url:
-                image_content = [
-                    {
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "input_image",
-                                "image_url": image_url,
-                            }
-                        ],
-                    }
-                ]
-            try:
-                interpreted = await asyncio.to_thread(
-                    custom_prompt_model,
-                    image_content=image_content,
-                    prompt={
-                        "id": "pmpt_68abf98a25b481938994e409ffd1ecf20db1ff235be9e7ab",
-                        "version": "6",
-                        "variables": {"question": text.strip()},
-                    },
-                )
-            except Exception as e:
-                interpreted = f"Error: {e}"
+            interpreted = await interpret_target(
+                text,
+                image_url,
+                prompt_version="6",
+            )
             try:
                 await interaction.followup.send(interpreted)
             except Exception:
@@ -218,3 +236,7 @@ class InterpretCommands(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(InterpretCommands(bot))
+    try:
+        bot.tree.add_command(interpret_message_context_menu)
+    except app_commands.CommandAlreadyRegistered:
+        pass

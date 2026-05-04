@@ -22,6 +22,7 @@ class Clean(commands.Cog):
     @app_commands.describe(
         minutes="현재 시각부터 과거 몇 분까지 삭제할지(1~10080; 10080=7일)",
     )
+    @app_commands.rename(minutes="분")
     async def clean(
         self,
         interaction: discord.Interaction,

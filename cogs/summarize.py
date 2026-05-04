@@ -7,12 +7,15 @@ from discord.ext import commands
 from api.chatGPT import custom_prompt_model
 from func.youtube_summary import (
     YOUTUBE_POST_KIND,
+    YOUTUBE_VIDEO_KIND,
     YouTubeLinkCandidate,
     get_recent_youtube_links_with_titles,
+    get_youtube_link_kind,
     get_youtube_summary_title,
     process_youtube_link,
 )
 from util.get_recent_messages import get_recent_messages
+from util.message_context import extract_first_youtube_link
 
 
 def _truncate_select_text(text: str, max_length: int = 100) -> str:
@@ -131,6 +134,32 @@ class YouTubeSummarySelectionView(discord.ui.View):
             pass
 
 
+@app_commands.context_menu(name="유튜브 요약")
+async def summarize_youtube_message_context_menu(
+    interaction: discord.Interaction,
+    message: discord.Message,
+) -> None:
+    youtube_url = extract_first_youtube_link(message)
+    if not youtube_url:
+        await interaction.response.send_message(
+            "유튜브 링크가 아닙니다.",
+            ephemeral=True,
+        )
+        return
+
+    await interaction.response.defer(thinking=True)
+    link_kind = get_youtube_link_kind(youtube_url) or YOUTUBE_VIDEO_KIND
+    try:
+        summary_result = await process_youtube_link(youtube_url)
+    except Exception as e:
+        await interaction.edit_original_response(content=f"오류가 발생했습니다: {e}")
+        return
+
+    await interaction.edit_original_response(
+        content=f"{get_youtube_summary_title(link_kind)}\n{summary_result}"
+    )
+
+
 class SummarizeCommands(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -222,4 +251,8 @@ class SummarizeCommands(commands.Cog):
 async def setup(bot):
     """Cog를 봇에 추가합니다."""
     await bot.add_cog(SummarizeCommands(bot))
+    try:
+        bot.tree.add_command(summarize_youtube_message_context_menu)
+    except app_commands.CommandAlreadyRegistered:
+        pass
     print("SummarizeCommands Cog : setup 완료!")

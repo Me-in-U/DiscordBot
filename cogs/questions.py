@@ -22,6 +22,7 @@ class QuestionCommands(commands.Cog):
         name="질문",
         description="ChatGPT에게 질문합니다. 텍스트 매개변수로 질문 내용을 입력하세요.",
     )
+    @app_commands.rename(text="질문", image="이미지")
     @app_commands.describe(text="질문할 내용을 입력하세요.")
     async def question(
         self,
@@ -81,6 +82,7 @@ class QuestionCommands(commands.Cog):
         name="신이시여",
         description="정상화의 신에게 질문합니다. 질문 내용과 이미지를 함께 입력할 수 있습니다.",
     )
+    @app_commands.rename(text="질문", image="이미지")
     @app_commands.describe(
         text="질문할 내용을 입력하세요.", image="(선택) 질문과 함께 보낼 이미지 첨부"
     )
