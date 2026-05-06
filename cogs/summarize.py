@@ -5,6 +5,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from api.chatGPT import custom_prompt_model
+from common.openai_prompt import build_prompt
 from func.youtube_summary import (
     YOUTUBE_POST_KIND,
     YOUTUBE_VIDEO_KIND,
@@ -16,6 +17,10 @@ from func.youtube_summary import (
 )
 from util.get_recent_messages import get_recent_messages
 from util.message_context import extract_first_youtube_link
+
+
+DISCORD_SUMMARY_PROMPT_ID = "pmpt_68ac08b66784819785d89655eaaaa7470bc0cc5deddb37d9"
+DISCORD_SUMMARY_PROMPT_VERSION = "5"
 
 
 def _truncate_select_text(text: str, max_length: int = 100) -> str:
@@ -196,16 +201,16 @@ class SummarizeCommands(commands.Cog):
         try:
             response = await asyncio.to_thread(
                 custom_prompt_model,
-                prompt={
-                    "id": "pmpt_68ac08b66784819785d89655eaaaa7470bc0cc5deddb37d9",
-                    "version": "5",
-                    "variables": {
+                prompt=build_prompt(
+                    DISCORD_SUMMARY_PROMPT_ID,
+                    DISCORD_SUMMARY_PROMPT_VERSION,
+                    {
                         "recent_messages": get_recent_messages(
                             client=self.bot, guild_id=interaction.guild.id, limit=150
                         ),
                         "additional_requests": request_message,
                     },
-                },
+                ),
             )
         except Exception as e:
             response = f"Error: {e}"

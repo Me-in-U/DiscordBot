@@ -1,8 +1,12 @@
 import asyncio
 import json
-import os
 from api.chatGPT import custom_prompt_model
+from common.openai_prompt import build_prompt, build_single_image_content
 from util.db import execute_query
+
+
+FIND1557_FROM_IMAGE_PROMPT_ID = "pmpt_68ad1661f57c8190b18ab6adfaa69c4d0c4d98e2fa43e7fa"
+FIND1557_FROM_IMAGE_PROMPT_VERSION = "6"
 
 
 def count1557(ocr_text: str) -> int:
@@ -60,25 +64,14 @@ async def find1557(message):
 
     # !image_url이 존재할 때에만 이미지 관련 메시지 추가
     if image_url is not None:
-        image_content = [
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "input_image",
-                        "image_url": image_url,
-                    }
-                ],
-            },
-        ]
         try:
             response = await asyncio.to_thread(
                 custom_prompt_model,
-                image_content=image_content,
-                prompt={
-                    "id": "pmpt_68ad1661f57c8190b18ab6adfaa69c4d0c4d98e2fa43e7fa",
-                    "version": "6",
-                },
+                image_content=build_single_image_content(image_url),
+                prompt=build_prompt(
+                    FIND1557_FROM_IMAGE_PROMPT_ID,
+                    FIND1557_FROM_IMAGE_PROMPT_VERSION,
+                ),
             )
         except Exception as e:
             print("GPT 호출 중 예외 발생:", e)

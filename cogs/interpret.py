@@ -5,37 +5,21 @@ from discord import app_commands
 from discord.ext import commands
 
 from api.chatGPT import custom_prompt_model
+from common.openai_prompt import build_prompt, build_single_image_content
 from util.message_context import (
     build_message_action_target,
     build_message_select_label,
     build_recent_message_option,
 )
 
-
 INTERPRET_PROMPT_ID = "pmpt_68abf98a25b481938994e409ffd1ecf20db1ff235be9e7ab"
-
-
-def _build_image_content(image_url: str | None):
-    if not image_url:
-        return None
-
-    return [
-        {
-            "role": "user",
-            "content": [
-                {
-                    "type": "input_image",
-                    "image_url": image_url,
-                }
-            ],
-        },
-    ]
+INTERPRET_PROMPT_VERSION = "7"
 
 
 async def interpret_target(
     question: str,
     image_url: str | None,
-    prompt_version: str = "8",
+    prompt_version: str = INTERPRET_PROMPT_VERSION,
 ) -> str:
     normalized_question = question.strip()
     if image_url and not normalized_question:
@@ -44,12 +28,12 @@ async def interpret_target(
     try:
         return await asyncio.to_thread(
             custom_prompt_model,
-            image_content=_build_image_content(image_url),
-            prompt={
-                "id": INTERPRET_PROMPT_ID,
-                "version": prompt_version,
-                "variables": {"question": normalized_question},
-            },
+            image_content=build_single_image_content(image_url),
+            prompt=build_prompt(
+                INTERPRET_PROMPT_ID,
+                prompt_version,
+                {"question": normalized_question},
+            ),
         )
     except Exception as e:
         return f"Error: {e}"
@@ -203,7 +187,7 @@ class InterpretCommands(commands.Cog):
             interpreted = await interpret_target(
                 text or "",
                 image_url,
-                prompt_version="8",
+                prompt_version=INTERPRET_PROMPT_VERSION,
             )
             try:
                 await interaction.followup.send(interpreted)

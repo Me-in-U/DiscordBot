@@ -6,10 +6,10 @@ os.environ.setdefault("OPENAI_KEY", "test-key")
 from cogs.explanation import (
     EXPLANATION_PROMPT_ID,
     EXPLANATION_PROMPT_VERSION,
-    build_explanation_image_content,
     build_explanation_option_label,
     build_explanation_prompt,
 )
+from common.openai_prompt import build_single_image_content
 
 
 class ExplanationActionTests(unittest.TestCase):
@@ -47,8 +47,8 @@ class ExplanationActionTests(unittest.TestCase):
             "첨부 이미지의 내용을 설명해줘.",
         )
 
-    def test_build_explanation_image_content_includes_image(self):
-        payload = build_explanation_image_content("https://cdn.example/image.png")
+    def test_common_image_content_includes_image(self):
+        payload = build_single_image_content("https://cdn.example/image.png")
 
         content = payload[0]["content"]
         self.assertEqual(
@@ -59,8 +59,8 @@ class ExplanationActionTests(unittest.TestCase):
             },
         )
 
-    def test_build_explanation_image_content_returns_none_without_image(self):
-        self.assertIsNone(build_explanation_image_content(None))
+    def test_common_image_content_returns_none_without_image(self):
+        self.assertIsNone(build_single_image_content(None))
 
 
 if __name__ == "__main__":

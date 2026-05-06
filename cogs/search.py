@@ -5,6 +5,11 @@ from discord import app_commands
 from discord.ext import commands
 
 from api.chatGPT import custom_prompt_model
+from common.openai_prompt import build_prompt
+
+
+SEARCH_PROMPT_ID = "pmpt_68b25c89c1a48193a60de5a3cb23a1eb0c25a13613efd1bf"
+SEARCH_PROMPT_VERSION = "1"
 
 
 class SearchCommands(commands.Cog):
@@ -29,11 +34,11 @@ class SearchCommands(commands.Cog):
             # 서울 지역을 기준으로 웹 검색 수행
             response = await asyncio.to_thread(
                 custom_prompt_model,
-                prompt={
-                    "id": "pmpt_68b25c89c1a48193a60de5a3cb23a1eb0c25a13613efd1bf",
-                    "version": "1",
-                    "variables": {"user_input": 내용},
-                },
+                prompt=build_prompt(
+                    SEARCH_PROMPT_ID,
+                    SEARCH_PROMPT_VERSION,
+                    {"user_input": 내용},
+                ),
             )
         except Exception as e:
             response = f"Error: {e}"

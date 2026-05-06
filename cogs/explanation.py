@@ -5,6 +5,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from api.chatGPT import custom_prompt_model
+from common.openai_prompt import build_prompt, build_single_image_content
 from util.message_context import (
     build_message_action_target,
     build_message_select_label,
@@ -36,33 +37,16 @@ def build_explanation_prompt(
     elif not normalized_text:
         normalized_text = "입력된 내용을 설명해줘."
 
-    return {
-        "id": EXPLANATION_PROMPT_ID,
-        "version": prompt_version,
-        "variables": {"target_message": normalized_text},
-    }
-
-
-def build_explanation_image_content(image_url: str | None):
-    if not image_url:
-        return None
-
-    return [
-        {
-            "role": "user",
-            "content": [
-                {
-                    "type": "input_image",
-                    "image_url": image_url,
-                }
-            ],
-        }
-    ]
+    return build_prompt(
+        EXPLANATION_PROMPT_ID,
+        prompt_version,
+        {"target_message": normalized_text},
+    )
 
 
 def _generate_explanation(text: str, image_url: str | None) -> str:
     return custom_prompt_model(
-        image_content=build_explanation_image_content(image_url),
+        image_content=build_single_image_content(image_url),
         prompt=build_explanation_prompt(
             text,
             has_image=bool(image_url),

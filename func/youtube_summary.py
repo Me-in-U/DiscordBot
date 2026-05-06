@@ -19,6 +19,7 @@ from util.env_utils import getenv_clean, sanitize_environment
 
 # request_gpt.py 에 정의된 함수들 임포트
 from api.chatGPT import custom_prompt_model, generate_text_model
+from common.openai_prompt import build_prompt
 
 load_dotenv()
 sanitize_environment()
@@ -33,6 +34,10 @@ YOUTUBE_URL_PATTERN = re.compile(
 YOUTUBE_HOSTS = {"youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be"}
 YOUTUBE_POST_KIND = "post"
 YOUTUBE_VIDEO_KIND = "video"
+COMMENTS_SUMMARY_PROMPT_ID = "pmpt_68abfada6cc8819392effc146b3a39730a3a8fd787c57011"
+COMMENTS_SUMMARY_PROMPT_VERSION = "9"
+YOUTUBE_SUMMARY_PROMPT_ID = "pmpt_68ac079c0d1081958393a758f0b6f4cc01c6576daa0b0eb7"
+YOUTUBE_SUMMARY_PROMPT_VERSION = "5"
 
 # 공통 HTTP 헤더 (YouTube 우회에 도움)
 HEADERS = {
@@ -521,11 +526,11 @@ async def summarize_comments_with_gpt(comments: list) -> str:
     comments_text = "\n".join(comments)
     response_text = await asyncio.to_thread(
         custom_prompt_model,
-        prompt={
-            "id": "pmpt_68abfada6cc8819392effc146b3a39730a3a8fd787c57011",
-            "version": "9",
-            "variables": {"comments_text": comments_text},
-        },
+        prompt=build_prompt(
+            COMMENTS_SUMMARY_PROMPT_ID,
+            COMMENTS_SUMMARY_PROMPT_VERSION,
+            {"comments_text": comments_text},
+        ),
     )
     return response_text
 
@@ -914,11 +919,11 @@ async def speech_to_text(audio_path: str) -> str:
 async def summarize_text_with_gpt(youtube_text: str) -> str:
     response_text = await asyncio.to_thread(
         custom_prompt_model,
-        prompt={
-            "id": "pmpt_68ac079c0d1081958393a758f0b6f4cc01c6576daa0b0eb7",
-            "version": "5",
-            "variables": {"youtube_text": youtube_text},
-        },
+        prompt=build_prompt(
+            YOUTUBE_SUMMARY_PROMPT_ID,
+            YOUTUBE_SUMMARY_PROMPT_VERSION,
+            {"youtube_text": youtube_text},
+        ),
     )
     return response_text
 

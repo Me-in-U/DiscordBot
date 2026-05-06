@@ -5,6 +5,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from api.chatGPT import custom_prompt_model
+from common.openai_prompt import build_prompt, build_single_image_content
 from util.message_context import (
     build_message_action_target,
     build_message_select_label,
@@ -13,29 +14,13 @@ from util.message_context import (
 
 
 TRANSLATION_PROMPT_ID = "pmpt_68ac23cf2e6c81969b355cc2d2ab11600ddeea74b62910b3"
-
-
-def _build_image_content(image_url: str | None):
-    if not image_url:
-        return None
-
-    return [
-        {
-            "role": "user",
-            "content": [
-                {
-                    "type": "input_image",
-                    "image_url": image_url,
-                }
-            ],
-        },
-    ]
+TRANSLATION_PROMPT_VERSION = "5"
 
 
 async def translate_target(
     target_message: str,
     image_url: str | None,
-    prompt_version: str = "5",
+    prompt_version: str = TRANSLATION_PROMPT_VERSION,
 ) -> str:
     normalized_message = target_message.strip()
     if image_url and not normalized_message:
@@ -44,12 +29,12 @@ async def translate_target(
     try:
         return await asyncio.to_thread(
             custom_prompt_model,
-            image_content=_build_image_content(image_url),
-            prompt={
-                "id": TRANSLATION_PROMPT_ID,
-                "version": prompt_version,
-                "variables": {"target_message": normalized_message},
-            },
+            image_content=build_single_image_content(image_url),
+            prompt=build_prompt(
+                TRANSLATION_PROMPT_ID,
+                prompt_version,
+                {"target_message": normalized_message},
+            ),
         )
     except Exception as e:
         return f"Error: {e}"
@@ -207,7 +192,7 @@ class TranslationCommands(commands.Cog):
             translated_message = await translate_target(
                 target_message,
                 image_url,
-                prompt_version="5",
+                prompt_version=TRANSLATION_PROMPT_VERSION,
             )
 
             await interaction.followup.send(translated_message)

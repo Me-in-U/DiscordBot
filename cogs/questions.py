@@ -5,7 +5,14 @@ from discord import app_commands
 from discord.ext import commands
 
 from api.chatGPT import custom_prompt_model
+from common.openai_prompt import build_prompt, build_single_image_content
 from util.get_recent_messages import get_recent_messages
+
+
+GENERAL_PROMPT_ID = "pmpt_68ac254fa8008190861e8f3f686556d50c6160cd272b9aca"
+GENERAL_PROMPT_VERSION = "4"
+GOD_QUESTION_PROMPT_ID = "pmpt_68acfa93ac6481959537fcb1853c883307d25e6bf62ef36c"
+GOD_QUESTION_PROMPT_VERSION = "5"
 
 
 class QuestionCommands(commands.Cog):
@@ -42,36 +49,21 @@ class QuestionCommands(commands.Cog):
         if image:
             image_url = image.url
 
-        # ChatGPT에 메시지 전달
-        image_content = None
-        if image_url:
-            image_content = [
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "input_image",
-                            "image_url": image_url,
-                        }
-                    ],
-                },
-            ]
-
         try:
             response = await asyncio.to_thread(
                 custom_prompt_model,
-                image_content=image_content,
-                prompt={
-                    "id": "pmpt_68ac254fa8008190861e8f3f686556d50c6160cd272b9aca",
-                    "version": "4",
-                    "variables": {
+                image_content=build_single_image_content(image_url),
+                prompt=build_prompt(
+                    GENERAL_PROMPT_ID,
+                    GENERAL_PROMPT_VERSION,
+                    {
                         "recent_messages": get_recent_messages(
                             client=self.bot, guild_id=interaction.guild.id, limit=20
                         ),
                         "user_name": interaction.user.name,
                         "question": text.strip(),
                     },
-                },
+                ),
             )
         except Exception as e:
             response = f"Error: {e}"
@@ -104,38 +96,21 @@ class QuestionCommands(commands.Cog):
         if image:
             image_url = image.url
 
-        # ChatGPT에 메시지 전달
-        image_content = None
-        if image_url:
-            image_content = [
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": image_url,
-                            },
-                        },
-                    ],
-                },
-            ]
-
         try:
             response = await asyncio.to_thread(
                 custom_prompt_model,
-                image_content=image_content,
-                prompt={
-                    "id": "pmpt_68acfa93ac6481959537fcb1853c883307d25e6bf62ef36c",
-                    "version": "5",
-                    "variables": {
+                image_content=build_single_image_content(image_url),
+                prompt=build_prompt(
+                    GOD_QUESTION_PROMPT_ID,
+                    GOD_QUESTION_PROMPT_VERSION,
+                    {
                         "recent_messages": get_recent_messages(
                             client=self.bot, guild_id=interaction.guild.id, limit=20
                         ),
                         "user_name": interaction.user.name,
                         "question": text.strip(),
                     },
-                },
+                ),
             )
         except Exception as e:
             response = f"Error: {e}"
