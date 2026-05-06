@@ -1,4 +1,5 @@
 import asyncio
+import re
 
 import discord
 from discord import app_commands
@@ -14,7 +15,10 @@ from util.message_context import (
 
 
 EXPLANATION_PROMPT_ID = "pmpt_69fabdb4fa308190867e700bb0a2de160eaa5a328b9e0f83"
-EXPLANATION_PROMPT_VERSION = "2"
+EXPLANATION_PROMPT_VERSION = "3"
+_EXPLANATION_RESPONSE_LABEL_PATTERN = re.compile(
+    r"(?i)\b(Summary|Details|Explanation|Context|Unclear|요약|설명|주요 내용|맥락|추가 맥락|불확실한 부분)\s*:"
+)
 
 
 def build_explanation_option_label(
@@ -44,14 +48,57 @@ def build_explanation_prompt(
     )
 
 
+def format_explanation_response_for_discord(response: str) -> str:
+    stripped_response = response.strip()
+    if not stripped_response or stripped_response.startswith("Error:"):
+        return response
+    if (
+        "**요약**" in stripped_response
+        or "**설명**" in stripped_response
+        or "### 요약" in stripped_response
+        or "### 설명" in stripped_response
+    ):
+        return stripped_response
+
+    matches = list(_EXPLANATION_RESPONSE_LABEL_PATTERN.finditer(stripped_response))
+    if not matches:
+        return f"**설명**\n{stripped_response}"
+
+    heading_by_label = {
+        "summary": "요약",
+        "요약": "요약",
+        "details": "설명",
+        "explanation": "설명",
+        "설명": "설명",
+        "주요 내용": "설명",
+        "context": "맥락",
+        "맥락": "맥락",
+        "추가 맥락": "맥락",
+        "unclear": "불확실한 부분",
+        "불확실한 부분": "불확실한 부분",
+    }
+    sections = []
+    for index, match in enumerate(matches):
+        label = match.group(1).lower()
+        heading = heading_by_label[label]
+        start = match.end()
+        end = matches[index + 1].start() if index + 1 < len(matches) else None
+        content = stripped_response[start:end].strip()
+        if content:
+            sections.append(f"**{heading}**\n{content}")
+
+    return "\n\n".join(sections) if sections else stripped_response
+
+
 def _generate_explanation(text: str, image_url: str | None) -> str:
-    return custom_prompt_model(
+    response = custom_prompt_model(
         image_content=build_single_image_content(image_url),
         prompt=build_explanation_prompt(
             text,
             has_image=bool(image_url),
         ),
     )
+    return format_explanation_response_for_discord(response)
 
 
 async def explain_target(text: str, image_url: str | None) -> str:

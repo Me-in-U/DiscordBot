@@ -1,4 +1,5 @@
 import asyncio
+import re
 
 import discord
 from discord import app_commands
@@ -13,7 +14,39 @@ from util.message_context import (
 )
 
 INTERPRET_PROMPT_ID = "pmpt_68abf98a25b481938994e409ffd1ecf20db1ff235be9e7ab"
-INTERPRET_PROMPT_VERSION = "7"
+INTERPRET_PROMPT_VERSION = "9"
+_INTERPRET_RESPONSE_LABEL_PATTERN = re.compile(
+    r"(?i)\b(Reasoning|Conclusion|Hidden meaning)\s*:"
+)
+
+
+def format_interpret_response_for_discord(response: str) -> str:
+    stripped_response = response.strip()
+    if not stripped_response or stripped_response.startswith("Error:"):
+        return response
+    if "**의미 분석**" in stripped_response or "### 의미 분석" in stripped_response:
+        return stripped_response
+
+    matches = list(_INTERPRET_RESPONSE_LABEL_PATTERN.finditer(stripped_response))
+    if not matches:
+        return f"**의미 분석**\n{stripped_response}"
+
+    heading_by_label = {
+        "reasoning": "의미 분석",
+        "conclusion": "결론",
+        "hidden meaning": "숨은 의미",
+    }
+    sections = []
+    for index, match in enumerate(matches):
+        label = match.group(1).lower()
+        heading = heading_by_label[label]
+        start = match.end()
+        end = matches[index + 1].start() if index + 1 < len(matches) else None
+        content = stripped_response[start:end].strip()
+        if content:
+            sections.append(f"**{heading}**\n{content}")
+
+    return "\n\n".join(sections) if sections else stripped_response
 
 
 async def interpret_target(
@@ -26,7 +59,7 @@ async def interpret_target(
         normalized_question = "첨부 이미지를 해석해줘."
 
     try:
-        return await asyncio.to_thread(
+        response = await asyncio.to_thread(
             custom_prompt_model,
             image_content=build_single_image_content(image_url),
             prompt=build_prompt(
@@ -35,6 +68,7 @@ async def interpret_target(
                 {"question": normalized_question},
             ),
         )
+        return format_interpret_response_for_discord(response)
     except Exception as e:
         return f"Error: {e}"
 
