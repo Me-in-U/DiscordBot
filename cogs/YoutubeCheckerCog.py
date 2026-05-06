@@ -44,9 +44,14 @@ class YoutubeCheckerCog(commands.Cog):
 
             # Cog 제어
             cog = self.bot.get_cog("LoopTasks")
+            subscription_ready = None
             if cog:
                 loop_task = cog.youtube_live_check
                 if action.value == "on":
+                    if hasattr(cog, "ensure_youtube_websub_subscription"):
+                        subscription_ready = (
+                            await cog.ensure_youtube_websub_subscription()
+                        )
                     if not loop_task.is_running():
                         loop_task.start()
                 else:
@@ -54,8 +59,12 @@ class YoutubeCheckerCog(commands.Cog):
                         loop_task.stop()
 
             # 사용자 응답
+            message = f"✅ YouTube 라이브 체크가 **{status}**."
+            if action.value == "on" and subscription_ready is False:
+                message += "\n⚠️ WebSub callback URL 또는 YouTube 채널 ID 설정을 확인하세요."
             await interaction.response.send_message(
-                f"✅ YouTube 라이브 체크가 **{status}**.", ephemeral=True
+                message,
+                ephemeral=True,
             )
         except Exception as e:
             await interaction.response.send_message(f"오류: {e}", ephemeral=True)

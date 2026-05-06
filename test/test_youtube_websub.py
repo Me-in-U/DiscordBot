@@ -1,0 +1,106 @@
+import unittest
+
+from util.youtube_websub import (
+    YouTubeVideoStatus,
+    build_youtube_feed_topic_url,
+    classify_video_item,
+    parse_youtube_atom_entries,
+)
+
+
+SAMPLE_ATOM = """<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns:yt="http://www.youtube.com/xml/schemas/2015"
+      xmlns="http://www.w3.org/2005/Atom">
+  <link rel="hub" href="https://pubsubhubbub.appspot.com"/>
+  <link rel="self" href="https://www.youtube.com/xml/feeds/videos.xml?channel_id=UC_TEST"/>
+  <title>YouTube video feed</title>
+  <entry>
+    <id>yt:video:VIDEO123</id>
+    <yt:videoId>VIDEO123</yt:videoId>
+    <yt:channelId>UC_TEST</yt:channelId>
+    <title>테스트 라이브</title>
+    <link rel="alternate" href="https://www.youtube.com/watch?v=VIDEO123"/>
+    <author>
+      <name>테스트 채널</name>
+    </author>
+    <published>2026-05-06T10:00:00+00:00</published>
+    <updated>2026-05-06T10:01:00+00:00</updated>
+  </entry>
+</feed>
+"""
+
+
+class YouTubeWebSubTests(unittest.TestCase):
+    def test_parses_youtube_atom_entry(self):
+        entries = parse_youtube_atom_entries(SAMPLE_ATOM)
+
+        self.assertEqual(len(entries), 1)
+        self.assertEqual(entries[0].video_id, "VIDEO123")
+        self.assertEqual(entries[0].channel_id, "UC_TEST")
+        self.assertEqual(entries[0].title, "테스트 라이브")
+        self.assertEqual(entries[0].link, "https://www.youtube.com/watch?v=VIDEO123")
+
+    def test_builds_channel_feed_topic_url(self):
+        self.assertEqual(
+            build_youtube_feed_topic_url("UC_TEST"),
+            "https://www.youtube.com/feeds/videos.xml?channel_id=UC_TEST",
+        )
+
+    def test_classifies_current_live_video(self):
+        status = classify_video_item(
+            {
+                "id": "VIDEO123",
+                "snippet": {
+                    "title": "라이브 중",
+                    "channelId": "UC_TEST",
+                    "liveBroadcastContent": "live",
+                },
+                "liveStreamingDetails": {
+                    "actualStartTime": "2026-05-06T10:00:00Z",
+                },
+            }
+        )
+
+        self.assertEqual(status.status, YouTubeVideoStatus.LIVE)
+        self.assertEqual(status.video_id, "VIDEO123")
+        self.assertEqual(status.scheduled_start_time, None)
+
+    def test_classifies_upcoming_live_video(self):
+        status = classify_video_item(
+            {
+                "id": "VIDEO123",
+                "snippet": {
+                    "title": "예정 방송",
+                    "channelId": "UC_TEST",
+                    "liveBroadcastContent": "upcoming",
+                },
+                "liveStreamingDetails": {
+                    "scheduledStartTime": "2026-05-06T12:00:00Z",
+                },
+            }
+        )
+
+        self.assertEqual(status.status, YouTubeVideoStatus.UPCOMING)
+        self.assertEqual(status.scheduled_start_time, "2026-05-06T12:00:00Z")
+
+    def test_classifies_completed_live_as_not_live(self):
+        status = classify_video_item(
+            {
+                "id": "VIDEO123",
+                "snippet": {
+                    "title": "종료 방송",
+                    "channelId": "UC_TEST",
+                    "liveBroadcastContent": "none",
+                },
+                "liveStreamingDetails": {
+                    "actualStartTime": "2026-05-06T10:00:00Z",
+                    "actualEndTime": "2026-05-06T11:00:00Z",
+                },
+            }
+        )
+
+        self.assertEqual(status.status, YouTubeVideoStatus.NOT_LIVE)
+
+
+if __name__ == "__main__":
+    unittest.main()

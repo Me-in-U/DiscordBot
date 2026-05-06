@@ -2,6 +2,7 @@ import json
 import os
 import time
 from datetime import datetime, timezone
+from xml.etree import ElementTree
 
 from aiohttp import web
 from discord.ext import commands
@@ -12,6 +13,7 @@ from util.env_utils import getenv_clean
 
 class StatusApi(commands.Cog):
     CELEBRATION_UPDATE_PATH = "/celebration/update"
+    YOUTUBE_WEBSUB_PATH = "/youtube/websub"
 
     def __init__(self, bot):
         self.bot = bot
@@ -27,6 +29,14 @@ class StatusApi(commands.Cog):
         self.app.router.add_post(
             self.CELEBRATION_UPDATE_PATH,
             self.celebration_update_handler,
+        )
+        self.app.router.add_get(
+            self.YOUTUBE_WEBSUB_PATH,
+            self.youtube_websub_verify_handler,
+        )
+        self.app.router.add_post(
+            self.YOUTUBE_WEBSUB_PATH,
+            self.youtube_websub_notify_handler,
         )
         self.runner = None
         self.site = None
@@ -68,6 +78,16 @@ class StatusApi(commands.Cog):
             return web.json_response({"error": "Unauthorized"}, status=401)
 
         return await handler(request)
+
+    def _is_valid_youtube_websub_request(self, request) -> bool:
+        expected_token = getenv_clean("YOUTUBE_WEBSUB_VERIFY_TOKEN", "")
+        if not expected_token:
+            return True
+
+        provided_token = request.query.get("token") or request.query.get(
+            "hub.verify_token"
+        )
+        return provided_token == expected_token
 
     async def index_handler(self, request):
         """루트 경로 접속 시 간단한 안내 문구 반환"""
@@ -147,6 +167,41 @@ class StatusApi(commands.Cog):
 
         status_code = 200 if error_count == 0 else 207
         return web.json_response(data, status=status_code)
+
+    async def youtube_websub_verify_handler(self, request):
+        """YouTube WebSub 구독 검증 요청에 challenge를 반환합니다."""
+        if not self._is_valid_youtube_websub_request(request):
+            return web.Response(status=403, text="Forbidden")
+
+        mode = request.query.get("hub.mode")
+        challenge = request.query.get("hub.challenge")
+        topic = request.query.get("hub.topic", "")
+        if mode not in {"subscribe", "unsubscribe"} or not challenge or not topic:
+            return web.Response(status=400, text="Invalid WebSub verification request")
+
+        return web.Response(text=challenge)
+
+    async def youtube_websub_notify_handler(self, request):
+        """YouTube WebSub Atom 알림을 받아 라이브 후보로 처리합니다."""
+        if not self._is_valid_youtube_websub_request(request):
+            return web.Response(status=403, text="Forbidden")
+
+        loop_cog = self.bot.get_cog("LoopTasks")
+        if loop_cog is None or not hasattr(
+            loop_cog, "handle_youtube_websub_notification"
+        ):
+            return web.json_response({"error": "LoopTasks is not ready."}, status=503)
+
+        raw_body = await request.text()
+        try:
+            result = await loop_cog.handle_youtube_websub_notification(raw_body)
+        except ElementTree.ParseError:
+            return web.json_response({"error": "Invalid Atom XML."}, status=400)
+        except Exception as e:
+            print(f"YouTube WebSub 처리 오류: {e}")
+            return web.json_response({"error": "WebSub notification failed."}, status=500)
+
+        return web.json_response(result, status=202)
 
     async def cog_load(self):
         """Cog가 로드될 때 웹 서버 시작"""

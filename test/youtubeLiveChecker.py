@@ -1,58 +1,55 @@
-import time
 import os
+import sys
 
 from dotenv import load_dotenv
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+from util.youtube_websub import (
+    build_youtube_feed_topic_url,
+    classify_video_item,
+)
 
 load_dotenv()
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 API_KEY = GOOGLE_API_KEY
 YT_CHANNEL_ID = "UCb5NLtXAsTBrmaZVhyFa-Wg"  # 감시할 채널 ID
-POLL_INTERVAL = 60  # 초 단위 조회 간격
 
 
-def is_channel_live(youtube, channel_id):
-    """
-    channel_id 채널이 live 상태인지 확인.
-    성공 시 live 영상의 videoId를, 아니면 None을 반환.
-    """
+def get_video_status(youtube, video_id):
     try:
-        req = youtube.search().list(
-            part="snippet",
-            channelId=channel_id,
-            eventType="live",
-            type="video",
+        req = youtube.videos().list(
+            part="snippet,liveStreamingDetails,status",
+            id=video_id,
             maxResults=1,
         )
         res = req.execute()
         items = res.get("items", [])
         if items:
-            return items[0]["id"]["videoId"]
+            return classify_video_item(items[0])
     except HttpError as e:
         print(f"API 에러: {e}")
     return None
 
 
 def main():
-    youtube = build("youtube", "v3", developerKey=API_KEY)
-    last_live_id = None
+    video_id = sys.argv[1] if len(sys.argv) > 1 else os.getenv("YOUTUBE_LIVE_TEST_VIDEO_ID")
+    if not video_id:
+        print("WebSub topic:")
+        print(build_youtube_feed_topic_url(YT_CHANNEL_ID))
+        print("영상 확인: python test/youtubeLiveChecker.py <VIDEO_ID>")
+        return
 
-    while True:
-        vid = is_channel_live(youtube, YT_CHANNEL_ID)
-        if vid and vid != last_live_id:
-            print(
-                f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] 채널이 LIVE 시작! ▶ https://youtu.be/{vid}"
-            )
-            last_live_id = vid
-        elif not vid:
-            # 채널이 live 아님
-            last_live_id = None
-            print(
-                f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] 채널이 LIVE 상태가 아닙니다."
-            )
-        time.sleep(POLL_INTERVAL)
+    youtube = build("youtube", "v3", developerKey=API_KEY)
+    status = get_video_status(youtube, video_id)
+    if status is None:
+        print("영상을 찾지 못했습니다.")
+        return
+
+    print(f"video_id={status.video_id}")
+    print(f"title={status.title}")
+    print(f"status={status.status}")
+    print(f"scheduled_start_time={status.scheduled_start_time}")
 
 
 if __name__ == "__main__":
