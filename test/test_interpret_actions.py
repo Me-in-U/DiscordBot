@@ -63,7 +63,7 @@ class InterpretTargetTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(target_question, "요즘 일찍 들어오네?")
         self.assertNotIn("Discord Markdown", target_question)
         self.assertEqual(captured_kwargs["prompt"]["version"], INTERPRET_PROMPT_VERSION)
-        self.assertEqual(INTERPRET_PROMPT_VERSION, "9")
+        self.assertEqual(INTERPRET_PROMPT_VERSION, "10")
         self.assertEqual(
             result,
             "**의미 분석**\n표면 의미입니다.\n\n**결론**\n최종 해석입니다.",
