@@ -77,7 +77,7 @@ async def find1557(message):
                 image_content=image_content,
                 prompt={
                     "id": "pmpt_68ad1661f57c8190b18ab6adfaa69c4d0c4d98e2fa43e7fa",
-                    "version": "5",
+                    "version": "6",
                 },
             )
         except Exception as e:

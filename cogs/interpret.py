@@ -5,7 +5,11 @@ from discord import app_commands
 from discord.ext import commands
 
 from api.chatGPT import custom_prompt_model
-from util.message_context import build_message_action_target
+from util.message_context import (
+    build_message_action_target,
+    build_message_select_label,
+    build_recent_message_option,
+)
 
 
 INTERPRET_PROMPT_ID = "pmpt_68abf98a25b481938994e409ffd1ecf20db1ff235be9e7ab"
@@ -31,7 +35,7 @@ def _build_image_content(image_url: str | None):
 async def interpret_target(
     question: str,
     image_url: str | None,
-    prompt_version: str = "7",
+    prompt_version: str = "8",
 ) -> str:
     normalized_question = question.strip()
     if image_url and not normalized_question:
@@ -74,8 +78,11 @@ class InterpretSelect(discord.ui.Select):
         # options_data: [{'content': 메시지내용, 'id': 메시지ID}, ...]
         options = []
         for msg in options_data:
-            label = msg["content"][:50] + ("..." if len(msg["content"]) > 50 else "")
-            desc = "📷 이미지 첨부됨" if msg.get("image_url") else None
+            label = build_message_select_label(
+                msg.get("content", ""),
+                msg.get("image_url"),
+            )
+            desc = "이미지 첨부됨" if msg.get("image_url") else None
             options.append(
                 discord.SelectOption(
                     label=label, value=str(msg["id"]), description=desc
@@ -94,7 +101,10 @@ class InterpretSelect(discord.ui.Select):
         self.view.selected_message = self.view.option_mapping.get(selected_id, "")
 
         # 선택 즉시 "해석 진행중..."으로 메시지를 편집하며 뷰를 해제
-        preview = self.view.selected_message["content"][:50]
+        preview = build_message_select_label(
+            self.view.selected_message.get("content", ""),
+            self.view.selected_message.get("image_url"),
+        )
         await interaction.response.edit_message(
             content=f"{preview}에 대한 해석 진행중...", view=None
         )
@@ -187,12 +197,13 @@ class InterpretCommands(commands.Cog):
         text: str | None = None,
         image: discord.Attachment | None = None,
     ):
-        if text:
+        if text or image:
+            await interaction.response.defer(thinking=True)
             image_url = image.url if image else None
             interpreted = await interpret_target(
-                text,
+                text or "",
                 image_url,
-                prompt_version="6",
+                prompt_version="8",
             )
             try:
                 await interaction.followup.send(interpreted)
@@ -202,16 +213,16 @@ class InterpretCommands(commands.Cog):
             messages_options = []
             async for message in interaction.channel.history(limit=20):
                 # 봇의 메시지나 빈 내용, 그리고 '/'로 시작하는 커맨드는 제외합니다.
-                if (
-                    message.author != self.bot.user
-                    and message.content
-                    and not message.content.startswith("/")
-                ):
-                    messages_options.append(
-                        {"content": message.content, "id": message.id}
-                    )
-                    if len(messages_options) >= 20:
-                        break
+                if message.author == self.bot.user:
+                    continue
+
+                option = build_recent_message_option(message)
+                if option is None:
+                    continue
+
+                messages_options.append(option)
+                if len(messages_options) >= 20:
+                    break
             if not messages_options:
                 try:
                     await interaction.response.send_message(

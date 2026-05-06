@@ -35,7 +35,7 @@
    - 용도: Git 저장소 checkout
 2. `discordbot-env`
    - 타입: `Secret text`
-   - 값: 운영 `.env` 전체 내용
+   - 값: 운영 `.env.deploy` 전체 내용
 3. `discordbot-github-webhook-secret`
    - 타입: `Secret text`
    - 값: GitHub webhook shared secret
@@ -64,7 +64,8 @@
 ## 배포 동작
 
 - `main` 브랜치 push 시 Jenkins 가 자동 실행된다.
-- Jenkins 는 저장소를 checkout 한 뒤 `discordbot-env` Credential 로 `.env` 를 복원한다.
+- Jenkins 는 저장소를 checkout 한 뒤 `discordbot-env` Credential 로 `.env.deploy` 를 복원한다.
+- Docker Compose 는 로컬 기본값으로 `.env` 를 사용하고, Jenkins 배포에서는 `ENV_FILE=.env.deploy` 를 통해 배포 전용 env 파일을 사용한다.
 - 배포 스크립트는 다음 순서로 동작한다.
   - `docker compose build discord-bot`
   - `docker compose up -d --no-build discord-bot`
@@ -80,8 +81,8 @@
 ## 수동 복구 명령
 
 ```bash
-docker compose --env-file .env build discord-bot
-docker compose --env-file .env up -d --no-build discord-bot
+ENV_FILE=.env.deploy docker compose --env-file .env.deploy build discord-bot
+ENV_FILE=.env.deploy docker compose --env-file .env.deploy up -d --no-build discord-bot
 curl -H "Host: host.docker.internal" http://127.0.0.1:1557/health
 ```
 

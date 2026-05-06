@@ -63,7 +63,7 @@ class QuestionCommands(commands.Cog):
                 image_content=image_content,
                 prompt={
                     "id": "pmpt_68ac254fa8008190861e8f3f686556d50c6160cd272b9aca",
-                    "version": "3",
+                    "version": "4",
                     "variables": {
                         "recent_messages": get_recent_messages(
                             client=self.bot, guild_id=interaction.guild.id, limit=20
@@ -127,7 +127,7 @@ class QuestionCommands(commands.Cog):
                 image_content=image_content,
                 prompt={
                     "id": "pmpt_68acfa93ac6481959537fcb1853c883307d25e6bf62ef36c",
-                    "version": "4",
+                    "version": "5",
                     "variables": {
                         "recent_messages": get_recent_messages(
                             client=self.bot, guild_id=interaction.guild.id, limit=20

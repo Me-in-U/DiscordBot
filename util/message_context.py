@@ -10,6 +10,7 @@ IMAGE_EXTENSIONS = {
     ".png",
     ".webp",
 }
+IMAGE_ONLY_LABEL = "(이미지)"
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,6 +49,31 @@ def build_message_action_target(message) -> MessageActionTarget:
         text=str(getattr(message, "content", "") or "").strip(),
         image_url=_first_image_url(getattr(message, "attachments", []) or []),
     )
+
+
+def build_message_select_label(
+    content: str,
+    image_url: str | None = None,
+    max_length: int = 50,
+) -> str:
+    normalized = str(content or "").strip()
+    if not normalized and image_url:
+        return IMAGE_ONLY_LABEL
+    if not normalized:
+        return "(내용 없음)"
+    return normalized[:max_length] + ("..." if len(normalized) > max_length else "")
+
+
+def build_recent_message_option(message) -> dict | None:
+    target = build_message_action_target(message)
+    if not target.has_input or target.text.startswith("/"):
+        return None
+
+    return {
+        "content": target.text,
+        "id": getattr(message, "id"),
+        "image_url": target.image_url,
+    }
 
 
 def extract_first_youtube_link(message) -> str | None:

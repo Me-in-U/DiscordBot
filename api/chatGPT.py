@@ -46,7 +46,7 @@ def custom_prompt_model(prompt, image_content=None):
 def generate_text_model(
     user_input: str,
     instructions: str,
-    model: str = "gpt-5-mini",
+    model: str = "gpt-5.4-mini",
     max_output_tokens: int | None = None,
 ):
     request_kwargs = {

@@ -198,7 +198,7 @@ class SummarizeCommands(commands.Cog):
                 custom_prompt_model,
                 prompt={
                     "id": "pmpt_68ac08b66784819785d89655eaaaa7470bc0cc5deddb37d9",
-                    "version": "3",
+                    "version": "5",
                     "variables": {
                         "recent_messages": get_recent_messages(
                             client=self.bot, guild_id=interaction.guild.id, limit=150

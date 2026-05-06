@@ -23,6 +23,8 @@ This repository hosts a modular Discord bot built with `discord.py`. Follow thes
   - Access through DB helpers in `util/db.py`, not local JSON files.
 - **Environment**:
   - `.env` file required. Keys include `DISCORD_TOKEN`, `OPENAI_KEY`, `GOOGLE_API_KEY`, `RIOT_KEY`, `SONPANNO_GUILD_ID`, `SSAFY_GUILD_ID`, `DB_HOST`, `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD`, `API_PORT`, `CELEBRATION_UPDATE_API_KEY`, and `ECOS_API_KEY`.
+  - Keep local runtime values in `.env` and deployment runtime values in `.env.deploy`; both files are local secrets and must stay out of Git.
+  - In deployment, `DB_HOST` must point to the Docker host gateway, for example `host.docker.internal:3306`, because the shared MySQL service binds to the host loopback port and is reached from the bot container through Docker's host gateway.
   - YouTube live notifications use WebSub. Set `YOUTUBE_WEBSUB_CALLBACK_URL` to the public HTTPS callback ending in `/youtube/websub`, and set `YOUTUBE_WEBSUB_VERIFY_TOKEN` to a long random token.
 
 ## Key Components & Patterns
@@ -61,11 +63,11 @@ This repository hosts a modular Discord bot built with `discord.py`. Follow thes
 - Shared Jenkins controller, inbound agents, and n8n runtime are managed in an external/private environment and are not defined in this repository.
 - Keep committed docs generic: do not mention private repository names, local absolute paths, internal webhook URLs, or other internal operations details.
 - The example `Jenkinsfile` uses the label `discordbot-docker`; self-hosters may rename it if they also update the pipeline accordingly.
-- Jenkins deploys restore the root `.env` file from the Secret text credential `discordbot-env`, referenced by `Jenkinsfile` as `ENV_CREDENTIAL_ID`.
-- When server deployment values in `.env` change, update the Jenkins `discordbot-env` credential in the same work session; a repo diff alone does not change the deployed environment.
-- Preferred credential update method: replace the entire Secret text payload with the current root `.env` content via Jenkins Credentials UI or Script Console, then verify the stored credential matches the local file content before ending the task.
-- Script Console fallback procedure: if the browser credential form fails with `400 This page expects a form submission` or `No valid crumb was included`, fetch a fresh Jenkins crumb and authenticated session cookie first, then post to `/scriptText` and replace the full `discordbot-env` Secret text payload with the current `.env` content in one shot.
-- Verification procedure: after updating the credential, re-read `discordbot-env` through Jenkins Script Console and compare a SHA-256 hash of the stored payload against the local `.env` file; if hashing is inconvenient, at least verify the changed key lines match exactly before ending the task.
+- Jenkins deploys restore the root `.env.deploy` file from the Secret text credential `discordbot-env`, referenced by `Jenkinsfile` as `ENV_CREDENTIAL_ID`.
+- When server deployment values in `.env.deploy` change, update the Jenkins `discordbot-env` credential in the same work session; a repo diff alone does not change the deployed environment.
+- Preferred credential update method: replace the entire Secret text payload with the current root `.env.deploy` content via Jenkins Credentials UI or Script Console, then verify the stored credential matches the local file content before ending the task.
+- Script Console fallback procedure: if the browser credential form fails with `400 This page expects a form submission` or `No valid crumb was included`, fetch a fresh Jenkins crumb and authenticated session cookie first, then post to `/scriptText` and replace the full `discordbot-env` Secret text payload with the current `.env.deploy` content in one shot.
+- Verification procedure: after updating the credential, re-read `discordbot-env` through Jenkins Script Console and compare a SHA-256 hash of the stored payload against the local `.env.deploy` file; if hashing is inconvenient, at least verify the changed key lines match exactly before ending the task.
 
 ## Coding Conventions
 

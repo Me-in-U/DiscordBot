@@ -17,7 +17,6 @@ from pytube.exceptions import VideoUnavailable
 from yt_dlp import YoutubeDL
 from util.env_utils import getenv_clean, sanitize_environment
 
-
 # request_gpt.py 에 정의된 함수들 임포트
 from api.chatGPT import custom_prompt_model, generate_text_model
 
@@ -524,7 +523,7 @@ async def summarize_comments_with_gpt(comments: list) -> str:
         custom_prompt_model,
         prompt={
             "id": "pmpt_68abfada6cc8819392effc146b3a39730a3a8fd787c57011",
-            "version": "8",
+            "version": "9",
             "variables": {"comments_text": comments_text},
         },
     )
@@ -797,6 +796,7 @@ async def youtube_to_mp3(url: str) -> None:
     유튜브 영상을 다운로드(mp4) 한 뒤, mp3로 변환
     """
     try:
+
         def _download_with_ytdlp():
             ffmpeg_exec = _detect_ffmpeg_executable()
             # yt-dlp를 사용하여 오디오만 다운로드 후 mp3로 변환
@@ -846,6 +846,7 @@ async def youtube_to_mp3(url: str) -> None:
             audio_url, _ = await _fetch_stream_info(page_url)
             if not audio_url:
                 raise RuntimeError("오디오 스트림 URL을 찾지 못했습니다.")
+
             # ffmpeg로 직접 mp3 변환
             def _run_ffmpeg():
                 header_str = _build_headers_str(HEADERS)
@@ -915,7 +916,7 @@ async def summarize_text_with_gpt(youtube_text: str) -> str:
         custom_prompt_model,
         prompt={
             "id": "pmpt_68ac079c0d1081958393a758f0b6f4cc01c6576daa0b0eb7",
-            "version": "4",
+            "version": "5",
             "variables": {"youtube_text": youtube_text},
         },
     )
@@ -966,7 +967,7 @@ async def summarize_youtube_post_with_gpt(post_info: YouTubePostInfo) -> str:
         generate_text_model,
         post_input,
         instructions,
-        "gpt-5-mini",
+        "gpt-5.4-mini",
         400,
     )
 
@@ -1002,9 +1003,7 @@ async def process_youtube_video_link(url: str) -> str:
         if subtitle_path:
             print("자막이 확인되었습니다. 자막을 사용합니다.")
             # 자막 파일 내용을 읽어 텍스트로 변환
-            subtitles_text = await asyncio.to_thread(
-                read_subtitles_file, subtitle_path
-            )
+            subtitles_text = await asyncio.to_thread(read_subtitles_file, subtitle_path)
             if not subtitles_text.strip():
                 print("자막 파일이 비어 있습니다. STT로 진행합니다.")
                 raise ValueError("자막 파일이 비어 있습니다.")

@@ -11,7 +11,7 @@ services:
     restart: unless-stopped
     mem_limit: 500m
     env_file:
-      - .env
+      - ${ENV_FILE:-.env}
     environment:
       - API_PORT=1557
     ports:

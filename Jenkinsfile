@@ -113,7 +113,7 @@ pipeline {
     DOCKER_BUILDKIT = '1'
     COMPOSE_DOCKER_CLI_BUILD = '1'
     COMPOSE_FILE = 'docker-compose.yml'
-    ENV_FILE = '.env'
+    ENV_FILE = '.env.deploy'
     HEALTHCHECK_URL = 'http://host.docker.internal:1557/health'
     HEALTHCHECK_HOST_HEADER = 'host.docker.internal'
     ENV_CREDENTIAL_ID = 'discordbot-env'

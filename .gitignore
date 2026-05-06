@@ -1,5 +1,6 @@
 
 .env
+.env.deploy
 *.pyc
 *.vtt
 youtube_subtitles.ko.vtt

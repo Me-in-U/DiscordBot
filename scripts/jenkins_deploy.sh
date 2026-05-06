@@ -5,6 +5,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.yml}"
 ENV_FILE="${ENV_FILE:-.env}"
+export ENV_FILE
 MODE="${1:-auto}"
 HEALTHCHECK_URL="${HEALTHCHECK_URL:-http://host.docker.internal:1557/health}"
 HEALTHCHECK_HOST_HEADER="${HEALTHCHECK_HOST_HEADER:-host.docker.internal}"

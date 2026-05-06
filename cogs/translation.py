@@ -5,7 +5,11 @@ from discord import app_commands
 from discord.ext import commands
 
 from api.chatGPT import custom_prompt_model
-from util.message_context import build_message_action_target
+from util.message_context import (
+    build_message_action_target,
+    build_message_select_label,
+    build_recent_message_option,
+)
 
 
 TRANSLATION_PROMPT_ID = "pmpt_68ac23cf2e6c81969b355cc2d2ab11600ddeea74b62910b3"
@@ -31,7 +35,7 @@ def _build_image_content(image_url: str | None):
 async def translate_target(
     target_message: str,
     image_url: str | None,
-    prompt_version: str = "4",
+    prompt_version: str = "5",
 ) -> str:
     normalized_message = target_message.strip()
     if image_url and not normalized_message:
@@ -74,8 +78,11 @@ class TranslationSelect(discord.ui.Select):
         # options_data: [{'content': 메시지내용, 'id': 메시지ID, 'image_url': 첨부 이미지 URL (옵션)} ...]
         options = []
         for msg in options_data:
-            label = msg["content"][:50] + ("..." if len(msg["content"]) > 50 else "")
-            desc = "📷 이미지 첨부됨" if msg.get("image_url") else None
+            label = build_message_select_label(
+                msg.get("content", ""),
+                msg.get("image_url"),
+            )
+            desc = "이미지 첨부됨" if msg.get("image_url") else None
             options.append(
                 discord.SelectOption(
                     label=label, value=str(msg["id"]), description=desc
@@ -94,7 +101,10 @@ class TranslationSelect(discord.ui.Select):
         self.view.selected_message = self.view.option_mapping[selected_id]
 
         # 선택 즉시 "번역 진행중..."으로 메시지를 편집하며 뷰를 해제
-        preview = self.view.selected_message["content"][:50]
+        preview = build_message_select_label(
+            self.view.selected_message.get("content", ""),
+            self.view.selected_message.get("image_url"),
+        )
         await interaction.response.edit_message(
             content=f'"{preview}"에 대한  번역 진행중...', view=None
         )
@@ -197,7 +207,7 @@ class TranslationCommands(commands.Cog):
             translated_message = await translate_target(
                 target_message,
                 image_url,
-                prompt_version="3",
+                prompt_version="5",
             )
 
             await interaction.followup.send(translated_message)
@@ -205,17 +215,16 @@ class TranslationCommands(commands.Cog):
             messages_options = []
             async for msg in interaction.channel.history(limit=20):
                 # 봇 자신의 메시지와 슬래시 커맨드 메시지는 제외
-                if (
-                    msg.author != self.bot.user
-                    and msg.content
-                    and not msg.content.startswith("/")
-                ):
-                    opt = {"content": msg.content, "id": msg.id}
-                    if msg.attachments:
-                        opt["image_url"] = msg.attachments[0].url
-                    messages_options.append(opt)
-                    if len(messages_options) >= 20:
-                        break
+                if msg.author == self.bot.user:
+                    continue
+
+                opt = build_recent_message_option(msg)
+                if opt is None:
+                    continue
+
+                messages_options.append(opt)
+                if len(messages_options) >= 20:
+                    break
 
             if not messages_options:
                 await interaction.followup.send("**번역할 메시지를 찾지 못했습니다.**")
