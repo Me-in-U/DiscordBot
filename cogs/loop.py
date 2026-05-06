@@ -1,5 +1,5 @@
 import asyncio
-import json
+from dataclasses import replace
 from datetime import datetime, timedelta, time, timezone
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
@@ -15,10 +15,20 @@ from bot import (
     SEOUL_TZ,
     load_recent_messages,
 )
+from util.channel_settings import get_channel
 from util.celebration import refresh_celebration_messages
 from util.db import fetch_all, fetch_one, execute_query
 from util.env_utils import getenv_clean
 from func.find1557 import clearCount
+from util.youtube_subscriptions import (
+    YouTubeSubscription,
+    delete_legacy_youtube_live_checker_setting,
+    find_youtube_subscriptions_by_channel_id,
+    get_youtube_subscription,
+    list_all_youtube_subscriptions,
+    update_youtube_subscription_state,
+    update_youtube_websub_state,
+)
 from util.youtube_websub import (
     YOUTUBE_HUB_URL,
     YouTubeVideoStatus,
@@ -28,7 +38,7 @@ from util.youtube_websub import (
 )
 
 
-YOUTUBE_LIVE_SETTING_KEY = "youtubeLiveChecker"
+YOUTUBE_CHANNEL_TYPE = "youtube"
 YOUTUBE_WEBSUB_LEASE_SECONDS = 604800
 YOUTUBE_PENDING_CHECK_INTERVAL_SECONDS = 300
 YOUTUBE_PENDING_EARLY_WINDOW = timedelta(minutes=15)
@@ -43,6 +53,7 @@ class LoopTasks(commands.Cog):
         self.weekly_1557_report.start()
         api_key = getenv_clean("GOOGLE_API_KEY")
         self._youtube = build("youtube", "v3", developerKey=api_key)
+        self._legacy_youtube_setting_removed = False
         self.youtube_live_check.start()
         self.youtube_websub_renewal.start()
         print("LoopTasks Cog : init 완료!")
@@ -133,27 +144,6 @@ class LoopTasks(commands.Cog):
         # 카운트 초기화
         await clearCount()
 
-    async def _load_youtube_live_config(self) -> dict:
-        query = "SELECT setting_value FROM setting_data WHERE setting_key = %s"
-        row = await fetch_one(query, (YOUTUBE_LIVE_SETTING_KEY,))
-        if not row or not row["setting_value"]:
-            return {}
-
-        value = row["setting_value"]
-        return json.loads(value) if isinstance(value, str) else dict(value)
-
-    async def _save_youtube_live_config(self, cfg: dict) -> None:
-        json_str = json.dumps(cfg, ensure_ascii=False)
-        query = """
-        INSERT INTO setting_data (setting_key, setting_value)
-        VALUES (%s, %s)
-        ON DUPLICATE KEY UPDATE setting_value = %s
-        """
-        await execute_query(
-            query,
-            (YOUTUBE_LIVE_SETTING_KEY, json_str, json_str),
-        )
-
     def _build_youtube_websub_callback_url(self) -> str:
         callback_url = getenv_clean("YOUTUBE_WEBSUB_CALLBACK_URL", "").strip()
         if not callback_url:
@@ -176,31 +166,85 @@ class LoopTasks(commands.Cog):
             )
         )
 
-    async def ensure_youtube_websub_subscription(self) -> bool:
-        cfg = await self._load_youtube_live_config()
-        channel_id = cfg.get("youtubeChannelId")
+    async def _delete_legacy_youtube_live_checker_setting_once(self) -> None:
+        if self._legacy_youtube_setting_removed:
+            return
+        await delete_legacy_youtube_live_checker_setting()
+        self._legacy_youtube_setting_removed = True
+
+    async def ensure_youtube_websub_subscription(
+        self,
+        subscription_id: int | None = None,
+    ) -> bool:
+        await self._delete_legacy_youtube_live_checker_setting_once()
         callback_url = self._build_youtube_websub_callback_url()
-        if not channel_id or not callback_url:
+        if not callback_url:
             return False
 
+        if subscription_id is None:
+            subscriptions = await list_all_youtube_subscriptions()
+        else:
+            subscription = await get_youtube_subscription(subscription_id)
+            subscriptions = [subscription] if subscription is not None else []
+        if not subscriptions:
+            return False
+
+        success_count = 0
+        for subscription in subscriptions:
+            subscribed = await self._request_youtube_websub(
+                subscription,
+                callback_url=callback_url,
+                mode="subscribe",
+            )
+            if not subscribed:
+                continue
+            success_count += 1
+            await update_youtube_websub_state(
+                subscription.id,
+                websub_subscribed_at=datetime.now(timezone.utc),
+                websub_lease_seconds=YOUTUBE_WEBSUB_LEASE_SECONDS,
+            )
+        return success_count == len(subscriptions)
+
+    async def unsubscribe_youtube_websub_subscription(
+        self,
+        subscription: YouTubeSubscription,
+    ) -> bool:
+        callback_url = self._build_youtube_websub_callback_url()
+        if not callback_url:
+            return False
+        return await self._request_youtube_websub(
+            subscription,
+            callback_url=callback_url,
+            mode="unsubscribe",
+        )
+
+    async def _request_youtube_websub(
+        self,
+        subscription: YouTubeSubscription,
+        *,
+        callback_url: str,
+        mode: str,
+    ) -> bool:
         data = {
-            "hub.mode": "subscribe",
-            "hub.topic": build_youtube_feed_topic_url(channel_id),
+            "hub.mode": mode,
+            "hub.topic": build_youtube_feed_topic_url(subscription.channel_id),
             "hub.callback": callback_url,
             "hub.verify": "async",
-            "hub.lease_seconds": str(YOUTUBE_WEBSUB_LEASE_SECONDS),
         }
+        if mode == "subscribe":
+            data["hub.lease_seconds"] = str(YOUTUBE_WEBSUB_LEASE_SECONDS)
 
         async with aiohttp.ClientSession(trust_env=False) as session:
             async with session.post(YOUTUBE_HUB_URL, data=data) as response:
                 if response.status < 200 or response.status >= 300:
                     body = await response.text()
-                    print(f"YouTube WebSub 구독 요청 실패: {response.status} {body}")
+                    print(
+                        "YouTube WebSub 요청 실패: "
+                        f"mode={mode} channel={subscription.channel_id} "
+                        f"status={response.status} body={body}"
+                    )
                     return False
-
-        cfg["websubSubscribedAt"] = datetime.now(timezone.utc).isoformat()
-        cfg["websubLeaseSeconds"] = YOUTUBE_WEBSUB_LEASE_SECONDS
-        await self._save_youtube_live_config(cfg)
         return True
 
     async def _fetch_youtube_video_status(self, video_id: str):
@@ -220,54 +264,102 @@ class LoopTasks(commands.Cog):
         item = await asyncio.to_thread(_fetch_video_item)
         return classify_video_item(item) if item else None
 
-    def _get_notified_video_ids(self, cfg: dict) -> set[str]:
-        notified_ids = cfg.get("notifiedVideoIds", [])
-        return {str(video_id) for video_id in notified_ids if video_id}
+    def _get_notified_video_ids(self, subscription: YouTubeSubscription) -> set[str]:
+        return {str(video_id) for video_id in subscription.notified_video_ids if video_id}
 
-    def _mark_youtube_video_notified(self, cfg: dict, video_id: str) -> None:
-        notified_ids = [
-            str(current_id)
-            for current_id in cfg.get("notifiedVideoIds", [])
-            if current_id
-        ]
+    async def _mark_youtube_video_notified(
+        self,
+        subscription: YouTubeSubscription,
+        video_id: str,
+    ) -> YouTubeSubscription:
+        notified_ids = [str(current_id) for current_id in subscription.notified_video_ids]
         if video_id not in notified_ids:
             notified_ids.append(video_id)
-        cfg["notifiedVideoIds"] = notified_ids[-30:]
+        notified_ids = notified_ids[-30:]
+        pending = dict(subscription.pending_videos)
+        pending.pop(video_id, None)
+        await update_youtube_subscription_state(
+            subscription.id,
+            pending_videos=pending,
+            notified_video_ids=notified_ids,
+        )
+        return replace(
+            subscription,
+            pending_videos=pending,
+            notified_video_ids=notified_ids,
+        )
 
-    def _remember_pending_youtube_video(self, cfg: dict, status) -> None:
-        pending = cfg.setdefault("pendingVideos", {})
+    async def _remember_pending_youtube_video(
+        self,
+        subscription: YouTubeSubscription,
+        status,
+    ) -> YouTubeSubscription:
+        pending = dict(subscription.pending_videos)
         pending[status.video_id] = {
             "title": status.title,
             "channelId": status.channel_id,
             "scheduledStartTime": status.scheduled_start_time,
             "lastCheckedAt": datetime.now(timezone.utc).isoformat(),
         }
+        await update_youtube_subscription_state(
+            subscription.id,
+            pending_videos=pending,
+            notified_video_ids=subscription.notified_video_ids,
+        )
+        return replace(subscription, pending_videos=pending)
 
-    def _remove_pending_youtube_video(self, cfg: dict, video_id: str) -> None:
-        pending = cfg.get("pendingVideos")
-        if isinstance(pending, dict):
-            pending.pop(video_id, None)
+    async def _remove_pending_youtube_video(
+        self,
+        subscription: YouTubeSubscription,
+        video_id: str,
+    ) -> YouTubeSubscription:
+        pending = dict(subscription.pending_videos)
+        pending.pop(video_id, None)
+        await update_youtube_subscription_state(
+            subscription.id,
+            pending_videos=pending,
+            notified_video_ids=subscription.notified_video_ids,
+        )
+        return replace(subscription, pending_videos=pending)
 
-    async def _send_youtube_live_notification(self, cfg: dict, status) -> bool:
-        if status.video_id in self._get_notified_video_ids(cfg):
+    async def _send_youtube_live_notification(
+        self,
+        subscription: YouTubeSubscription,
+        status,
+    ) -> bool:
+        if status.video_id in self._get_notified_video_ids(subscription):
             return False
 
-        target = self.bot.get_channel(SONPANNO_GUILD_ID)
+        target_channel_id = await get_channel(subscription.guild_id, YOUTUBE_CHANNEL_TYPE)
+        if target_channel_id is None:
+            print(
+                "YouTube 라이브 알림 채널이 설정되지 않았습니다. "
+                f"guild={subscription.guild_id} channel={subscription.channel_id}"
+            )
+            return False
+
+        target = self.bot.get_channel(target_channel_id)
         if target is None:
-            print("YouTube 라이브 알림 대상 채널을 찾을 수 없습니다.")
-            return False
+            try:
+                target = await self.bot.fetch_channel(target_channel_id)
+            except discord.DiscordException:
+                print(
+                    "YouTube 라이브 알림 대상 채널을 찾을 수 없습니다. "
+                    f"guild={subscription.guild_id} channel_id={target_channel_id}"
+                )
+                return False
 
         title = f"**{status.title}** " if status.title else ""
-        await target.send(f"📺 {title}LIVE 시작! ▶ https://youtu.be/{status.video_id}")
-        self._mark_youtube_video_notified(cfg, status.video_id)
-        self._remove_pending_youtube_video(cfg, status.video_id)
-        cfg["loop"] = False
-        await self._save_youtube_live_config(cfg)
-        self.youtube_live_check.stop()
+        channel_name = f"[{subscription.channel_name}] "
+        await target.send(
+            f"📺 {channel_name}{title}LIVE 시작! ▶ https://youtu.be/{status.video_id}"
+        )
         return True
 
     async def _process_youtube_video_candidate(
-        self, cfg: dict, video_id: str
+        self,
+        subscription: YouTubeSubscription,
+        video_id: str,
     ) -> str:
         try:
             status = await self._fetch_youtube_video_status(video_id)
@@ -276,38 +368,31 @@ class LoopTasks(commands.Cog):
             return "error"
 
         if status is None:
-            self._remove_pending_youtube_video(cfg, video_id)
-            await self._save_youtube_live_config(cfg)
+            await self._remove_pending_youtube_video(subscription, video_id)
             return "missing"
 
+        if status.channel_id and status.channel_id != subscription.channel_id:
+            await self._remove_pending_youtube_video(subscription, video_id)
+            return "channel_mismatch"
+
         if status.status == YouTubeVideoStatus.LIVE:
-            if cfg.get("loop", False):
-                if status.video_id in self._get_notified_video_ids(cfg):
-                    return "duplicate"
-                sent = await self._send_youtube_live_notification(cfg, status)
-                if sent:
-                    return "notified"
-
-                self._remember_pending_youtube_video(cfg, status)
-                await self._save_youtube_live_config(cfg)
-                return "live_pending"
-
-            self._remember_pending_youtube_video(cfg, status)
-            await self._save_youtube_live_config(cfg)
+            if status.video_id in self._get_notified_video_ids(subscription):
+                return "duplicate"
+            sent = await self._send_youtube_live_notification(subscription, status)
+            if sent:
+                await self._mark_youtube_video_notified(subscription, status.video_id)
+                return "notified"
+            await self._remember_pending_youtube_video(subscription, status)
             return "live_pending"
 
         if status.status == YouTubeVideoStatus.UPCOMING:
-            self._remember_pending_youtube_video(cfg, status)
-            await self._save_youtube_live_config(cfg)
+            await self._remember_pending_youtube_video(subscription, status)
             return "upcoming"
 
-        self._remove_pending_youtube_video(cfg, video_id)
-        await self._save_youtube_live_config(cfg)
+        await self._remove_pending_youtube_video(subscription, video_id)
         return "not_live"
 
     async def handle_youtube_websub_notification(self, atom_xml: str) -> dict:
-        cfg = await self._load_youtube_live_config()
-        configured_channel_id = cfg.get("youtubeChannelId")
         entries = parse_youtube_atom_entries(atom_xml)
 
         result = {
@@ -317,17 +402,27 @@ class LoopTasks(commands.Cog):
             "results": [],
         }
         for entry in entries:
-            if configured_channel_id and entry.channel_id != configured_channel_id:
+            subscriptions = await find_youtube_subscriptions_by_channel_id(
+                entry.channel_id
+            )
+            if not subscriptions:
                 result["ignored"] += 1
                 continue
 
-            outcome = await self._process_youtube_video_candidate(
-                cfg,
-                entry.video_id,
-            )
-            result["processed"] += 1
-            result["results"].append({"video_id": entry.video_id, "status": outcome})
-            cfg = await self._load_youtube_live_config()
+            for subscription in subscriptions:
+                outcome = await self._process_youtube_video_candidate(
+                    subscription,
+                    entry.video_id,
+                )
+                result["processed"] += 1
+                result["results"].append(
+                    {
+                        "guild_id": subscription.guild_id,
+                        "subscription_id": subscription.id,
+                        "video_id": entry.video_id,
+                        "status": outcome,
+                    }
+                )
 
         return result
 
@@ -367,25 +462,43 @@ class LoopTasks(commands.Cog):
     async def youtube_live_check(self):
         """WebSub로 받은 라이브 후보만 videos.list로 확인합니다."""
         try:
-            cfg = await self._load_youtube_live_config()
-            if not cfg.get("loop", False):
-                return
-
-            pending = cfg.get("pendingVideos", {})
-            if not isinstance(pending, dict) or not pending:
-                return
-
-            for video_id, pending_entry in list(pending.items()):
-                if not isinstance(pending_entry, dict):
-                    self._remove_pending_youtube_video(cfg, str(video_id))
-                    continue
-                if not self._should_check_pending_youtube_video(pending_entry):
+            await self._delete_legacy_youtube_live_checker_setting_once()
+            subscriptions = await list_all_youtube_subscriptions()
+            for subscription in subscriptions:
+                pending = dict(subscription.pending_videos)
+                if not pending:
                     continue
 
-                pending_entry["lastCheckedAt"] = datetime.now(timezone.utc).isoformat()
-                await self._save_youtube_live_config(cfg)
-                await self._process_youtube_video_candidate(cfg, str(video_id))
-                cfg = await self._load_youtube_live_config()
+                for video_id, pending_entry in list(pending.items()):
+                    if not isinstance(pending_entry, dict):
+                        subscription = await self._remove_pending_youtube_video(
+                            subscription,
+                            str(video_id),
+                        )
+                        pending = dict(subscription.pending_videos)
+                        continue
+                    if not self._should_check_pending_youtube_video(pending_entry):
+                        continue
+
+                    pending_entry["lastCheckedAt"] = datetime.now(
+                        timezone.utc
+                    ).isoformat()
+                    pending[str(video_id)] = pending_entry
+                    await update_youtube_subscription_state(
+                        subscription.id,
+                        pending_videos=pending,
+                        notified_video_ids=subscription.notified_video_ids,
+                    )
+                    subscription = replace(subscription, pending_videos=pending)
+                    await self._process_youtube_video_candidate(
+                        subscription,
+                        str(video_id),
+                    )
+                    refreshed = await get_youtube_subscription(subscription.id)
+                    if refreshed is None:
+                        break
+                    subscription = refreshed
+                    pending = dict(subscription.pending_videos)
         except Exception as e:
             print(f"YouTube 라이브 후보 확인 오류: {e}")
 

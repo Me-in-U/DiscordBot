@@ -9,6 +9,7 @@ from util.channel_settings import get_settings_for_guild, set_channel
 PURPOSE_CHOICES = {
     "celebration": "기념일",
     "gamble": "도박",
+    "youtube": "유튜브",
 }
 
 
@@ -18,7 +19,7 @@ class ChannelSettings(commands.Cog):
 
     @app_commands.command(
         name="채널설정",
-        description="기념일 또는 도박 기능이 동작할 채널을 지정하거나 해제합니다.",
+        description="기념일, 도박, 유튜브 기능이 동작할 채널을 지정하거나 해제합니다.",
     )
     @app_commands.describe(
         purpose="설정할 기능 타입을 선택하세요.",
@@ -29,6 +30,7 @@ class ChannelSettings(commands.Cog):
         purpose=[
             app_commands.Choice(name="기념일", value="celebration"),
             app_commands.Choice(name="도박", value="gamble"),
+            app_commands.Choice(name="유튜브", value="youtube"),
         ]
     )
     async def configure_channel(
@@ -67,6 +69,7 @@ class ChannelSettings(commands.Cog):
         summary = await get_settings_for_guild(guild_id)
         celebration = summary.get("celebration")
         gamble = summary.get("gamble")
+        youtube = summary.get("youtube")
 
         embed = discord.Embed(
             title="⚙️ 채널 설정",
@@ -78,6 +81,7 @@ class ChannelSettings(commands.Cog):
         )
         celebration_value = f"<#{celebration}>" if celebration else "미지정"
         gamble_value = f"<#{gamble}>" if gamble else "미지정"
+        youtube_value = f"<#{youtube}>" if youtube else "미지정"
 
         embed.add_field(
             name="현재 기념일 채널",
@@ -89,12 +93,17 @@ class ChannelSettings(commands.Cog):
             value=gamble_value,
             inline=True,
         )
+        embed.add_field(
+            name="현재 유튜브 채널",
+            value=youtube_value,
+            inline=True,
+        )
 
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @app_commands.command(
         name="채널설정확인",
-        description="현재 길드에 설정된 기념일/도박 채널을 확인합니다.",
+        description="현재 길드에 설정된 기념일/도박/유튜브 채널을 확인합니다.",
     )
     async def show_channel_settings(self, interaction: discord.Interaction) -> None:
         if interaction.guild_id is None:
@@ -107,10 +116,12 @@ class ChannelSettings(commands.Cog):
         summary = await get_settings_for_guild(int(interaction.guild_id))
         celebration = summary.get("celebration")
         gamble = summary.get("gamble")
+        youtube = summary.get("youtube")
 
         embed = discord.Embed(title="🔎 채널 설정 현황", color=discord.Color.blurple())
         celebration_value = f"<#{celebration}>" if celebration else "미지정"
         gamble_value = f"<#{gamble}>" if gamble else "미지정"
+        youtube_value = f"<#{youtube}>" if youtube else "미지정"
 
         embed.add_field(
             name="기념일",
@@ -120,6 +131,11 @@ class ChannelSettings(commands.Cog):
         embed.add_field(
             name="도박",
             value=gamble_value,
+            inline=True,
+        )
+        embed.add_field(
+            name="유튜브",
+            value=youtube_value,
             inline=True,
         )
 

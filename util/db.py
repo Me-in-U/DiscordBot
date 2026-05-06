@@ -143,6 +143,25 @@ async def create_tables():
         ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
         """,
         """
+        CREATE TABLE IF NOT EXISTS youtube_subscriptions (
+            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            guild_id BIGINT UNSIGNED NOT NULL,
+            channel_name VARCHAR(255) NOT NULL,
+            channel_id VARCHAR(32) NOT NULL,
+            channel_handle VARCHAR(255),
+            source_input VARCHAR(255) NOT NULL,
+            websub_subscribed_at DATETIME(6),
+            websub_lease_seconds INT,
+            pending_videos JSON,
+            notified_video_ids JSON,
+            created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+            updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+            UNIQUE KEY uk_youtube_subscriptions_guild_channel (guild_id, channel_id),
+            INDEX idx_youtube_subscriptions_channel_id (channel_id),
+            INDEX idx_youtube_subscriptions_guild_id (guild_id)
+        ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+        """,
+        """
         CREATE TABLE IF NOT EXISTS special_days (
             id INT AUTO_INCREMENT PRIMARY KEY,
             day_key VARCHAR(10) NOT NULL,
@@ -170,6 +189,8 @@ async def create_tables():
             await _ensure_bigint_unsigned(conn, "panel_messages", "guild_id")
             await _ensure_bigint_unsigned(conn, "panel_messages", "message_id")
             await _ensure_bigint_unsigned(conn, "counter_1557", "user_id")
+            await _ensure_bigint_unsigned(conn, "youtube_subscriptions", "id")
+            await _ensure_bigint_unsigned(conn, "youtube_subscriptions", "guild_id")
 
 
 async def upsert_guild(guild_id, guild_name):
