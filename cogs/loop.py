@@ -35,6 +35,7 @@ from util.youtube_websub import (
     build_youtube_feed_topic_url,
     classify_video_item,
     parse_youtube_atom_entries,
+    should_process_youtube_feed_update,
 )
 
 
@@ -43,6 +44,8 @@ YOUTUBE_WEBSUB_LEASE_SECONDS = 604800
 YOUTUBE_PENDING_CHECK_INTERVAL_SECONDS = 300
 YOUTUBE_PENDING_EARLY_WINDOW = timedelta(minutes=15)
 YOUTUBE_PENDING_EXPIRE_WINDOW = timedelta(hours=24)
+YOUTUBE_FEED_FALLBACK_INTERVAL_SECONDS = 300
+YOUTUBE_FEED_FALLBACK_MAX_ENTRIES = 5
 
 
 class LoopTasks(commands.Cog):
@@ -54,6 +57,8 @@ class LoopTasks(commands.Cog):
         api_key = getenv_clean("GOOGLE_API_KEY")
         self._youtube = build("youtube", "v3", developerKey=api_key)
         self._legacy_youtube_setting_removed = False
+        self._youtube_feed_checked_at: dict[int, datetime] = {}
+        self._youtube_feed_seen_updates: dict[int, dict[str, str]] = {}
         self.youtube_live_check.start()
         self.youtube_websub_renewal.start()
         print("LoopTasks Cog : init 완료!")
@@ -264,8 +269,107 @@ class LoopTasks(commands.Cog):
         item = await asyncio.to_thread(_fetch_video_item)
         return classify_video_item(item) if item else None
 
+    async def _fetch_youtube_feed_entries(
+        self,
+        session: aiohttp.ClientSession,
+        subscription: YouTubeSubscription,
+    ):
+        topic_url = build_youtube_feed_topic_url(subscription.channel_id)
+        async with session.get(topic_url) as response:
+            if response.status < 200 or response.status >= 300:
+                body = await response.text()
+                print(
+                    "YouTube Atom feed 조회 실패: "
+                    f"channel={subscription.channel_id} "
+                    f"status={response.status} body={body[:300]}"
+                )
+                return []
+            atom_xml = await response.text()
+        return parse_youtube_atom_entries(atom_xml)
+
     def _get_notified_video_ids(self, subscription: YouTubeSubscription) -> set[str]:
         return {str(video_id) for video_id in subscription.notified_video_ids if video_id}
+
+    def _should_poll_youtube_feed(self, subscription_id: int) -> bool:
+        now = datetime.now(timezone.utc)
+        last_checked = self._youtube_feed_checked_at.get(subscription_id)
+        if (
+            last_checked
+            and now - last_checked
+            < timedelta(seconds=YOUTUBE_FEED_FALLBACK_INTERVAL_SECONDS)
+        ):
+            return False
+        self._youtube_feed_checked_at[subscription_id] = now
+        return True
+
+    def _should_process_youtube_feed_entry(
+        self,
+        subscription: YouTubeSubscription,
+        video_id: str,
+        entry_updated: str,
+    ) -> bool:
+        seen_updates = self._youtube_feed_seen_updates.setdefault(subscription.id, {})
+        return should_process_youtube_feed_update(
+            video_id=video_id,
+            entry_updated=entry_updated,
+            seen_updates=seen_updates,
+            pending_videos=subscription.pending_videos,
+            notified_video_ids=subscription.notified_video_ids,
+        )
+
+    def _remember_youtube_feed_entry_seen(
+        self,
+        subscription_id: int,
+        video_id: str,
+        entry_updated: str,
+    ) -> None:
+        seen_updates = self._youtube_feed_seen_updates.setdefault(subscription_id, {})
+        seen_updates[video_id] = entry_updated
+        if len(seen_updates) > 50:
+            for old_video_id in list(seen_updates)[: len(seen_updates) - 50]:
+                seen_updates.pop(old_video_id, None)
+
+    async def _poll_youtube_feed_fallback(
+        self,
+        subscription: YouTubeSubscription,
+        session: aiohttp.ClientSession,
+    ) -> YouTubeSubscription | None:
+        if not self._should_poll_youtube_feed(subscription.id):
+            return subscription
+
+        try:
+            entries = await self._fetch_youtube_feed_entries(session, subscription)
+        except Exception as e:
+            print(
+                "YouTube Atom feed 처리 오류: "
+                f"channel={subscription.channel_id} error={e}"
+            )
+            return subscription
+
+        for entry in entries[:YOUTUBE_FEED_FALLBACK_MAX_ENTRIES]:
+            if entry.channel_id != subscription.channel_id:
+                continue
+
+            entry_updated = entry.updated or entry.published
+            if not self._should_process_youtube_feed_entry(
+                subscription,
+                entry.video_id,
+                entry_updated,
+            ):
+                continue
+
+            await self._process_youtube_video_candidate(subscription, entry.video_id)
+            self._remember_youtube_feed_entry_seen(
+                subscription.id,
+                entry.video_id,
+                entry_updated,
+            )
+            refreshed = await get_youtube_subscription(subscription.id)
+            if refreshed is None:
+                return None
+            subscription = refreshed
+
+        return subscription
 
     async def _mark_youtube_video_notified(
         self,
@@ -460,45 +564,53 @@ class LoopTasks(commands.Cog):
 
     @tasks.loop(seconds=60)
     async def youtube_live_check(self):
-        """WebSub로 받은 라이브 후보만 videos.list로 확인합니다."""
+        """WebSub 후보와 Atom feed fallback 후보를 videos.list로 확인합니다."""
         try:
             await self._delete_legacy_youtube_live_checker_setting_once()
             subscriptions = await list_all_youtube_subscriptions()
-            for subscription in subscriptions:
-                pending = dict(subscription.pending_videos)
-                if not pending:
-                    continue
+            async with aiohttp.ClientSession(trust_env=False) as session:
+                for subscription in subscriptions:
+                    subscription = await self._poll_youtube_feed_fallback(
+                        subscription,
+                        session,
+                    )
+                    if subscription is None:
+                        continue
 
-                for video_id, pending_entry in list(pending.items()):
-                    if not isinstance(pending_entry, dict):
-                        subscription = await self._remove_pending_youtube_video(
+                    pending = dict(subscription.pending_videos)
+                    if not pending:
+                        continue
+
+                    for video_id, pending_entry in list(pending.items()):
+                        if not isinstance(pending_entry, dict):
+                            subscription = await self._remove_pending_youtube_video(
+                                subscription,
+                                str(video_id),
+                            )
+                            pending = dict(subscription.pending_videos)
+                            continue
+                        if not self._should_check_pending_youtube_video(pending_entry):
+                            continue
+
+                        pending_entry["lastCheckedAt"] = datetime.now(
+                            timezone.utc
+                        ).isoformat()
+                        pending[str(video_id)] = pending_entry
+                        await update_youtube_subscription_state(
+                            subscription.id,
+                            pending_videos=pending,
+                            notified_video_ids=subscription.notified_video_ids,
+                        )
+                        subscription = replace(subscription, pending_videos=pending)
+                        await self._process_youtube_video_candidate(
                             subscription,
                             str(video_id),
                         )
+                        refreshed = await get_youtube_subscription(subscription.id)
+                        if refreshed is None:
+                            break
+                        subscription = refreshed
                         pending = dict(subscription.pending_videos)
-                        continue
-                    if not self._should_check_pending_youtube_video(pending_entry):
-                        continue
-
-                    pending_entry["lastCheckedAt"] = datetime.now(
-                        timezone.utc
-                    ).isoformat()
-                    pending[str(video_id)] = pending_entry
-                    await update_youtube_subscription_state(
-                        subscription.id,
-                        pending_videos=pending,
-                        notified_video_ids=subscription.notified_video_ids,
-                    )
-                    subscription = replace(subscription, pending_videos=pending)
-                    await self._process_youtube_video_candidate(
-                        subscription,
-                        str(video_id),
-                    )
-                    refreshed = await get_youtube_subscription(subscription.id)
-                    if refreshed is None:
-                        break
-                    subscription = refreshed
-                    pending = dict(subscription.pending_videos)
         except Exception as e:
             print(f"YouTube 라이브 후보 확인 오류: {e}")
 

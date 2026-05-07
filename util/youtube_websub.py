@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import Any
 from urllib.parse import urlencode
 from xml.etree import ElementTree
 
@@ -107,3 +108,18 @@ def classify_video_item(item: dict) -> YouTubeVideoLiveStatus:
         status=status,
         scheduled_start_time=scheduled_start_time,
     )
+
+
+def should_process_youtube_feed_update(
+    *,
+    video_id: str,
+    entry_updated: str,
+    seen_updates: dict[str, str],
+    pending_videos: dict[str, Any],
+    notified_video_ids: list[str],
+) -> bool:
+    if video_id in {str(current_id) for current_id in notified_video_ids if current_id}:
+        return False
+    if video_id in pending_videos:
+        return True
+    return seen_updates.get(video_id) != entry_updated

@@ -5,6 +5,7 @@ from util.youtube_websub import (
     build_youtube_feed_topic_url,
     classify_video_item,
     parse_youtube_atom_entries,
+    should_process_youtube_feed_update,
 )
 
 
@@ -100,6 +101,50 @@ class YouTubeWebSubTests(unittest.TestCase):
         )
 
         self.assertEqual(status.status, YouTubeVideoStatus.NOT_LIVE)
+
+    def test_processes_unseen_feed_update(self):
+        self.assertTrue(
+            should_process_youtube_feed_update(
+                video_id="VIDEO123",
+                entry_updated="2026-05-07T07:03:59+00:00",
+                seen_updates={},
+                pending_videos={},
+                notified_video_ids=[],
+            )
+        )
+
+    def test_skips_unchanged_feed_update(self):
+        self.assertFalse(
+            should_process_youtube_feed_update(
+                video_id="VIDEO123",
+                entry_updated="2026-05-07T07:03:59+00:00",
+                seen_updates={"VIDEO123": "2026-05-07T07:03:59+00:00"},
+                pending_videos={},
+                notified_video_ids=[],
+            )
+        )
+
+    def test_processes_pending_feed_update_even_when_unchanged(self):
+        self.assertTrue(
+            should_process_youtube_feed_update(
+                video_id="VIDEO123",
+                entry_updated="2026-05-07T07:03:59+00:00",
+                seen_updates={"VIDEO123": "2026-05-07T07:03:59+00:00"},
+                pending_videos={"VIDEO123": {"scheduledStartTime": None}},
+                notified_video_ids=[],
+            )
+        )
+
+    def test_skips_notified_feed_update(self):
+        self.assertFalse(
+            should_process_youtube_feed_update(
+                video_id="VIDEO123",
+                entry_updated="2026-05-07T07:03:59+00:00",
+                seen_updates={},
+                pending_videos={"VIDEO123": {"scheduledStartTime": None}},
+                notified_video_ids=["VIDEO123"],
+            )
+        )
 
 
 if __name__ == "__main__":
