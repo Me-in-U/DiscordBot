@@ -201,9 +201,9 @@ class YouTubeSubscriptionsCog(commands.Cog):
 
     @youtube_subscription.command(
         name="추가",
-        description="유튜브 채널 ID 또는 @handle을 서버 구독 목록에 추가합니다.",
+        description="유튜브 채널 URL, ID, @handle 또는 검색어로 구독을 추가합니다.",
     )
-    @app_commands.describe(input_value="유튜브 채널 ID 또는 @handle")
+    @app_commands.describe(input_value="유튜브 채널 URL, ID, @handle 또는 검색어")
     @app_commands.rename(input_value="입력")
     async def add_subscription(
         self,

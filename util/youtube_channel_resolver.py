@@ -69,7 +69,8 @@ async def resolve_youtube_channel_input(
     if handle:
         return await _fetch_channel_metadata(client, forHandle=handle)
 
-    raise ValueError("채널 ID 또는 @handle 형식으로 입력해 주세요.")
+    searched_channel_id = await _search_relevant_channel_id(client, clean_value)
+    return await _fetch_channel_metadata(client, id=searched_channel_id)
 
 
 def _build_youtube_client():
@@ -103,3 +104,30 @@ async def _fetch_channel_metadata(client, **query) -> YouTubeChannelMetadata:
         channel_name=channel_name,
         channel_handle=channel_handle,
     )
+
+
+async def _search_relevant_channel_id(client, query: str) -> str:
+    def _execute():
+        return (
+            client.search()
+            .list(
+                part="snippet",
+                q=query,
+                type="channel",
+                order="relevance",
+                maxResults=1,
+            )
+            .execute()
+        )
+
+    response = await asyncio.to_thread(_execute)
+    items = response.get("items", []) if isinstance(response, dict) else []
+    if not items:
+        raise ValueError("유튜브 채널을 찾지 못했습니다.")
+
+    item = items[0]
+    item_id = item.get("id", {}) or {}
+    channel_id = str(item_id.get("channelId") or "").strip()
+    if not is_youtube_channel_id(channel_id):
+        raise ValueError("유효한 유튜브 채널 ID를 가져오지 못했습니다.")
+    return channel_id

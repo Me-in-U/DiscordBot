@@ -22,6 +22,29 @@ def _is_ephemeral_true(keyword: ast.keyword) -> bool:
 
 
 class YouTubeSubscriptionTests(unittest.TestCase):
+    def test_add_subscription_description_mentions_search_terms(self):
+        tree = ast.parse(
+            YOUTUBE_SUBSCRIPTION_COG_PATH.read_text(encoding="utf-8"),
+            filename=str(YOUTUBE_SUBSCRIPTION_COG_PATH),
+        )
+        add_node = next(
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.AsyncFunctionDef)
+            and node.name == "add_subscription"
+        )
+        decorator_texts = [
+            node.value
+            for decorator in add_node.decorator_list
+            for node in ast.walk(decorator)
+            if isinstance(node, ast.Constant) and isinstance(node.value, str)
+        ]
+
+        self.assertTrue(
+            any("검색어" in text for text in decorator_texts),
+            decorator_texts,
+        )
+
     def test_subscription_command_messages_are_public(self):
         tree = ast.parse(
             YOUTUBE_SUBSCRIPTION_COG_PATH.read_text(encoding="utf-8"),

@@ -9,18 +9,28 @@ from util.youtube_channel_resolver import (
 
 
 class FakeYouTubeClient:
-    def __init__(self, response):
+    def __init__(self, response, *, search_response=None):
         self.response = response
+        self.search_response = search_response
         self.calls = []
+        self.resource = None
 
     def channels(self):
+        self.resource = "channels"
+        return self
+
+    def search(self):
+        self.resource = "search"
         return self
 
     def list(self, **kwargs):
+        kwargs["resource"] = self.resource
         self.calls.append(kwargs)
         return self
 
     def execute(self):
+        if self.resource == "search":
+            return self.search_response
         return self.response
 
 
@@ -95,6 +105,49 @@ class YouTubeChannelResolverTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.channel_name, "침착맨 원본 박물관")
         self.assertEqual(result.channel_handle, "@ChimChakMan_Data")
         self.assertEqual(client.calls[0]["forHandle"], "@ChimChakMan_Data")
+
+    async def test_search_query_fetches_most_relevant_channel_metadata(self):
+        client = FakeYouTubeClient(
+            {
+                "items": [
+                    {
+                        "id": "UCabcdefghijklmnopqrstuv",
+                        "snippet": {
+                            "title": "침착맨 플러스",
+                            "customUrl": "@ChimChakMan_Data",
+                        },
+                    }
+                ]
+            },
+            search_response={
+                "items": [
+                    {
+                        "id": {"channelId": "UCabcdefghijklmnopqrstuv"},
+                        "snippet": {"title": "침착맨 플러스"},
+                    }
+                ]
+            },
+        )
+
+        result = await resolve_youtube_channel_input(
+            "침착맨 플러스",
+            youtube_client=client,
+        )
+
+        self.assertEqual(
+            result,
+            YouTubeChannelMetadata(
+                channel_id="UCabcdefghijklmnopqrstuv",
+                channel_name="침착맨 플러스",
+                channel_handle="@ChimChakMan_Data",
+            ),
+        )
+        self.assertEqual(client.calls[0]["resource"], "search")
+        self.assertEqual(client.calls[0]["q"], "침착맨 플러스")
+        self.assertEqual(client.calls[0]["type"], "channel")
+        self.assertEqual(client.calls[0]["maxResults"], 1)
+        self.assertEqual(client.calls[1]["resource"], "channels")
+        self.assertEqual(client.calls[1]["id"], "UCabcdefghijklmnopqrstuv")
 
     async def test_raises_when_channel_is_not_found(self):
         client = FakeYouTubeClient({"items": []})
