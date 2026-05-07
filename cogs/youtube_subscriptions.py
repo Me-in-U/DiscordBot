@@ -217,11 +217,11 @@ class YouTubeSubscriptionsCog(commands.Cog):
         if target_channel_id is None:
             await interaction.response.send_message(
                 "`/채널설정 기능:유튜브 채널:#알림채널`을 먼저 설정해 주세요.",
-                ephemeral=True,
+                ephemeral=False,
             )
             return
 
-        await interaction.response.defer(ephemeral=True, thinking=True)
+        await interaction.response.defer(ephemeral=False, thinking=True)
         try:
             metadata = await resolve_youtube_channel_input(input_value)
             subscription_id = await create_youtube_subscription(
@@ -245,9 +245,9 @@ class YouTubeSubscriptionsCog(commands.Cog):
             )
             if not subscribed:
                 message += "\n⚠️ WebSub callback 설정을 확인해 주세요."
-            await interaction.followup.send(message, ephemeral=True)
+            await interaction.followup.send(message, ephemeral=False)
         except Exception as error:
-            await interaction.followup.send(f"오류: {error}", ephemeral=True)
+            await interaction.followup.send(f"오류: {error}", ephemeral=False)
 
     @youtube_subscription.command(
         name="삭제",
@@ -261,7 +261,7 @@ class YouTubeSubscriptionsCog(commands.Cog):
         if not subscriptions:
             await interaction.response.send_message(
                 "등록된 유튜브 구독이 없습니다.",
-                ephemeral=True,
+                ephemeral=False,
             )
             return
 
@@ -274,7 +274,7 @@ class YouTubeSubscriptionsCog(commands.Cog):
         await interaction.response.send_message(
             view._content(),
             view=view,
-            ephemeral=True,
+            ephemeral=False,
         )
 
     @youtube_subscription.command(
@@ -285,7 +285,7 @@ class YouTubeSubscriptionsCog(commands.Cog):
         if interaction.guild_id is None:
             await interaction.response.send_message(
                 "이 명령어는 길드에서만 사용할 수 있습니다.",
-                ephemeral=True,
+                ephemeral=False,
             )
             return
 
@@ -313,7 +313,7 @@ class YouTubeSubscriptionsCog(commands.Cog):
             if len(lines) > 30:
                 embed.set_footer(text=f"총 {len(lines)}개 중 30개만 표시합니다.")
 
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.response.send_message(embed=embed, ephemeral=False)
 
 
 def _format_subscription_line(

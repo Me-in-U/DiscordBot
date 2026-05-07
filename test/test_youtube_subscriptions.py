@@ -1,9 +1,48 @@
+import ast
 import unittest
+from pathlib import Path
 
 from util.youtube_subscriptions import YouTubeSubscription, row_to_subscription
 
 
+YOUTUBE_SUBSCRIPTION_COG_PATH = Path("cogs/youtube_subscriptions.py")
+PUBLIC_COMMAND_METHODS = {
+    "add_subscription",
+    "delete_subscription",
+    "list_subscription",
+}
+
+
+def _is_ephemeral_true(keyword: ast.keyword) -> bool:
+    return (
+        keyword.arg == "ephemeral"
+        and isinstance(keyword.value, ast.Constant)
+        and keyword.value.value is True
+    )
+
+
 class YouTubeSubscriptionTests(unittest.TestCase):
+    def test_subscription_command_messages_are_public(self):
+        tree = ast.parse(
+            YOUTUBE_SUBSCRIPTION_COG_PATH.read_text(encoding="utf-8"),
+            filename=str(YOUTUBE_SUBSCRIPTION_COG_PATH),
+        )
+        failures: list[str] = []
+
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.AsyncFunctionDef):
+                continue
+            if node.name not in PUBLIC_COMMAND_METHODS:
+                continue
+
+            for call in ast.walk(node):
+                if not isinstance(call, ast.Call):
+                    continue
+                if any(_is_ephemeral_true(keyword) for keyword in call.keywords):
+                    failures.append(f"{node.name}:{call.lineno}")
+
+        self.assertEqual(failures, [])
+
     def test_row_to_subscription_decodes_json_state(self):
         row = {
             "id": 7,
