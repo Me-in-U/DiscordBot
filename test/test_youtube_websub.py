@@ -1,5 +1,7 @@
 import unittest
 
+import util.youtube_websub as youtube_websub
+
 from util.youtube_websub import (
     YouTubeVideoStatus,
     build_youtube_feed_topic_url,
@@ -45,6 +47,18 @@ class YouTubeWebSubTests(unittest.TestCase):
         self.assertEqual(
             build_youtube_feed_topic_url("UC_TEST"),
             "https://www.youtube.com/feeds/videos.xml?channel_id=UC_TEST",
+        )
+
+    def test_builds_live_notification_message_as_masked_link_header(self):
+        build_message = getattr(
+            youtube_websub,
+            "build_youtube_live_notification_message",
+            None,
+        )
+        self.assertIsNotNone(build_message)
+        self.assertEqual(
+            build_message("VIDEO123"),
+            "## 🔴 [LIVE 시작](https://youtu.be/VIDEO123)",
         )
 
     def test_classifies_current_live_video(self):

@@ -43,6 +43,10 @@ def build_youtube_feed_topic_url(channel_id: str) -> str:
     return f"{YOUTUBE_FEED_BASE_URL}?{urlencode({'channel_id': channel_id})}"
 
 
+def build_youtube_live_notification_message(video_id: str) -> str:
+    return f"## 🔴 [LIVE 시작](https://youtu.be/{video_id})"
+
+
 def _find_text(element: ElementTree.Element, name: str) -> str:
     child = element.find(name)
     return (child.text or "").strip() if child is not None else ""

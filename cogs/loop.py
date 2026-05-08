@@ -33,6 +33,7 @@ from util.youtube_websub import (
     YOUTUBE_HUB_URL,
     YouTubeVideoStatus,
     build_youtube_feed_topic_url,
+    build_youtube_live_notification_message,
     classify_video_item,
     parse_youtube_atom_entries,
     should_process_youtube_feed_update,
@@ -453,11 +454,7 @@ class LoopTasks(commands.Cog):
                 )
                 return False
 
-        title = f"**{status.title}** " if status.title else ""
-        channel_name = f"[{subscription.channel_name}] "
-        await target.send(
-            f"📺 {channel_name}{title}LIVE 시작! ▶ https://youtu.be/{status.video_id}"
-        )
+        await target.send(build_youtube_live_notification_message(status.video_id))
         return True
 
     async def _process_youtube_video_candidate(
