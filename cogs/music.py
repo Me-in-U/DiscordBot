@@ -930,7 +930,7 @@ class MusicCog(commands.Cog):
             # ! 임베드 기본 설정
             embed = Embed(
                 title="🎵 신창섭의 다해줬잖아",
-                description="명령어로 음악을 재생·일시정지·스킵할 수 있습니다.\n 재생이후 버튼을 통해 제어도 가능합니다.\n(재생 후 첫 대기열 추가기 노래가 일시 끊길수도 있습니다.)",
+                description="명령어로 음악을 재생·일시정지·스킵할 수 있습니다.\n 재생이후 버튼을 통해 제어도 가능합니다.\n(재생 후 첫 대기열 추가 시 노래가 일시 끊길 수도 있습니다.)",
                 color=0xFFC0CB,
                 timestamp=datetime.now(),
             )
@@ -1386,7 +1386,9 @@ class MusicCog(commands.Cog):
         # ! 메시지
         _ = asyncio.create_task(
             self._auto_delete(
-                await interaction.followup.send("⏹️ 정지하고 나갑니다.", ephemeral=True),
+                await interaction.followup.send(
+                    "⏹️ 정지하고 나갑니다.", ephemeral=True
+                ),
                 5.0,
             )
         )
