@@ -3,6 +3,7 @@ import asyncio
 import collections
 import json
 import os
+import random
 import re
 import time
 from dataclasses import dataclass, field
@@ -18,6 +19,7 @@ from discord import Embed, Message, Object, TextChannel, app_commands
 from discord.ext import commands
 from discord.ui import Button, View, button
 from discord.utils import utcnow
+from util.channel_settings import get_channel
 from util.db import execute_query, fetch_all
 from dotenv import load_dotenv
 
@@ -25,6 +27,10 @@ load_dotenv()
 H_BAR = "\u2015"
 # 공통 상수
 PANEL_TITLE = "🎵 신창섭의 다해줬잖아"
+DEFAULT_MUSIC_CHANNEL_NAME = "🎵ㆍ神-음악채널"
+MUSIC_CHANNEL_TYPE = "music"
+MAX_QUEUE_DISPLAY = 10
+IDLE_DISCONNECT_SECONDS = 300
 MSG_NO_PLAYING = "❌ 재생 중인 음악이 없습니다."
 UNKNOWN = "알 수 없음"
 HEADERS = {
@@ -289,6 +295,7 @@ class GuildMusicState:
     control_msg: Optional[Message] = None
     control_view: Optional[View] = None
     updater_task: Optional[asyncio.Task] = None
+    idle_disconnect_task: Optional[asyncio.Task] = None
     is_loop: bool = False
     is_seeking: bool = False
     is_skipping: bool = False
@@ -308,6 +315,73 @@ class QueuedTrack:
     uploader: Optional[str] = None
     thumbnail: Optional[str] = None
     added_at: float = field(default_factory=lambda: time.time())
+
+
+def parse_seek_seconds(value: str) -> int:
+    text = (value or "").strip()
+    if not text:
+        raise ValueError("시간을 입력해 주세요.")
+
+    if ":" in text:
+        parts = text.split(":")
+        if len(parts) != 2 or not all(part.isdigit() for part in parts):
+            raise ValueError("시간 형식이 올바르지 않습니다.")
+        minutes, seconds = (int(parts[0]), int(parts[1]))
+        if seconds >= 60:
+            raise ValueError("초는 0~59 사이여야 합니다.")
+        total = minutes * 60 + seconds
+    else:
+        if not text.isdigit():
+            raise ValueError("시간 형식이 올바르지 않습니다.")
+        total = int(text)
+
+    if total < 0:
+        raise ValueError("시간은 0초 이상이어야 합니다.")
+    return total
+
+
+def _validate_queue_position(queue: Deque[QueuedTrack], position: int) -> int:
+    if position < 1 or position > len(queue):
+        raise ValueError(f"대기열 번호는 1~{len(queue)} 사이여야 합니다.")
+    return position - 1
+
+
+def remove_queue_track(queue: Deque[QueuedTrack], position: int) -> QueuedTrack:
+    index = _validate_queue_position(queue, position)
+    tracks = list(queue)
+    removed = tracks.pop(index)
+    queue.clear()
+    queue.extend(tracks)
+    return removed
+
+
+def move_queue_track(
+    queue: Deque[QueuedTrack], current_position: int, new_position: int
+) -> QueuedTrack:
+    current_index = _validate_queue_position(queue, current_position)
+    if new_position < 1 or new_position > len(queue):
+        raise ValueError(f"이동 위치는 1~{len(queue)} 사이여야 합니다.")
+
+    tracks = list(queue)
+    moved = tracks.pop(current_index)
+    tracks.insert(new_position - 1, moved)
+    queue.clear()
+    queue.extend(tracks)
+    return moved
+
+
+def shuffle_queue(
+    queue: Deque[QueuedTrack], randomizer: Optional[random.Random] = None
+) -> None:
+    tracks = list(queue)
+    rng = randomizer or random
+    rng.shuffle(tracks)
+    queue.clear()
+    queue.extend(tracks)
+
+
+def _track_title(track: QueuedTrack) -> str:
+    return track.title or track.webpage_url or track.url or "(제목 정보 없음)"
 
 
 class YTDLSource:
@@ -468,7 +542,7 @@ class YTDLSource:
 class SearchResultView(View):
     def __init__(self, cog, videos: list[dict]):
         # 검색 결과를 최대 10개까지 숫자 버튼으로 제공
-        super().__init__(timeout=None)
+        super().__init__(timeout=120)
         self.cog = cog
 
         vids = list(videos[:10])
@@ -633,10 +707,8 @@ class SeekModal(discord.ui.Modal, title="구간이동"):
     async def on_submit(self, interaction: discord.Interaction):
         t = (self.time.value or "").strip()
         try:
-            seconds = (
-                int(t.split(":")[0]) * 60 + int(t.split(":")[1]) if ":" in t else int(t)
-            )
-        except Exception:
+            seconds = parse_seek_seconds(t)
+        except ValueError:
             # 입력 형식 오류에 대해 반드시 응답하여 상호작용 실패를 방지
             if not interaction.response.is_done():
                 await interaction.response.send_message(
@@ -758,6 +830,11 @@ class MusicCog(commands.Cog):
         voice_client = interaction.guild.voice_client
         state = self._get_state(interaction.guild.id)
         if voice_client and (voice_client.is_playing() or voice_client.is_paused()):
+            error = self._same_voice_channel_error(interaction, voice_client)
+            if error:
+                msg = await interaction.followup.send(error, ephemeral=True)
+                self._spawn_bg(self._auto_delete(msg, 5.0))
+                return
             track = QueuedTrack(
                 url=url,
                 requester=interaction.user,
@@ -791,6 +868,63 @@ class MusicCog(commands.Cog):
     # !길드의 State 리턴
     def _get_state(self, guild_id: int) -> GuildMusicState:
         return self.states.setdefault(guild_id, GuildMusicState())
+
+    def _user_voice_channel(self, interaction: discord.Interaction):
+        voice_state = getattr(interaction.user, "voice", None)
+        return getattr(voice_state, "channel", None)
+
+    def _same_voice_channel_error(
+        self,
+        interaction: discord.Interaction,
+        voice_client=None,
+    ) -> Optional[str]:
+        voice_client = voice_client or getattr(interaction.guild, "voice_client", None)
+        bot_channel = getattr(voice_client, "channel", None)
+        if bot_channel is None:
+            return None
+
+        user_channel = self._user_voice_channel(interaction)
+        if user_channel != bot_channel:
+            return "❌ 같은 음성 채널에 있는 사용자만 음악을 제어할 수 있습니다."
+        return None
+
+    async def _send_auto_delete(
+        self,
+        interaction: discord.Interaction,
+        content: str,
+        *,
+        delay: float = 5.0,
+    ) -> None:
+        msg = await interaction.followup.send(content, ephemeral=True)
+        self._spawn_bg(self._auto_delete(msg, delay))
+
+    async def _resolve_music_channel(
+        self, guild: discord.Guild
+    ) -> Optional[TextChannel]:
+        state = self._get_state(guild.id)
+        configured_channel_id = await get_channel(guild.id, MUSIC_CHANNEL_TYPE)
+        if configured_channel_id:
+            configured = guild.get_channel(configured_channel_id)
+            if isinstance(configured, TextChannel):
+                return configured
+
+        if isinstance(state.control_channel, TextChannel):
+            return state.control_channel
+
+        return discord.utils.get(guild.text_channels, name=DEFAULT_MUSIC_CHANNEL_NAME)
+
+    async def _is_music_control_channel(self, message: discord.Message) -> bool:
+        if not message.guild:
+            return False
+
+        state = self._get_state(message.guild.id)
+        if state.control_channel and message.channel.id == state.control_channel.id:
+            return True
+        if message.channel.name == DEFAULT_MUSIC_CHANNEL_NAME:
+            return True
+
+        configured_channel_id = await get_channel(message.guild.id, MUSIC_CHANNEL_TYPE)
+        return bool(configured_channel_id and message.channel.id == configured_channel_id)
 
     def make_timeline_line(self, elapsed: int, total: int, length: int = 16) -> str:
         def format_time(seconds: int) -> str:
@@ -853,12 +987,12 @@ class MusicCog(commands.Cog):
                 if not voice_client:
                     dbg("_updater_loop: voice_client disconnected")
                     await self._force_stop(guild_id)
-                    return await self._on_song_end(guild_id)
+                    return
                 # ! 봇만 남아있음 → 종료 호출
                 if voice_client and len(voice_client.channel.members) == 1:
                     dbg("_updater_loop: bot alone in channel, stopping")
                     await self._force_stop(guild_id)
-                    return await self._on_song_end(guild_id)
+                    return
                 # ! 일시정지 대기
                 if voice_client.is_paused():
                     dbg("_updater_loop: paused")
@@ -868,28 +1002,71 @@ class MusicCog(commands.Cog):
                 elapsed = int(time.time() - state.start_ts)
                 total = state.player.data.get("duration", 0)
                 dbg(f"_updater_loop: elapsed={elapsed} total={total}")
-                # ! 노래시간이 지났고 반복이 아니고 구간이동중이 아니면 종료 호출
-                if (
-                    total > 0
-                    and elapsed >= total
-                    and not state.is_loop
-                    and not state.is_seeking
-                ):
-                    dbg("_updater_loop: natural end reached, calling on_song_end")
-                    return await self._on_song_end(guild_id)
-
                 # ! 메시지 수정(임베드, 뷰)
-                embed = self._make_playing_embed(state.player, guild_id, elapsed)
+                embed = self._make_playing_embed(
+                    state.player, guild_id, min(elapsed, total) if total else elapsed
+                )
                 await self._edit_msg(state, embed, state.control_view)
                 await asyncio.sleep(5)
         finally:
             dbg("_updater_loop: end")
             state.updater_task = None
 
+    def _cancel_idle_disconnect(self, state: GuildMusicState) -> None:
+        task = state.idle_disconnect_task
+        if task and not task.done():
+            task.cancel()
+        state.idle_disconnect_task = None
+
+    def _schedule_idle_disconnect(self, guild_id: int) -> None:
+        state = self._get_state(guild_id)
+        self._cancel_idle_disconnect(state)
+        task = asyncio.create_task(self._idle_disconnect_after_timeout(guild_id))
+        state.idle_disconnect_task = task
+        self._bg_tasks.add(task)
+
+        def _clear_task(done_task: asyncio.Task) -> None:
+            self._bg_tasks.discard(done_task)
+            if state.idle_disconnect_task is done_task:
+                state.idle_disconnect_task = None
+
+        task.add_done_callback(_clear_task)
+
+    async def _idle_disconnect_after_timeout(self, guild_id: int):
+        try:
+            await asyncio.sleep(IDLE_DISCONNECT_SECONDS)
+            state = self._get_state(guild_id)
+            if state.player or state.queue:
+                return
+
+            guild = self.bot.get_guild(guild_id)
+            voice_client = guild.voice_client if guild else None
+            if voice_client:
+                try:
+                    await voice_client.disconnect()
+                except Exception as e:
+                    dbg(f"_idle_disconnect_after_timeout: disconnect 실패: {type(e)} {e}")
+
+            state.control_view = MusicHelperView(self)
+            state.paused_at = None
+            state.start_ts = 0.0
+            state.is_loop = False
+            state.is_skipping = False
+            state.is_stopping = False
+            try:
+                await self._edit_msg(state, self._make_default_embed(), state.control_view)
+            except Exception as e:
+                dbg(f"_idle_disconnect_after_timeout: 패널 리셋 실패: {type(e)} {e}")
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            dbg(f"_idle_disconnect_after_timeout: failed: {type(e)} {e}")
+
     async def _force_stop(self, guild_id: int):
         """interaction 없이 강제 정지하고 패널을 초기 상태로 돌립니다."""
         dbg(f"_force_stop: guild_id={guild_id}")
         state = self._get_state(guild_id)
+        self._cancel_idle_disconnect(state)
         guild = self.bot.get_guild(guild_id)
         vc = guild.voice_client if guild else None
         # 정지 상태 진입
@@ -930,7 +1107,7 @@ class MusicCog(commands.Cog):
             # ! 임베드 기본 설정
             embed = Embed(
                 title="🎵 신창섭의 다해줬잖아",
-                description="명령어로 음악을 재생·일시정지·스킵할 수 있습니다.\n 재생이후 버튼을 통해 제어도 가능합니다.\n(재생 후 첫 대기열 추가 시 노래가 일시 끊길 수도 있습니다.)",
+                description="명령어로 음악을 재생·일시정지·스킵할 수 있습니다.\n재생 이후 버튼을 통해 제어도 가능합니다.\n(재생 후 첫 대기열 추가 시 노래가 일시 끊길 수도 있습니다.)",
                 color=0xFFC0CB,
                 timestamp=datetime.now(),
             )
@@ -940,6 +1117,10 @@ class MusicCog(commands.Cog):
                 value=(
                     "• `/재생 <URL/검색어>`: 유튜브 <URL/검색어>로 즉시 재생\n"
                     "• `/스킵`: 현재 재생중인 곡 스킵(다음 대기열 재생)\n"
+                    "• `/대기열`: 현재 대기열 확인\n"
+                    "• `/구간이동 <시간>`: 현재 곡의 위치 이동\n"
+                    "• `/반복`: 현재 곡 반복 모드 토글\n"
+                    "• `/대기열삭제 <번호>`, `/대기열비우기`, `/대기열이동`, `/셔플`: 대기열 관리\n"
                     "• `/일시정지`, 현재 재생중인 곡 일시정지\n"
                     "• `/다시재생`: 일시정지된 곡 다시재생\n"
                     "• `/정지`: 노래 종료 후 신창섭 퇴장\n\n"
@@ -1001,7 +1182,7 @@ class MusicCog(commands.Cog):
         # ! 상태 기본값 설정
         state = self._get_state(guild.id)
         # ! 채널 확보
-        control_channel = discord.utils.get(guild.text_channels, name="🎵ㆍ神-음악채널")
+        control_channel = await self._resolve_music_channel(guild)
         # ! 채널 없으면 생성
         if control_channel is None:
             print("[채널 없음]->", end="")
@@ -1014,7 +1195,7 @@ class MusicCog(commands.Cog):
                 ),
             }
             control_channel = await guild.create_text_channel(
-                "🎵ㆍ神-음악채널",
+                DEFAULT_MUSIC_CHANNEL_NAME,
                 overwrites=overwrites,
             )
             print("[채널 생성됨]")
@@ -1078,7 +1259,7 @@ class MusicCog(commands.Cog):
         """음악 채널에서 '패널 임베드' 메시지를 제외한 일반 사용자/과거 메세지를 정리.
 
         조건:
-        - 채널명: 🎵ㆍ神-음악채널
+        - 채널명: DEFAULT_MUSIC_CHANNEL_NAME 또는 /채널설정 기능:음악 대상
         - 유지: 봇이 보낸 패널 메시지(제목이 PANEL_TITLE 또는 기본 패널 제목)
         - 나머지: 모두 삭제 (핀 고정은 존중 -> pinned True면 건너뜀)
         - 1회만 수행 (재연결 시 중복 제거 방지)
@@ -1086,9 +1267,7 @@ class MusicCog(commands.Cog):
         if guild.id in self._purged_guilds:
             return
         state = self._get_state(guild.id)
-        channel = state.control_channel or discord.utils.get(
-            guild.text_channels, name="🎵ㆍ神-음악채널"
-        )
+        channel = state.control_channel or await self._resolve_music_channel(guild)
         if channel is None:
             return
         panel_msg_id = (
@@ -1188,20 +1367,38 @@ class MusicCog(commands.Cog):
         # ! 기본정보 로드
         guild_id = interaction.guild.id
         voice_client = interaction.guild.voice_client
+        user_channel = self._user_voice_channel(interaction)
 
         # ! 봇이 음성 채널에 없음
         if not voice_client:
             # ! 유저가 음성채널에 없음
-            if not (ch := interaction.user.voice and interaction.user.voice.channel):
+            if not user_channel:
                 return await interaction.followup.send(
                     "❌ 먼저 음성 채널에 들어가 있어야 합니다.", ephemeral=True
                 )
             # ! 봇을 채널 연결
-            voice_client = await ch.connect()
-            dbg(f"_play: connected to voice channel id={ch.id}")
+            voice_client = await user_channel.connect()
+            dbg(f"_play: connected to voice channel id={user_channel.id}")
+        elif user_channel and voice_client.channel != user_channel:
+            if voice_client.is_playing() or voice_client.is_paused():
+                msg = await interaction.followup.send(
+                    "❌ 같은 음성 채널에 있는 사용자만 음악을 추가할 수 있습니다.",
+                    ephemeral=True,
+                )
+                self._spawn_bg(self._auto_delete(msg, 5.0))
+                return
+            await voice_client.move_to(user_channel)
+            dbg(f"_play: moved to voice channel id={user_channel.id}")
+        elif not user_channel:
+            msg = await interaction.followup.send(
+                "❌ 먼저 음성 채널에 들어가 있어야 합니다.", ephemeral=True
+            )
+            self._spawn_bg(self._auto_delete(msg, 5.0))
+            return
 
         # ! 이미 재생(또는 일시정지) 중이면 URL만 큐에 추가
         state = self._get_state(interaction.guild.id)
+        self._cancel_idle_disconnect(state)
         if (voice_client and voice_client.is_playing()) or (
             voice_client and voice_client.is_paused()
         ):
@@ -1241,6 +1438,8 @@ class MusicCog(commands.Cog):
             return
 
         # !상태 업데이트 및 재생 시작
+        state.is_stopping = False
+        state.is_skipping = False
         state.player = player
         state.start_ts = time.time()
         state.paused_at = None
@@ -1264,6 +1463,10 @@ class MusicCog(commands.Cog):
         # !재생중 아님
         if not voice_client or not voice_client.is_playing():
             msg = await interaction.followup.send(MSG_NO_PLAYING, ephemeral=True)
+            _ = asyncio.create_task(self._auto_delete(msg, 5.0))
+            return
+        if error := self._same_voice_channel_error(interaction, voice_client):
+            msg = await interaction.followup.send(error, ephemeral=True)
             _ = asyncio.create_task(self._auto_delete(msg, 5.0))
             return
         print("[일시정지]")
@@ -1296,6 +1499,10 @@ class MusicCog(commands.Cog):
                 msg = await interaction.followup.send(
                     "❌ 일시정지된 음악이 없습니다.", ephemeral=True
                 )
+                _ = asyncio.create_task(self._auto_delete(msg, 5.0))
+                return
+            if error := self._same_voice_channel_error(interaction, voice_client):
+                msg = await interaction.followup.send(error, ephemeral=True)
                 _ = asyncio.create_task(self._auto_delete(msg, 5.0))
                 return
             print("[다시재생]")
@@ -1338,6 +1545,10 @@ class MusicCog(commands.Cog):
             msg = await interaction.followup.send(MSG_NO_PLAYING, ephemeral=True)
             _ = asyncio.create_task(self._auto_delete(msg, 5.0))
             return
+        if error := self._same_voice_channel_error(interaction, voice_client):
+            msg = await interaction.followup.send(error, ephemeral=True)
+            _ = asyncio.create_task(self._auto_delete(msg, 5.0))
+            return
 
         if state.is_loop:
             # ! 현재 트랙 강제 중단
@@ -1363,6 +1574,10 @@ class MusicCog(commands.Cog):
             msg = await interaction.followup.send(
                 "❌ 봇이 음성채널에 없습니다.", ephemeral=True
             )
+            _ = asyncio.create_task(self._auto_delete(msg, 5.0))
+            return
+        if error := self._same_voice_channel_error(interaction, voice_client):
+            msg = await interaction.followup.send(error, ephemeral=True)
             _ = asyncio.create_task(self._auto_delete(msg, 5.0))
             return
         # 정지 상태 진입
@@ -1422,17 +1637,20 @@ class MusicCog(commands.Cog):
             desc_lines.append("")  # 구분선 역할
 
         # 대기열 리스트 (URL 기반 QueuedTrack)
-        for i, track in enumerate(state.queue, start=1):
+        visible_tracks = list(state.queue)[:MAX_QUEUE_DISPLAY]
+        for i, track in enumerate(visible_tracks, start=1):
             total = track.duration or 0
             m, s = divmod(total, 60)
             uploader = track.uploader or UNKNOWN
             user = f"<@{track.requester.id}>" if track.requester else UNKNOWN
-            title = track.title or "(제목 정보 없음)"
+            title = _track_title(track)
             link = track.webpage_url or track.url
             length = f"({m:02}:{s:02})" if total else ""
             desc_lines.append(
                 f"{i}. [{title}]({link}){length}({uploader}) - 신청자: {user}"
             )
+        if len(state.queue) > MAX_QUEUE_DISPLAY:
+            desc_lines.append(f"... 외 {len(state.queue) - MAX_QUEUE_DISPLAY}곡")
 
         embed = Embed(
             title=f"대기열 - {n}개의 곡",
@@ -1442,6 +1660,82 @@ class MusicCog(commands.Cog):
 
         msg = await interaction.followup.send(embed=embed, ephemeral=True)
         _ = asyncio.create_task(self._auto_delete(msg, 20.0))
+
+    async def _remove_from_queue(
+        self, interaction: discord.Interaction, position: int
+    ) -> None:
+        await interaction.response.defer(thinking=True, ephemeral=True)
+        voice_client = interaction.guild.voice_client
+        if voice_client and (error := self._same_voice_channel_error(interaction, voice_client)):
+            await self._send_auto_delete(interaction, error)
+            return
+
+        state = self._get_state(interaction.guild.id)
+        if not state.queue:
+            await self._send_auto_delete(interaction, "❌ 대기열이 비어있습니다.")
+            return
+        try:
+            removed = remove_queue_track(state.queue, position)
+        except ValueError as e:
+            await self._send_auto_delete(interaction, f"❌ {e}")
+            return
+        await self._send_auto_delete(
+            interaction, f"🗑️ 대기열에서 **{_track_title(removed)}** 항목을 삭제했습니다."
+        )
+
+    async def _clear_queue(self, interaction: discord.Interaction) -> None:
+        await interaction.response.defer(thinking=True, ephemeral=True)
+        voice_client = interaction.guild.voice_client
+        if voice_client and (error := self._same_voice_channel_error(interaction, voice_client)):
+            await self._send_auto_delete(interaction, error)
+            return
+
+        state = self._get_state(interaction.guild.id)
+        count = len(state.queue)
+        if count == 0:
+            await self._send_auto_delete(interaction, "❌ 대기열이 비어있습니다.")
+            return
+        state.queue.clear()
+        await self._send_auto_delete(interaction, f"🧹 대기열 {count}곡을 비웠습니다.")
+
+    async def _move_queue(
+        self, interaction: discord.Interaction, current_position: int, new_position: int
+    ) -> None:
+        await interaction.response.defer(thinking=True, ephemeral=True)
+        voice_client = interaction.guild.voice_client
+        if voice_client and (error := self._same_voice_channel_error(interaction, voice_client)):
+            await self._send_auto_delete(interaction, error)
+            return
+
+        state = self._get_state(interaction.guild.id)
+        if not state.queue:
+            await self._send_auto_delete(interaction, "❌ 대기열이 비어있습니다.")
+            return
+        try:
+            moved = move_queue_track(state.queue, current_position, new_position)
+        except ValueError as e:
+            await self._send_auto_delete(interaction, f"❌ {e}")
+            return
+        await self._send_auto_delete(
+            interaction,
+            f"↕️ **{_track_title(moved)}** 항목을 {new_position}번으로 이동했습니다.",
+        )
+
+    async def _shuffle_queue(self, interaction: discord.Interaction) -> None:
+        await interaction.response.defer(thinking=True, ephemeral=True)
+        voice_client = interaction.guild.voice_client
+        if voice_client and (error := self._same_voice_channel_error(interaction, voice_client)):
+            await self._send_auto_delete(interaction, error)
+            return
+
+        state = self._get_state(interaction.guild.id)
+        if len(state.queue) < 2:
+            await self._send_auto_delete(
+                interaction, "❌ 섞을 대기열이 2곡 이상 필요합니다."
+            )
+            return
+        shuffle_queue(state.queue)
+        await self._send_auto_delete(interaction, "🔀 대기열을 섞었습니다.")
 
     async def _restart_updater(self, guild_id: int):
         dbg("_restart_updater: called")
@@ -1475,24 +1769,36 @@ class MusicCog(commands.Cog):
             msg = await interaction.followup.send(MSG_NO_PLAYING, ephemeral=True)
             _ = asyncio.create_task(self._auto_delete(msg, 5.0))
             return
+        if error := self._same_voice_channel_error(interaction, voice_client):
+            msg = await interaction.followup.send(error, ephemeral=True)
+            _ = asyncio.create_task(self._auto_delete(msg, 5.0))
+            return
         try:
+            total = int(state.player.data.get("duration", 0) or 0)
+            if total and seconds >= total:
+                msg = await interaction.followup.send(
+                    f"❌ 이동할 시간은 곡 길이({total}초)보다 작아야 합니다.",
+                    ephemeral=True,
+                )
+                _ = asyncio.create_task(self._auto_delete(msg, 6.0))
+                return
             # ! 새로운 player 생성 (start_time 포함)
             player = await YTDLSource.from_url(
                 url=state.player.webpage_url,
                 loop=self.bot.loop,
                 start_time=seconds,
+                requester=state.player.requester,
             )
             # ! 멈추고 재생 위치부터 새 소스 생성
             state.is_seeking = True
             voice_client.stop()
             dbg("_seek: stopped current and will restart from position")
-            # ! play & updater 재시작
-            self._vc_play(interaction=interaction, source=player.source)
-            await self._restart_updater(guild_id)
-            # ! 상태 업데이트
             state.player = player
             state.start_ts = time.time() - seconds
             state.paused_at = None
+            # ! play & updater 재시작
+            self._vc_play(guild_id=guild_id, source=player.source)
+            await self._restart_updater(guild_id)
             # ! 메시지 수정(임베드, 뷰)
             embed = self._make_playing_embed(state.player, guild_id, elapsed=seconds)
             await self._edit_msg(state, embed, state.control_view)
@@ -1508,6 +1814,7 @@ class MusicCog(commands.Cog):
                 "❌ FFmpeg 실행 파일을 찾을 수 없습니다.", ephemeral=True
             )
             _ = asyncio.create_task(self._auto_delete(msg, 8.0))
+            state.is_seeking = False
         except Exception as e:
             dbg(f"_seek: failed: {type(e)} {e}")
             # 실패 시 is_seeking 안전 복구
@@ -1523,6 +1830,11 @@ class MusicCog(commands.Cog):
         await interaction.response.defer(thinking=True, ephemeral=True)
         # ! 상태 업데이트
         state = self._get_state(interaction.guild.id)
+        voice_client = interaction.guild.voice_client
+        if voice_client and (error := self._same_voice_channel_error(interaction, voice_client)):
+            msg = await interaction.followup.send(error, ephemeral=True)
+            _ = asyncio.create_task(self._auto_delete(msg, 5.0))
+            return
         state.is_loop = not state.is_loop
         # ! 메시지
         msg = await interaction.followup.send(
@@ -1612,12 +1924,13 @@ class MusicCog(commands.Cog):
 
         # !대기열에 곡이 없으면 패널을 빈(embed 초기) 상태로 리셋
         if not state.queue:
-            dbg("_on_song_end: no next track -> reset panel")
-            # ! 메시지 수정(임베드, 뷰)
-            embed = self._make_default_embed()
-            state.control_view = MusicHelperView(self)
-            await self._edit_msg(state, embed, state.control_view)
+            dbg("_on_song_end: no next track -> reset panel and wait for idle timeout")
             state.player = None
+            state.paused_at = None
+            state.start_ts = 0.0
+            state.control_view = MusicHelperView(self)
+            await self._edit_msg(state, self._make_default_embed(), state.control_view)
+            self._schedule_idle_disconnect(guild_id)
             return
 
         # ! 다음 곡 준비: URL -> YTDLSource 변환 후 재생
@@ -1632,6 +1945,7 @@ class MusicCog(commands.Cog):
             # 실패 시 다음 곡으로 넘어가기 시도 (재귀적 호출 방지 위해 task로)
             self._spawn_bg(self._on_song_end(guild_id))
             return
+        self._cancel_idle_disconnect(state)
         state.player = player
         state.start_ts = time.time()
         state.paused_at = None
@@ -1671,6 +1985,54 @@ class MusicCog(commands.Cog):
     async def 정지(self, interaction: discord.Interaction):
         await self._stop(interaction)
 
+    @app_commands.command(name="스킵", description="현재 재생 중인 곡을 넘깁니다.")
+    async def 스킵(self, interaction: discord.Interaction):
+        await self._skip(interaction)
+
+    @app_commands.command(name="대기열", description="현재 음악 대기열을 보여줍니다.")
+    async def 대기열(self, interaction: discord.Interaction):
+        await self._show_queue(interaction)
+
+    @app_commands.command(name="구간이동", description="현재 곡의 재생 위치를 이동합니다.")
+    @app_commands.describe(시간="이동할 시간. 예: 1:23 또는 83")
+    async def 구간이동(self, interaction: discord.Interaction, 시간: str):
+        try:
+            seconds = parse_seek_seconds(시간)
+        except ValueError:
+            await interaction.response.send_message(
+                "❌ 시간 형식이 올바르지 않습니다. 예: 1:23 또는 83",
+                ephemeral=True,
+            )
+            return
+        await self._seek(interaction, seconds)
+
+    @app_commands.command(name="반복", description="현재 곡 반복 모드를 켜거나 끕니다.")
+    async def 반복(self, interaction: discord.Interaction):
+        await self._toggle_loop(interaction)
+
+    @app_commands.command(name="대기열삭제", description="대기열에서 지정한 번호의 곡을 삭제합니다.")
+    @app_commands.describe(번호="삭제할 대기열 번호")
+    async def 대기열삭제(self, interaction: discord.Interaction, 번호: int):
+        await self._remove_from_queue(interaction, 번호)
+
+    @app_commands.command(name="대기열비우기", description="현재 대기열을 모두 비웁니다.")
+    async def 대기열비우기(self, interaction: discord.Interaction):
+        await self._clear_queue(interaction)
+
+    @app_commands.command(name="대기열이동", description="대기열 곡의 위치를 변경합니다.")
+    @app_commands.describe(현재번호="현재 대기열 번호", 새번호="옮길 대기열 번호")
+    async def 대기열이동(
+        self,
+        interaction: discord.Interaction,
+        현재번호: int,
+        새번호: int,
+    ):
+        await self._move_queue(interaction, 현재번호, 새번호)
+
+    @app_commands.command(name="셔플", description="현재 대기열 순서를 무작위로 섞습니다.")
+    async def 셔플(self, interaction: discord.Interaction):
+        await self._shuffle_queue(interaction)
+
     @commands.Cog.listener()
     async def on_ready(self):
         print("DISCORD_CLIENT -> Music Cog : on ready!")
@@ -1688,7 +2050,7 @@ class MusicCog(commands.Cog):
     async def on_message(self, message: discord.Message):
         """음악 전용 채널에서 일반 유저 메시지를 자동 삭제.
 
-        - 채널명: "🎵ㆍ神-음악채널"
+        - 채널명: DEFAULT_MUSIC_CHANNEL_NAME 또는 /채널설정 기능:음악 대상
         - 봇 메시지는 허용
         - 패널/컨트롤 유지
         - Slash 명령은 별도의 application interaction이라 일반 메시지 객체가 아니므로 별도 처리 불필요
@@ -1698,7 +2060,7 @@ class MusicCog(commands.Cog):
             return
         if message.author.bot:
             return
-        if message.channel.name != "🎵ㆍ神-음악채널":
+        if not await self._is_music_control_channel(message):
             return
         # 유저가 붙여넣은 일반 텍스트/URL 등 모두 삭제
         try:
