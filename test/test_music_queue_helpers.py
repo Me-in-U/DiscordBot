@@ -4,6 +4,7 @@ import unittest
 
 from cogs.music import (
     QueuedTrack,
+    build_queue_preview,
     move_queue_track,
     parse_seek_seconds,
     remove_queue_track,
@@ -49,6 +50,22 @@ class MusicQueueHelperTests(unittest.TestCase):
 
         self.assertCountEqual([track.title for track in queue], ["a", "b", "c", "d"])
         self.assertNotEqual([track.title for track in queue], ["a", "b", "c", "d"])
+
+    def test_build_queue_preview_uses_first_three_tracks(self):
+        queue = _queue("노래1", "노래2", "노래3", "노래4")
+
+        title, preview = build_queue_preview(queue)
+
+        self.assertEqual(title, "대기열(4개)")
+        self.assertEqual(preview, "노래1 → 노래2 → 노래3")
+
+    def test_build_queue_preview_truncates_long_titles_to_ten_chars(self):
+        queue = _queue("12345678901", "가나다라마바사아자차카")
+
+        title, preview = build_queue_preview(queue)
+
+        self.assertEqual(title, "대기열(2개)")
+        self.assertEqual(preview, "1234567890 → 가나다라마바사아자차")
 
 
 if __name__ == "__main__":

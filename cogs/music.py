@@ -384,6 +384,22 @@ def _track_title(track: QueuedTrack) -> str:
     return track.title or track.webpage_url or track.url or "(제목 정보 없음)"
 
 
+def build_queue_preview(
+    queue: Deque[QueuedTrack],
+    *,
+    limit: int = 3,
+    title_limit: int = 10,
+) -> Optional[Tuple[str, str]]:
+    if not queue:
+        return None
+
+    titles = [
+        _track_title(track)[:title_limit]
+        for track in list(queue)[:limit]
+    ]
+    return f"대기열({len(queue)}개)", " → ".join(titles)
+
+
 class YTDLSource:
     def __init__(
         self,
@@ -1155,9 +1171,13 @@ class MusicCog(commands.Cog):
             # ! 진행바 생성
             timeline = self.make_timeline_line(elapsed, total)
             bar, _ = self.make_progress_bar(elapsed, total)
-            embed.add_field(name="진행", value=f"{timeline}\n`{bar}`", inline=False)
+            embed.add_field(name="진행", value=f"\n{timeline}\n`{bar}`", inline=False)
             # ! footer에 반복 상태
             state = self._get_state(guild_id)
+            queue_preview = build_queue_preview(state.queue)
+            if queue_preview:
+                queue_title, queue_value = queue_preview
+                embed.add_field(name=queue_title, value=queue_value, inline=False)
             requester = player.requester
             requester_name = requester.display_name if requester else UNKNOWN
             requester_icon = (
