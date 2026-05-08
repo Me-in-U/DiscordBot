@@ -654,7 +654,7 @@ class SeekModal(discord.ui.Modal, title="구간이동"):
 class SearchModal(discord.ui.Modal, title="음악검색"):
     query = discord.ui.TextInput(
         label="음악의 제목이나 링크를 입력하세요",
-        placeholder="예: Michael Jackson - Bad Lyrics",
+        placeholder='예: "신창섭 다해줬잖아" or https://www.youtube.com/watch?v=DYbt8rmJT40',
     )
 
     def __init__(self, cog: "MusicCog"):
