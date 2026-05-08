@@ -388,16 +388,24 @@ def build_queue_preview(
     queue: Deque[QueuedTrack],
     *,
     limit: int = 3,
-    title_limit: int = 10,
+    title_limit: int = 14,
 ) -> Optional[Tuple[str, str]]:
     if not queue:
         return None
 
-    titles = [
-        _track_title(track)[:title_limit]
-        for track in list(queue)[:limit]
+    def _shorten(title: str) -> str:
+        if len(title) <= title_limit:
+            return title
+        return f"{title[:title_limit]}…"
+
+    lines = [
+        f"`{index}` {_shorten(_track_title(track))}"
+        for index, track in enumerate(list(queue)[:limit], start=1)
     ]
-    return f"대기열({len(queue)}개)", " → ".join(titles)
+    remaining = len(queue) - limit
+    if remaining > 0:
+        lines.append(f"+ {remaining}곡 더")
+    return f"대기열({len(queue)}개)", "\n".join(lines)
 
 
 class YTDLSource:

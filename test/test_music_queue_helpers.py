@@ -57,15 +57,15 @@ class MusicQueueHelperTests(unittest.TestCase):
         title, preview = build_queue_preview(queue)
 
         self.assertEqual(title, "대기열(4개)")
-        self.assertEqual(preview, "노래1 → 노래2 → 노래3")
+        self.assertEqual(preview, "`1` 노래1\n`2` 노래2\n`3` 노래3\n+ 1곡 더")
 
-    def test_build_queue_preview_truncates_long_titles_to_ten_chars(self):
-        queue = _queue("12345678901", "가나다라마바사아자차카")
+    def test_build_queue_preview_truncates_long_titles_to_fourteen_chars(self):
+        queue = _queue("123456789012345", "가나다라마바사아자차카타파하끝")
 
         title, preview = build_queue_preview(queue)
 
         self.assertEqual(title, "대기열(2개)")
-        self.assertEqual(preview, "1234567890 → 가나다라마바사아자차")
+        self.assertEqual(preview, "`1` 12345678901234…\n`2` 가나다라마바사아자차카타파하…")
 
 
 if __name__ == "__main__":

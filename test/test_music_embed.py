@@ -49,7 +49,7 @@ class MusicEmbedTests(unittest.TestCase):
             "[출근용 봄노래] 장범준(버스커버스커) - 🎧봄노래 모음",
         )
         self.assertTrue(fields[1]["value"].startswith("\n01:35"))
-        self.assertEqual(fields[2]["value"], "노래1 → 노래2 → 노래3")
+        self.assertEqual(fields[2]["value"], "`1` 노래1\n`2` 노래2\n`3` 노래3\n+ 1곡 더")
 
 
 if __name__ == "__main__":
