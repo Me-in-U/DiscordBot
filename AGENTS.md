@@ -25,7 +25,7 @@ This repository hosts a modular Discord bot built with `discord.py`. Follow thes
   - `.env` file required. Keys include `DISCORD_TOKEN`, `OPENAI_KEY`, `GOOGLE_API_KEY`, `RIOT_KEY`, `SONPANNO_GUILD_ID`, `SSAFY_GUILD_ID`, `DB_HOST`, `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD`, `API_PORT`, `CELEBRATION_UPDATE_API_KEY`, and `ECOS_API_KEY`.
   - Keep local runtime values in `.env` and deployment runtime values in `.env.deploy`; both files are local secrets and must stay out of Git.
   - In deployment, `DB_HOST` must point to the Docker host gateway, for example `host.docker.internal:3306`, because the shared MySQL service binds to the host loopback port and is reached from the bot container through Docker's host gateway.
-  - YouTube live notifications use WebSub. Set `YOUTUBE_WEBSUB_CALLBACK_URL` to the public HTTPS callback ending in `/youtube/websub`, and set `YOUTUBE_WEBSUB_VERIFY_TOKEN` to a long random token.
+  - YouTube live and new-video notifications use WebSub. Set `YOUTUBE_WEBSUB_CALLBACK_URL` to the public HTTPS callback ending in `/youtube/websub`, and set `YOUTUBE_WEBSUB_VERIFY_TOKEN` to a long random token.
 
 ## Key Components & Patterns
 

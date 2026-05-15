@@ -13,6 +13,7 @@ from util.youtube_subscriptions import (
     create_youtube_subscription,
     delete_youtube_subscription,
     list_youtube_subscriptions,
+    update_youtube_subscription_alert_settings,
 )
 
 
@@ -28,7 +29,7 @@ class YouTubeSubscriptionDeleteSelect(discord.ui.Select):
             discord.SelectOption(
                 label=subscription.channel_name[:100],
                 value=str(subscription.id),
-                description=subscription.channel_id[:100],
+                description=_format_subscription_alert_summary(subscription)[:100],
             )
             for subscription in page_items
         ]
@@ -169,10 +170,179 @@ class YouTubeSubscriptionDeleteView(discord.ui.View):
         )
 
 
+class YouTubeSubscriptionAlertSettingsSelect(discord.ui.Select):
+    def __init__(self, view: "YouTubeSubscriptionAlertSettingsView"):
+        options = [
+            discord.SelectOption(
+                label=subscription.channel_name[:100],
+                value=str(subscription.id),
+                description=_format_subscription_alert_summary(subscription)[:100],
+                default=subscription.id == view.selected_subscription_id,
+            )
+            for subscription in view.subscriptions[:25]
+        ]
+        super().__init__(
+            placeholder="알림 설정을 바꿀 유튜브 구독을 선택해 주세요",
+            min_values=1,
+            max_values=1,
+            options=options,
+        )
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        parent = self.view
+        if not isinstance(parent, YouTubeSubscriptionAlertSettingsView):
+            return
+        if not await parent._check_requester(interaction):
+            return
+        parent.selected_subscription_id = int(self.values[0])
+        parent._refresh_items()
+        await interaction.response.edit_message(
+            content=parent._content(),
+            view=parent,
+        )
+
+
+class YouTubeSubscriptionAlertSettingsView(discord.ui.View):
+    def __init__(
+        self,
+        *,
+        requester_id: int,
+        subscriptions: list[YouTubeSubscription],
+    ):
+        super().__init__(timeout=120)
+        self.requester_id = requester_id
+        self.subscriptions = subscriptions
+        self.selected_subscription_id = subscriptions[0].id if subscriptions else None
+        self._refresh_items()
+
+    def _selected_subscription(self) -> YouTubeSubscription | None:
+        if self.selected_subscription_id is None:
+            return None
+        return next(
+            (
+                subscription
+                for subscription in self.subscriptions
+                if subscription.id == self.selected_subscription_id
+            ),
+            None,
+        )
+
+    def _refresh_items(self) -> None:
+        self.clear_items()
+        if not self.subscriptions:
+            return
+        self.add_item(YouTubeSubscriptionAlertSettingsSelect(self))
+        subscription = self._selected_subscription()
+        if subscription is None:
+            return
+
+        live_button = discord.ui.Button(
+            label=f"라이브 알림 {'끄기' if subscription.live_alert_enabled else '켜기'}",
+            style=(
+                discord.ButtonStyle.danger
+                if subscription.live_alert_enabled
+                else discord.ButtonStyle.success
+            ),
+            disabled=subscription.live_alert_enabled
+            and not subscription.upload_alert_enabled,
+        )
+        upload_button = discord.ui.Button(
+            label=f"영상 알림 {'끄기' if subscription.upload_alert_enabled else '켜기'}",
+            style=(
+                discord.ButtonStyle.danger
+                if subscription.upload_alert_enabled
+                else discord.ButtonStyle.success
+            ),
+            disabled=subscription.upload_alert_enabled
+            and not subscription.live_alert_enabled,
+        )
+
+        async def live_callback(interaction: discord.Interaction) -> None:
+            await self._update_selected(
+                interaction,
+                live_alert_enabled=not subscription.live_alert_enabled,
+                upload_alert_enabled=subscription.upload_alert_enabled,
+            )
+
+        async def upload_callback(interaction: discord.Interaction) -> None:
+            await self._update_selected(
+                interaction,
+                live_alert_enabled=subscription.live_alert_enabled,
+                upload_alert_enabled=not subscription.upload_alert_enabled,
+            )
+
+        live_button.callback = live_callback
+        upload_button.callback = upload_callback
+        self.add_item(live_button)
+        self.add_item(upload_button)
+
+    def _content(self) -> str:
+        subscription = self._selected_subscription()
+        if subscription is None:
+            return "알림 설정을 바꿀 유튜브 구독을 선택해 주세요."
+        return (
+            f"`{subscription.channel_name}` 알림 설정\n"
+            f"{_format_subscription_alert_summary(subscription)}\n"
+            "라이브 알림과 영상 알림 중 하나 이상은 켜져 있어야 합니다."
+        )
+
+    async def _check_requester(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id == self.requester_id:
+            return True
+        await interaction.response.send_message(
+            "이 알림 설정 메뉴는 명령어를 실행한 사용자만 조작할 수 있습니다.",
+            ephemeral=True,
+        )
+        return False
+
+    async def _update_selected(
+        self,
+        interaction: discord.Interaction,
+        *,
+        live_alert_enabled: bool,
+        upload_alert_enabled: bool,
+    ) -> None:
+        if not await self._check_requester(interaction):
+            return
+        if self.selected_subscription_id is None:
+            await interaction.response.send_message(
+                "설정할 구독을 찾지 못했습니다. 목록을 새로 열어 주세요.",
+                ephemeral=True,
+            )
+            return
+
+        try:
+            updated = await update_youtube_subscription_alert_settings(
+                self.selected_subscription_id,
+                live_alert_enabled=live_alert_enabled,
+                upload_alert_enabled=upload_alert_enabled,
+            )
+        except ValueError as error:
+            await interaction.response.send_message(str(error), ephemeral=True)
+            return
+
+        if updated is None:
+            await interaction.response.send_message(
+                "설정할 구독을 찾지 못했습니다. 목록을 새로 열어 주세요.",
+                ephemeral=True,
+            )
+            return
+
+        self.subscriptions = [
+            updated if subscription.id == updated.id else subscription
+            for subscription in self.subscriptions
+        ]
+        self._refresh_items()
+        await interaction.response.edit_message(
+            content=self._content(),
+            view=self,
+        )
+
+
 class YouTubeSubscriptionsCog(commands.Cog):
     youtube_subscription = app_commands.Group(
         name="유튜브구독",
-        description="서버별 유튜브 라이브 구독을 관리합니다.",
+        description="서버별 유튜브 라이브/영상 알림 구독을 관리합니다.",
     )
 
     def __init__(self, bot: commands.Bot):
@@ -203,14 +373,30 @@ class YouTubeSubscriptionsCog(commands.Cog):
         name="추가",
         description="유튜브 채널 URL, ID, @handle 또는 검색어로 구독을 추가합니다.",
     )
-    @app_commands.describe(input_value="유튜브 채널 URL, ID, @handle 또는 검색어")
-    @app_commands.rename(input_value="입력")
+    @app_commands.describe(
+        input_value="유튜브 채널 URL, ID, @handle 또는 검색어",
+        live_alert_enabled="라이브 시작 알림을 받을지 선택합니다. 기본값은 켜짐입니다.",
+        upload_alert_enabled="새 영상 업로드 알림을 받을지 선택합니다. 기본값은 꺼짐입니다.",
+    )
+    @app_commands.rename(
+        input_value="입력",
+        live_alert_enabled="라이브알림",
+        upload_alert_enabled="영상알림",
+    )
     async def add_subscription(
         self,
         interaction: discord.Interaction,
         input_value: str,
+        live_alert_enabled: bool = True,
+        upload_alert_enabled: bool = False,
     ) -> None:
         if not await self._require_guild_admin(interaction):
+            return
+        if not live_alert_enabled and not upload_alert_enabled:
+            await interaction.response.send_message(
+                "라이브 알림과 영상 알림 중 하나 이상을 켜야 합니다.",
+                ephemeral=False,
+            )
             return
         guild_id = int(interaction.guild_id)
         target_channel_id = await get_channel(guild_id, YOUTUBE_CHANNEL_TYPE)
@@ -230,6 +416,8 @@ class YouTubeSubscriptionsCog(commands.Cog):
                 channel_id=metadata.channel_id,
                 channel_handle=metadata.channel_handle,
                 source_input=input_value.strip(),
+                live_alert_enabled=live_alert_enabled,
+                upload_alert_enabled=upload_alert_enabled,
             )
             loop_cog = self.bot.get_cog("LoopTasks")
             subscribed = False
@@ -241,13 +429,44 @@ class YouTubeSubscriptionsCog(commands.Cog):
             message = (
                 f"`{metadata.channel_name}` 구독을 추가했습니다.\n"
                 f"채널 ID: `{metadata.channel_id}`\n"
-                f"알림 채널: <#{target_channel_id}>"
+                f"알림 채널: <#{target_channel_id}>\n"
+                f"라이브 알림: {_format_alert_enabled(live_alert_enabled)} / "
+                f"영상 알림: {_format_alert_enabled(upload_alert_enabled)}"
             )
             if not subscribed:
                 message += "\n⚠️ WebSub callback 설정을 확인해 주세요."
             await interaction.followup.send(message, ephemeral=False)
         except Exception as error:
             await interaction.followup.send(f"오류: {error}", ephemeral=False)
+
+    @youtube_subscription.command(
+        name="알림설정",
+        description="유튜브 구독별 라이브 알림과 영상 알림을 켜거나 끕니다.",
+    )
+    async def configure_subscription_alerts(
+        self,
+        interaction: discord.Interaction,
+    ) -> None:
+        if not await self._require_guild_admin(interaction):
+            return
+        guild_id = int(interaction.guild_id)
+        subscriptions = await list_youtube_subscriptions(guild_id)
+        if not subscriptions:
+            await interaction.response.send_message(
+                "등록된 유튜브 구독이 없습니다.",
+                ephemeral=False,
+            )
+            return
+
+        view = YouTubeSubscriptionAlertSettingsView(
+            requester_id=interaction.user.id,
+            subscriptions=subscriptions,
+        )
+        await interaction.response.send_message(
+            view._content(),
+            view=view,
+            ephemeral=False,
+        )
 
     @youtube_subscription.command(
         name="삭제",
@@ -323,7 +542,19 @@ def _format_subscription_line(
     handle = f" ({subscription.channel_handle})" if subscription.channel_handle else ""
     return (
         f"{index}. **{subscription.channel_name}**{handle}\n"
-        f"   `{subscription.channel_id}`"
+        f"   `{subscription.channel_id}`\n"
+        f"   {_format_subscription_alert_summary(subscription)}"
+    )
+
+
+def _format_alert_enabled(enabled: bool) -> str:
+    return "ON" if enabled else "OFF"
+
+
+def _format_subscription_alert_summary(subscription: YouTubeSubscription) -> str:
+    return (
+        f"라이브: {_format_alert_enabled(subscription.live_alert_enabled)} / "
+        f"영상: {_format_alert_enabled(subscription.upload_alert_enabled)}"
     )
 
 

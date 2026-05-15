@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from enum import StrEnum
 from typing import Any
 from urllib.parse import urlencode
@@ -17,6 +18,7 @@ YT_NS = "{http://www.youtube.com/xml/schemas/2015}"
 class YouTubeVideoStatus(StrEnum):
     LIVE = "live"
     UPCOMING = "upcoming"
+    UPLOAD = "upload"
     NOT_LIVE = "not_live"
 
 
@@ -36,6 +38,7 @@ class YouTubeVideoLiveStatus:
     channel_id: str
     title: str
     status: YouTubeVideoStatus
+    published_at: str | None = None
     scheduled_start_time: str | None = None
 
 
@@ -45,6 +48,44 @@ def build_youtube_feed_topic_url(channel_id: str) -> str:
 
 def build_youtube_live_notification_message(video_id: str) -> str:
     return f"## 🔴 [LIVE 시작](https://youtu.be/{video_id})"
+
+
+def build_youtube_upload_notification_message(
+    channel_name: str,
+    title: str,
+    video_id: str,
+) -> str:
+    display_channel = channel_name.strip() or "유튜브"
+    display_title = title.strip() or "새 영상"
+    return f"## 📺 {display_channel} 새 영상\n**{display_title}**\nhttps://youtu.be/{video_id}"
+
+
+def should_send_youtube_upload_alert(
+    *,
+    upload_alert_enabled: bool,
+    upload_alert_enabled_at: str | None,
+    published_at: str | None,
+) -> bool:
+    if not upload_alert_enabled:
+        return False
+    enabled_at = _parse_youtube_datetime(upload_alert_enabled_at)
+    published = _parse_youtube_datetime(published_at)
+    if enabled_at is None or published is None:
+        return True
+    return published >= enabled_at
+
+
+def _parse_youtube_datetime(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    normalized = value.replace("Z", "+00:00")
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
 
 
 def _find_text(element: ElementTree.Element, name: str) -> str:
@@ -90,6 +131,7 @@ def classify_video_item(item: dict) -> YouTubeVideoLiveStatus:
     video_id = str(item.get("id", "") or "")
     channel_id = str(snippet.get("channelId", "") or "")
     title = str(snippet.get("title", "") or "")
+    published_at = snippet.get("publishedAt")
     live_broadcast_content = str(snippet.get("liveBroadcastContent", "") or "")
 
     actual_start_time = live_details.get("actualStartTime")
@@ -102,14 +144,17 @@ def classify_video_item(item: dict) -> YouTubeVideoLiveStatus:
         scheduled_start_time and not actual_start_time and not actual_end_time
     ):
         status = YouTubeVideoStatus.UPCOMING
-    else:
+    elif actual_start_time or actual_end_time or scheduled_start_time:
         status = YouTubeVideoStatus.NOT_LIVE
+    else:
+        status = YouTubeVideoStatus.UPLOAD
 
     return YouTubeVideoLiveStatus(
         video_id=video_id,
         channel_id=channel_id,
         title=title,
         status=status,
+        published_at=str(published_at) if published_at else None,
         scheduled_start_time=scheduled_start_time,
     )
 
@@ -121,8 +166,13 @@ def should_process_youtube_feed_update(
     seen_updates: dict[str, str],
     pending_videos: dict[str, Any],
     notified_video_ids: list[str],
+    notified_upload_video_ids: list[str] | None = None,
 ) -> bool:
-    if video_id in {str(current_id) for current_id in notified_video_ids if current_id}:
+    notified_ids = {str(current_id) for current_id in notified_video_ids if current_id}
+    notified_upload_ids = {
+        str(current_id) for current_id in (notified_upload_video_ids or []) if current_id
+    }
+    if video_id in notified_ids or video_id in notified_upload_ids:
         return False
     if video_id in pending_videos:
         return True

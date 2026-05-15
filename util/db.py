@@ -154,6 +154,10 @@ async def create_tables():
             websub_lease_seconds INT,
             pending_videos JSON,
             notified_video_ids JSON,
+            live_alert_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+            upload_alert_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+            upload_alert_enabled_at DATETIME(6),
+            notified_upload_video_ids JSON,
             created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
             updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
             UNIQUE KEY uk_youtube_subscriptions_guild_channel (guild_id, channel_id),
@@ -191,6 +195,34 @@ async def create_tables():
             await _ensure_bigint_unsigned(conn, "counter_1557", "user_id")
             await _ensure_bigint_unsigned(conn, "youtube_subscriptions", "id")
             await _ensure_bigint_unsigned(conn, "youtube_subscriptions", "guild_id")
+            await _ensure_column(
+                conn,
+                "youtube_subscriptions",
+                "live_alert_enabled",
+                "BOOLEAN NOT NULL DEFAULT TRUE",
+            )
+            await _ensure_column(
+                conn,
+                "youtube_subscriptions",
+                "upload_alert_enabled",
+                "BOOLEAN NOT NULL DEFAULT FALSE",
+            )
+            await _ensure_column(
+                conn,
+                "youtube_subscriptions",
+                "upload_alert_enabled_at",
+                "DATETIME(6)",
+            )
+            await _ensure_column(
+                conn,
+                "youtube_subscriptions",
+                "notified_upload_video_ids",
+                "JSON",
+            )
+            await cur.execute(
+                "DELETE FROM setting_data WHERE setting_key = %s",
+                ("youtubeLiveChecker",),
+            )
 
 
 async def upsert_guild(guild_id, guild_name):
@@ -234,3 +266,23 @@ async def _ensure_bigint_unsigned(conn, table_name: str, column_name: str):
             # If the column is part of PK, MySQL will alter the PK in place.
             alter_sql = f"ALTER TABLE {table_name} MODIFY COLUMN {column_name} BIGINT UNSIGNED NOT NULL"
             await cur.execute(alter_sql)
+
+
+async def _ensure_column(
+    conn,
+    table_name: str,
+    column_name: str,
+    column_definition: str,
+):
+    query = (
+        "SELECT 1 FROM information_schema.COLUMNS "
+        "WHERE table_schema = %s AND table_name = %s AND column_name = %s"
+    )
+    async with conn.cursor() as cur:
+        await cur.execute(query, (DB_NAME, table_name, column_name))
+        row = await cur.fetchone()
+        if row is not None:
+            return
+        await cur.execute(
+            f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_definition}"
+        )

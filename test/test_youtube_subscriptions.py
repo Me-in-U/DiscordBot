@@ -6,8 +6,12 @@ from util.youtube_subscriptions import YouTubeSubscription, row_to_subscription
 
 
 YOUTUBE_SUBSCRIPTION_COG_PATH = Path("cogs/youtube_subscriptions.py")
+LEGACY_YOUTUBE_CHECKER_COG_PATH = Path("cogs/YoutubeCheckerCog.py")
+CUSTOM_HELP_PATH = Path("cogs/custom_help.py")
+DB_PATH = Path("util/db.py")
 PUBLIC_COMMAND_METHODS = {
     "add_subscription",
+    "configure_subscription_alerts",
     "delete_subscription",
     "list_subscription",
 }
@@ -45,6 +49,41 @@ class YouTubeSubscriptionTests(unittest.TestCase):
             decorator_texts,
         )
 
+    def test_add_subscription_accepts_live_and_upload_alert_options(self):
+        tree = ast.parse(
+            YOUTUBE_SUBSCRIPTION_COG_PATH.read_text(encoding="utf-8"),
+            filename=str(YOUTUBE_SUBSCRIPTION_COG_PATH),
+        )
+        add_node = next(
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.AsyncFunctionDef)
+            and node.name == "add_subscription"
+        )
+        arg_names = [arg.arg for arg in add_node.args.args]
+
+        self.assertIn("live_alert_enabled", arg_names)
+        self.assertIn("upload_alert_enabled", arg_names)
+
+    def test_alert_settings_command_exists(self):
+        tree = ast.parse(
+            YOUTUBE_SUBSCRIPTION_COG_PATH.read_text(encoding="utf-8"),
+            filename=str(YOUTUBE_SUBSCRIPTION_COG_PATH),
+        )
+        command_names: list[str] = []
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            for keyword in node.keywords:
+                if (
+                    keyword.arg == "name"
+                    and isinstance(keyword.value, ast.Constant)
+                    and isinstance(keyword.value.value, str)
+                ):
+                    command_names.append(keyword.value.value)
+
+        self.assertIn("알림설정", command_names)
+
     def test_subscription_command_messages_are_public(self):
         tree = ast.parse(
             YOUTUBE_SUBSCRIPTION_COG_PATH.read_text(encoding="utf-8"),
@@ -78,6 +117,10 @@ class YouTubeSubscriptionTests(unittest.TestCase):
             "websub_lease_seconds": 604800,
             "pending_videos": '{"VIDEO1":{"title":"예정 방송"}}',
             "notified_video_ids": '["VIDEO0"]',
+            "live_alert_enabled": 1,
+            "upload_alert_enabled": 1,
+            "upload_alert_enabled_at": "2026-05-06T01:00:00+00:00",
+            "notified_upload_video_ids": '["UPLOAD0"]',
         }
 
         subscription = row_to_subscription(row)
@@ -95,6 +138,10 @@ class YouTubeSubscriptionTests(unittest.TestCase):
                 websub_lease_seconds=604800,
                 pending_videos={"VIDEO1": {"title": "예정 방송"}},
                 notified_video_ids=["VIDEO0"],
+                live_alert_enabled=True,
+                upload_alert_enabled=True,
+                upload_alert_enabled_at="2026-05-06T01:00:00+00:00",
+                notified_upload_video_ids=["UPLOAD0"],
             ),
         )
 
@@ -111,11 +158,36 @@ class YouTubeSubscriptionTests(unittest.TestCase):
                 "websub_lease_seconds": None,
                 "pending_videos": None,
                 "notified_video_ids": None,
+                "live_alert_enabled": None,
+                "upload_alert_enabled": None,
+                "upload_alert_enabled_at": None,
+                "notified_upload_video_ids": None,
             }
         )
 
         self.assertEqual(subscription.pending_videos, {})
         self.assertEqual(subscription.notified_video_ids, [])
+        self.assertTrue(subscription.live_alert_enabled)
+        self.assertFalse(subscription.upload_alert_enabled)
+        self.assertIsNone(subscription.upload_alert_enabled_at)
+        self.assertEqual(subscription.notified_upload_video_ids, [])
+
+    def test_schema_defines_live_and_upload_alert_columns(self):
+        db_source = DB_PATH.read_text(encoding="utf-8")
+
+        self.assertIn("live_alert_enabled", db_source)
+        self.assertIn("upload_alert_enabled", db_source)
+        self.assertIn("upload_alert_enabled_at", db_source)
+        self.assertIn("notified_upload_video_ids", db_source)
+
+    def test_help_mentions_upload_alert_and_alert_settings(self):
+        help_source = CUSTOM_HELP_PATH.read_text(encoding="utf-8")
+
+        self.assertIn("/유튜브구독 알림설정", help_source)
+        self.assertIn("영상 알림", help_source)
+
+    def test_legacy_live_checker_cog_is_removed(self):
+        self.assertFalse(LEGACY_YOUTUBE_CHECKER_COG_PATH.exists())
 
 
 if __name__ == "__main__":

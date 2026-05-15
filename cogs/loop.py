@@ -27,6 +27,7 @@ from util.youtube_subscriptions import (
     get_youtube_subscription,
     list_all_youtube_subscriptions,
     update_youtube_subscription_state,
+    update_youtube_upload_notification_state,
     update_youtube_websub_state,
 )
 from util.youtube_websub import (
@@ -34,8 +35,10 @@ from util.youtube_websub import (
     YouTubeVideoStatus,
     build_youtube_feed_topic_url,
     build_youtube_live_notification_message,
+    build_youtube_upload_notification_message,
     classify_video_item,
     parse_youtube_atom_entries,
+    should_send_youtube_upload_alert,
     should_process_youtube_feed_update,
 )
 
@@ -60,7 +63,7 @@ class LoopTasks(commands.Cog):
         self._legacy_youtube_setting_removed = False
         self._youtube_feed_checked_at: dict[int, datetime] = {}
         self._youtube_feed_seen_updates: dict[int, dict[str, str]] = {}
-        self.youtube_live_check.start()
+        self.youtube_notification_check.start()
         self.youtube_websub_renewal.start()
         print("LoopTasks Cog : init 완료!")
 
@@ -291,6 +294,16 @@ class LoopTasks(commands.Cog):
     def _get_notified_video_ids(self, subscription: YouTubeSubscription) -> set[str]:
         return {str(video_id) for video_id in subscription.notified_video_ids if video_id}
 
+    def _get_notified_upload_video_ids(
+        self,
+        subscription: YouTubeSubscription,
+    ) -> set[str]:
+        return {
+            str(video_id)
+            for video_id in subscription.notified_upload_video_ids
+            if video_id
+        }
+
     def _should_poll_youtube_feed(self, subscription_id: int) -> bool:
         now = datetime.now(timezone.utc)
         last_checked = self._youtube_feed_checked_at.get(subscription_id)
@@ -316,6 +329,7 @@ class LoopTasks(commands.Cog):
             seen_updates=seen_updates,
             pending_videos=subscription.pending_videos,
             notified_video_ids=subscription.notified_video_ids,
+            notified_upload_video_ids=subscription.notified_upload_video_ids,
         )
 
     def _remember_youtube_feed_entry_seen(
@@ -394,6 +408,23 @@ class LoopTasks(commands.Cog):
             notified_video_ids=notified_ids,
         )
 
+    async def _mark_youtube_upload_video_notified(
+        self,
+        subscription: YouTubeSubscription,
+        video_id: str,
+    ) -> YouTubeSubscription:
+        notified_ids = [
+            str(current_id) for current_id in subscription.notified_upload_video_ids
+        ]
+        if video_id not in notified_ids:
+            notified_ids.append(video_id)
+        notified_ids = notified_ids[-30:]
+        await update_youtube_upload_notification_state(
+            subscription.id,
+            notified_upload_video_ids=notified_ids,
+        )
+        return replace(subscription, notified_upload_video_ids=notified_ids)
+
     async def _remember_pending_youtube_video(
         self,
         subscription: YouTubeSubscription,
@@ -435,13 +466,52 @@ class LoopTasks(commands.Cog):
         if status.video_id in self._get_notified_video_ids(subscription):
             return False
 
+        target = await self._resolve_youtube_notification_target(
+            subscription,
+            "라이브",
+        )
+        if target is None:
+            return False
+
+        await target.send(build_youtube_live_notification_message(status.video_id))
+        return True
+
+    async def _send_youtube_upload_notification(
+        self,
+        subscription: YouTubeSubscription,
+        status,
+    ) -> bool:
+        if status.video_id in self._get_notified_upload_video_ids(subscription):
+            return False
+
+        target = await self._resolve_youtube_notification_target(
+            subscription,
+            "영상",
+        )
+        if target is None:
+            return False
+
+        await target.send(
+            build_youtube_upload_notification_message(
+                subscription.channel_name,
+                status.title,
+                status.video_id,
+            )
+        )
+        return True
+
+    async def _resolve_youtube_notification_target(
+        self,
+        subscription: YouTubeSubscription,
+        alert_label: str,
+    ):
         target_channel_id = await get_channel(subscription.guild_id, YOUTUBE_CHANNEL_TYPE)
         if target_channel_id is None:
             print(
-                "YouTube 라이브 알림 채널이 설정되지 않았습니다. "
+                f"YouTube {alert_label} 알림 채널이 설정되지 않았습니다. "
                 f"guild={subscription.guild_id} channel={subscription.channel_id}"
             )
-            return False
+            return None
 
         target = self.bot.get_channel(target_channel_id)
         if target is None:
@@ -449,13 +519,12 @@ class LoopTasks(commands.Cog):
                 target = await self.bot.fetch_channel(target_channel_id)
             except discord.DiscordException:
                 print(
-                    "YouTube 라이브 알림 대상 채널을 찾을 수 없습니다. "
+                    f"YouTube {alert_label} 알림 대상 채널을 찾을 수 없습니다. "
                     f"guild={subscription.guild_id} channel_id={target_channel_id}"
                 )
-                return False
+                return None
 
-        await target.send(build_youtube_live_notification_message(status.video_id))
-        return True
+        return target
 
     async def _process_youtube_video_candidate(
         self,
@@ -477,6 +546,9 @@ class LoopTasks(commands.Cog):
             return "channel_mismatch"
 
         if status.status == YouTubeVideoStatus.LIVE:
+            if not subscription.live_alert_enabled:
+                await self._remove_pending_youtube_video(subscription, video_id)
+                return "live_disabled"
             if status.video_id in self._get_notified_video_ids(subscription):
                 return "duplicate"
             sent = await self._send_youtube_live_notification(subscription, status)
@@ -487,8 +559,30 @@ class LoopTasks(commands.Cog):
             return "live_pending"
 
         if status.status == YouTubeVideoStatus.UPCOMING:
+            if not subscription.live_alert_enabled:
+                await self._remove_pending_youtube_video(subscription, video_id)
+                return "upcoming_disabled"
             await self._remember_pending_youtube_video(subscription, status)
             return "upcoming"
+
+        if status.status == YouTubeVideoStatus.UPLOAD:
+            await self._remove_pending_youtube_video(subscription, video_id)
+            if status.video_id in self._get_notified_upload_video_ids(subscription):
+                return "duplicate_upload"
+            if not should_send_youtube_upload_alert(
+                upload_alert_enabled=subscription.upload_alert_enabled,
+                upload_alert_enabled_at=subscription.upload_alert_enabled_at,
+                published_at=status.published_at,
+            ):
+                return "upload_disabled"
+            sent = await self._send_youtube_upload_notification(subscription, status)
+            if sent:
+                await self._mark_youtube_upload_video_notified(
+                    subscription,
+                    status.video_id,
+                )
+                return "upload_notified"
+            return "upload_send_failed"
 
         await self._remove_pending_youtube_video(subscription, video_id)
         return "not_live"
@@ -560,7 +654,7 @@ class LoopTasks(commands.Cog):
         )
 
     @tasks.loop(seconds=60)
-    async def youtube_live_check(self):
+    async def youtube_notification_check(self):
         """WebSub 후보와 Atom feed fallback 후보를 videos.list로 확인합니다."""
         try:
             await self._delete_legacy_youtube_live_checker_setting_once()
@@ -609,7 +703,7 @@ class LoopTasks(commands.Cog):
                         subscription = refreshed
                         pending = dict(subscription.pending_videos)
         except Exception as e:
-            print(f"YouTube 라이브 후보 확인 오류: {e}")
+            print(f"YouTube 알림 후보 확인 오류: {e}")
 
     @tasks.loop(hours=12)
     async def youtube_websub_renewal(self):
@@ -621,9 +715,9 @@ class LoopTasks(commands.Cog):
         except Exception as e:
             print(f"YouTube WebSub 구독 갱신 오류: {e}")
 
-    @youtube_live_check.before_loop
-    async def before_youtube_live_check(self):
-        print("-------------YouTube 라이브 체크 대기중...---------------")
+    @youtube_notification_check.before_loop
+    async def before_youtube_notification_check(self):
+        print("-------------YouTube 알림 체크 대기중...---------------")
         await self.bot.wait_until_ready()
 
     @youtube_websub_renewal.before_loop

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
-from datetime import datetime
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Any
 
 from util.db import execute_query, fetch_all, fetch_one
@@ -23,14 +23,15 @@ class YouTubeSubscription:
     websub_lease_seconds: int | None
     pending_videos: dict[str, Any]
     notified_video_ids: list[str]
+    live_alert_enabled: bool = True
+    upload_alert_enabled: bool = False
+    upload_alert_enabled_at: str | None = None
+    notified_upload_video_ids: list[str] = field(default_factory=list)
 
 
 def row_to_subscription(row: dict[str, Any]) -> YouTubeSubscription:
-    subscribed_at = row.get("websub_subscribed_at")
-    if isinstance(subscribed_at, datetime):
-        subscribed_at = subscribed_at.isoformat()
-    elif subscribed_at is not None:
-        subscribed_at = str(subscribed_at)
+    subscribed_at = _optional_datetime_text(row.get("websub_subscribed_at"))
+    upload_alert_enabled_at = _optional_datetime_text(row.get("upload_alert_enabled_at"))
 
     return YouTubeSubscription(
         id=int(row["id"]),
@@ -43,6 +44,15 @@ def row_to_subscription(row: dict[str, Any]) -> YouTubeSubscription:
         websub_lease_seconds=_optional_int(row.get("websub_lease_seconds")),
         pending_videos=_json_dict(row.get("pending_videos")),
         notified_video_ids=_json_string_list(row.get("notified_video_ids")),
+        live_alert_enabled=_optional_bool(row.get("live_alert_enabled"), default=True),
+        upload_alert_enabled=_optional_bool(
+            row.get("upload_alert_enabled"),
+            default=False,
+        ),
+        upload_alert_enabled_at=upload_alert_enabled_at,
+        notified_upload_video_ids=_json_string_list(
+            row.get("notified_upload_video_ids")
+        ),
     )
 
 
@@ -106,11 +116,21 @@ async def create_youtube_subscription(
     channel_id: str,
     channel_handle: str | None,
     source_input: str,
+    live_alert_enabled: bool = True,
+    upload_alert_enabled: bool = False,
 ) -> int:
+    if not live_alert_enabled and not upload_alert_enabled:
+        raise ValueError("라이브 알림과 영상 알림 중 하나 이상을 켜야 합니다.")
+
     existing = await find_youtube_subscription(guild_id, channel_id)
     if existing is not None:
         raise ValueError("이미 등록된 유튜브 채널입니다.")
 
+    upload_alert_enabled_at = (
+        datetime.now(timezone.utc).replace(tzinfo=None)
+        if upload_alert_enabled
+        else None
+    )
     query = """
         INSERT INTO youtube_subscriptions (
             guild_id,
@@ -119,9 +139,13 @@ async def create_youtube_subscription(
             channel_handle,
             source_input,
             pending_videos,
-            notified_video_ids
+            notified_video_ids,
+            live_alert_enabled,
+            upload_alert_enabled,
+            upload_alert_enabled_at,
+            notified_upload_video_ids
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """
     return int(
         await execute_query(
@@ -133,6 +157,10 @@ async def create_youtube_subscription(
                 channel_handle,
                 source_input,
                 "{}",
+                "[]",
+                bool(live_alert_enabled),
+                bool(upload_alert_enabled),
+                upload_alert_enabled_at,
                 "[]",
             ),
         )
@@ -176,6 +204,66 @@ async def update_youtube_subscription_state(
     )
 
 
+async def update_youtube_upload_notification_state(
+    subscription_id: int,
+    *,
+    notified_upload_video_ids: list[str],
+) -> None:
+    query = """
+        UPDATE youtube_subscriptions
+        SET notified_upload_video_ids = %s
+        WHERE id = %s
+    """
+    await execute_query(
+        query,
+        (
+            json.dumps(notified_upload_video_ids, ensure_ascii=False),
+            int(subscription_id),
+        ),
+    )
+
+
+async def update_youtube_subscription_alert_settings(
+    subscription_id: int,
+    *,
+    live_alert_enabled: bool,
+    upload_alert_enabled: bool,
+) -> YouTubeSubscription | None:
+    if not live_alert_enabled and not upload_alert_enabled:
+        raise ValueError("라이브 알림과 영상 알림 중 하나 이상을 켜야 합니다.")
+
+    subscription = await get_youtube_subscription(subscription_id)
+    if subscription is None:
+        return None
+
+    upload_alert_enabled_at = None
+    if upload_alert_enabled:
+        if subscription.upload_alert_enabled and subscription.upload_alert_enabled_at:
+            upload_alert_enabled_at = _parse_db_datetime(
+                subscription.upload_alert_enabled_at
+            )
+        else:
+            upload_alert_enabled_at = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    query = """
+        UPDATE youtube_subscriptions
+        SET live_alert_enabled = %s,
+            upload_alert_enabled = %s,
+            upload_alert_enabled_at = %s
+        WHERE id = %s
+    """
+    await execute_query(
+        query,
+        (
+            bool(live_alert_enabled),
+            bool(upload_alert_enabled),
+            upload_alert_enabled_at,
+            int(subscription_id),
+        ),
+    )
+    return await get_youtube_subscription(subscription_id)
+
+
 async def update_youtube_websub_state(
     subscription_id: int,
     *,
@@ -216,6 +304,42 @@ def _optional_int(value: Any) -> int | None:
     if value is None:
         return None
     return int(value)
+
+
+def _optional_bool(value: Any, *, default: bool) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    text = str(value).strip().lower()
+    if text in {"1", "true", "t", "yes", "y", "on"}:
+        return True
+    if text in {"0", "false", "f", "no", "n", "off"}:
+        return False
+    return default
+
+
+def _optional_datetime_text(value: Any) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value.isoformat()
+    return str(value)
+
+
+def _parse_db_datetime(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    normalized = value.replace("Z", "+00:00")
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return None
+    if parsed.tzinfo is not None:
+        parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
+    return parsed
 
 
 def _json_dict(value: Any) -> dict[str, Any]:

@@ -4,9 +4,11 @@ import util.youtube_websub as youtube_websub
 
 from util.youtube_websub import (
     YouTubeVideoStatus,
+    build_youtube_upload_notification_message,
     build_youtube_feed_topic_url,
     classify_video_item,
     parse_youtube_atom_entries,
+    should_send_youtube_upload_alert,
     should_process_youtube_feed_update,
 )
 
@@ -59,6 +61,16 @@ class YouTubeWebSubTests(unittest.TestCase):
         self.assertEqual(
             build_message("VIDEO123"),
             "## 🔴 [LIVE 시작](https://youtu.be/VIDEO123)",
+        )
+
+    def test_builds_upload_notification_message_with_channel_and_title(self):
+        self.assertEqual(
+            build_youtube_upload_notification_message(
+                "테스트 채널",
+                "새 영상 제목",
+                "VIDEO123",
+            ),
+            "## 📺 테스트 채널 새 영상\n**새 영상 제목**\nhttps://youtu.be/VIDEO123",
         )
 
     def test_classifies_current_live_video(self):
@@ -116,6 +128,47 @@ class YouTubeWebSubTests(unittest.TestCase):
 
         self.assertEqual(status.status, YouTubeVideoStatus.NOT_LIVE)
 
+    def test_classifies_regular_upload_separately_from_finished_live(self):
+        status = classify_video_item(
+            {
+                "id": "UPLOAD123",
+                "snippet": {
+                    "title": "일반 업로드",
+                    "channelId": "UC_TEST",
+                    "publishedAt": "2026-05-18T10:00:00Z",
+                    "liveBroadcastContent": "none",
+                },
+            }
+        )
+
+        self.assertEqual(status.status, YouTubeVideoStatus.UPLOAD)
+        self.assertEqual(status.published_at, "2026-05-18T10:00:00Z")
+
+    def test_upload_alert_respects_enabled_at_cutoff(self):
+        self.assertFalse(
+            should_send_youtube_upload_alert(
+                upload_alert_enabled=True,
+                upload_alert_enabled_at="2026-05-18T10:00:00+00:00",
+                published_at="2026-05-18T09:59:59Z",
+            )
+        )
+        self.assertTrue(
+            should_send_youtube_upload_alert(
+                upload_alert_enabled=True,
+                upload_alert_enabled_at="2026-05-18T10:00:00+00:00",
+                published_at="2026-05-18T10:00:00Z",
+            )
+        )
+
+    def test_upload_alert_disabled_blocks_regular_upload(self):
+        self.assertFalse(
+            should_send_youtube_upload_alert(
+                upload_alert_enabled=False,
+                upload_alert_enabled_at=None,
+                published_at="2026-05-18T10:00:00Z",
+            )
+        )
+
     def test_processes_unseen_feed_update(self):
         self.assertTrue(
             should_process_youtube_feed_update(
@@ -157,6 +210,18 @@ class YouTubeWebSubTests(unittest.TestCase):
                 seen_updates={},
                 pending_videos={"VIDEO123": {"scheduledStartTime": None}},
                 notified_video_ids=["VIDEO123"],
+            )
+        )
+
+    def test_skips_notified_upload_feed_update(self):
+        self.assertFalse(
+            should_process_youtube_feed_update(
+                video_id="VIDEO123",
+                entry_updated="2026-05-07T07:03:59+00:00",
+                seen_updates={},
+                pending_videos={},
+                notified_video_ids=[],
+                notified_upload_video_ids=["VIDEO123"],
             )
         )
 
