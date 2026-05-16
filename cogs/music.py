@@ -595,10 +595,30 @@ class SearchResultView(View):
             async def _on_pick(interaction: discord.Interaction, _entry=v):
                 # 즉시 재생(또는 대기열 추가), 메타 함께 전달
                 await interaction.response.defer(thinking=True, ephemeral=True)
+                await self._dismiss_search_result_message(interaction)
                 await self.cog._play_from_search_pick(interaction, _entry)
 
             btn.callback = _on_pick
             self.add_item(btn)
+
+    async def _dismiss_search_result_message(
+        self,
+        interaction: discord.Interaction,
+    ) -> None:
+        message = getattr(interaction, "message", None)
+        if message is not None:
+            try:
+                await message.delete()
+                return
+            except (discord.Forbidden, discord.NotFound, discord.HTTPException) as e:
+                dbg(f"SearchResultView: failed to delete search message {type(e)} {e}")
+        try:
+            await interaction.delete_original_response()
+        except (discord.Forbidden, discord.NotFound, discord.HTTPException) as e:
+            dbg(
+                "SearchResultView: failed to delete original search response "
+                f"{type(e)} {e}"
+            )
 
 
 # ! 기본 임베드에 붙을 뷰

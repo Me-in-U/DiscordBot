@@ -134,6 +134,15 @@ class MusicCommandSurfaceTests(unittest.TestCase):
                 return
         raise AssertionError("SearchResultView class not found")
 
+    def test_search_pick_dismisses_result_message(self):
+        tree = ast.parse(MUSIC_PATH.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ClassDef) and node.name == "SearchResultView":
+                source = ast.get_source_segment(MUSIC_PATH.read_text(encoding="utf-8"), node)
+                self.assertIn("_dismiss_search_result_message(interaction)", source)
+                return
+        raise AssertionError("SearchResultView class not found")
+
     def test_empty_queue_schedules_idle_disconnect_instead_of_immediate_stop(self):
         tree = ast.parse(MUSIC_PATH.read_text(encoding="utf-8"))
         on_song_end = _function_node(tree, "_on_song_end")
