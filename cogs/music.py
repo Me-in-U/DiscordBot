@@ -388,7 +388,7 @@ def build_queue_preview(
     queue: Deque[QueuedTrack],
     *,
     limit: int = 3,
-    title_limit: int = 14,
+    title_limit: int = 28,
 ) -> Optional[Tuple[str, str]]:
     if not queue:
         return None
@@ -594,31 +594,16 @@ class SearchResultView(View):
 
             async def _on_pick(interaction: discord.Interaction, _entry=v):
                 # 즉시 재생(또는 대기열 추가), 메타 함께 전달
-                await interaction.response.defer(thinking=True, ephemeral=True)
-                await self._dismiss_search_result_message(interaction)
+                await interaction.response.edit_message(
+                    content="선택 처리 중...",
+                    embed=None,
+                    view=None,
+                    delete_after=0.1,
+                )
                 await self.cog._play_from_search_pick(interaction, _entry)
 
             btn.callback = _on_pick
             self.add_item(btn)
-
-    async def _dismiss_search_result_message(
-        self,
-        interaction: discord.Interaction,
-    ) -> None:
-        message = getattr(interaction, "message", None)
-        if message is not None:
-            try:
-                await message.delete()
-                return
-            except (discord.Forbidden, discord.NotFound, discord.HTTPException) as e:
-                dbg(f"SearchResultView: failed to delete search message {type(e)} {e}")
-        try:
-            await interaction.delete_original_response()
-        except (discord.Forbidden, discord.NotFound, discord.HTTPException) as e:
-            dbg(
-                "SearchResultView: failed to delete original search response "
-                f"{type(e)} {e}"
-            )
 
 
 # ! 기본 임베드에 붙을 뷰
