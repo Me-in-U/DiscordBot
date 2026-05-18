@@ -689,7 +689,7 @@ class FavoriteSearchModal(discord.ui.Modal, title="즐겨찾기 음악 검색"):
 
 class MusicFavoriteSlotSelect(discord.ui.Select):
     def __init__(self, parent: "MusicFavoriteManageView"):
-        self.parent = parent
+        self.manager_view = parent
         favorite_map = _favorite_by_slot(parent.favorites)
         options = []
         for slot in range(1, MUSIC_FAVORITE_SLOT_MAX + 1):
@@ -711,12 +711,12 @@ class MusicFavoriteSlotSelect(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
-        self.parent.selected_slot = int(self.values[0])
+        self.manager_view.selected_slot = int(self.values[0])
         for option in self.options:
             option.default = option.value == self.values[0]
         await interaction.response.edit_message(
-            content=self.parent.status_text(),
-            view=self.parent,
+            content=self.manager_view.status_text(),
+            view=self.manager_view,
         )
 
 
@@ -1110,6 +1110,7 @@ class MusicCog(commands.Cog):
         self,
         interaction: discord.Interaction,
     ) -> None:
+        await interaction.response.defer(thinking=True, ephemeral=True)
         guild_id = interaction.guild.id
         favorites = await self._load_music_favorites(guild_id, refresh=True)
         state = self._get_state(guild_id)
@@ -1120,7 +1121,7 @@ class MusicCog(commands.Cog):
             favorites=favorites,
             current_track=current_track,
         )
-        await interaction.response.send_message(
+        await interaction.followup.send(
             view.status_text(),
             view=view,
             ephemeral=True,

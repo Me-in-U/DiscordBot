@@ -1,6 +1,6 @@
 import unittest
 
-from cogs.music import GuildMusicState, MusicControlView, MusicHelperView
+from cogs.music import GuildMusicState, MusicCog, MusicControlView, MusicHelperView
 from util.music_favorites import (
     MusicFavorite,
     build_music_favorite_button_label,
@@ -56,6 +56,25 @@ class MusicFavoriteTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("⭐ 즐겨찾기", labels)
         self.assertEqual(labels[-5:], ["1 저장된 노래", "2 빈칸", "3 빈칸", "4 빈칸", "5 빈칸"])
 
+    async def test_open_favorite_manager_acknowledges_before_loading_favorites(self):
+        cog = MusicCog(_Bot())
+        interaction = _Interaction()
+
+        async def load_favorites(guild_id, *, refresh=False):
+            self.assertTrue(interaction.response.deferred)
+            self.assertEqual(guild_id, 1)
+            self.assertTrue(refresh)
+            return []
+
+        cog._load_music_favorites = load_favorites
+
+        await cog._open_music_favorite_manager(interaction)
+
+        self.assertTrue(interaction.followup.sent)
+        _, kwargs = interaction.followup.sent
+        self.assertTrue(kwargs["ephemeral"])
+        self.assertIsNotNone(kwargs["view"])
+
 
 class _Cog:
     async def _open_music_favorite_manager(self, interaction):
@@ -78,6 +97,43 @@ class _Cog:
 
     async def _toggle_loop(self, interaction):
         return None
+
+
+class _Bot:
+    pass
+
+
+class _Guild:
+    id = 1
+
+
+class _Response:
+    def __init__(self):
+        self.deferred = False
+        self.defer_kwargs = None
+
+    async def defer(self, **kwargs):
+        self.deferred = True
+        self.defer_kwargs = kwargs
+
+    async def send_message(self, *args, **kwargs):
+        raise AssertionError("favorite manager must use followup after defer")
+
+
+class _Followup:
+    def __init__(self):
+        self.sent = None
+
+    async def send(self, *args, **kwargs):
+        self.sent = (args, kwargs)
+        return object()
+
+
+class _Interaction:
+    def __init__(self):
+        self.guild = _Guild()
+        self.response = _Response()
+        self.followup = _Followup()
 
 
 if __name__ == "__main__":
