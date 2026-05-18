@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import StrEnum
+import re
 from typing import Any
 from urllib.parse import urlencode
 from xml.etree import ElementTree
@@ -10,6 +11,7 @@ from xml.etree import ElementTree
 
 YOUTUBE_FEED_BASE_URL = "https://www.youtube.com/feeds/videos.xml"
 YOUTUBE_HUB_URL = "https://pubsubhubbub.appspot.com/subscribe"
+YOUTUBE_SHORTS_MAX_SECONDS = 180
 
 ATOM_NS = "{http://www.w3.org/2005/Atom}"
 YT_NS = "{http://www.youtube.com/xml/schemas/2015}"
@@ -19,6 +21,7 @@ class YouTubeVideoStatus(StrEnum):
     LIVE = "live"
     UPCOMING = "upcoming"
     UPLOAD = "upload"
+    SHORTS = "shorts"
     NOT_LIVE = "not_live"
 
 
@@ -88,6 +91,22 @@ def _parse_youtube_datetime(value: str | None) -> datetime | None:
     return parsed.astimezone(timezone.utc)
 
 
+def _parse_iso8601_duration_seconds(value: str | None) -> int | None:
+    if not value:
+        return None
+    match = re.fullmatch(
+        r"P(?:(?P<days>\d+)D)?(?:T(?:(?P<hours>\d+)H)?(?:(?P<minutes>\d+)M)?(?:(?P<seconds>\d+)S)?)?",
+        value,
+    )
+    if not match:
+        return None
+    days = int(match.group("days") or 0)
+    hours = int(match.group("hours") or 0)
+    minutes = int(match.group("minutes") or 0)
+    seconds = int(match.group("seconds") or 0)
+    return days * 86400 + hours * 3600 + minutes * 60 + seconds
+
+
 def _find_text(element: ElementTree.Element, name: str) -> str:
     child = element.find(name)
     return (child.text or "").strip() if child is not None else ""
@@ -127,6 +146,7 @@ def parse_youtube_atom_entries(atom_xml: str) -> list[YouTubeAtomEntry]:
 def classify_video_item(item: dict) -> YouTubeVideoLiveStatus:
     snippet = item.get("snippet", {}) or {}
     live_details = item.get("liveStreamingDetails", {}) or {}
+    content_details = item.get("contentDetails", {}) or {}
 
     video_id = str(item.get("id", "") or "")
     channel_id = str(snippet.get("channelId", "") or "")
@@ -137,6 +157,7 @@ def classify_video_item(item: dict) -> YouTubeVideoLiveStatus:
     actual_start_time = live_details.get("actualStartTime")
     actual_end_time = live_details.get("actualEndTime")
     scheduled_start_time = live_details.get("scheduledStartTime")
+    duration_seconds = _parse_iso8601_duration_seconds(content_details.get("duration"))
 
     if actual_start_time and not actual_end_time:
         status = YouTubeVideoStatus.LIVE
@@ -146,6 +167,11 @@ def classify_video_item(item: dict) -> YouTubeVideoLiveStatus:
         status = YouTubeVideoStatus.UPCOMING
     elif actual_start_time or actual_end_time or scheduled_start_time:
         status = YouTubeVideoStatus.NOT_LIVE
+    elif (
+        duration_seconds is not None
+        and 0 < duration_seconds <= YOUTUBE_SHORTS_MAX_SECONDS
+    ):
+        status = YouTubeVideoStatus.SHORTS
     else:
         status = YouTubeVideoStatus.UPLOAD
 

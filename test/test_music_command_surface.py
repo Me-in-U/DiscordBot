@@ -6,6 +6,7 @@ from pathlib import Path
 MUSIC_PATH = Path("cogs/music.py")
 HELP_PATH = Path("cogs/custom_help.py")
 CHANNEL_SETTINGS_PATH = Path("cogs/channel_settings.py")
+DB_PATH = Path("util/db.py")
 
 
 def _decorator_name(decorator: ast.expr) -> str:
@@ -163,6 +164,22 @@ class MusicCommandSurfaceTests(unittest.TestCase):
 
         self.assertIn("IDLE_DISCONNECT_SECONDS = 300", text)
         self.assertIn("idle_disconnect_task: Optional[asyncio.Task] = None", text)
+
+    def test_music_favorites_are_backed_by_dedicated_table(self):
+        db_source = DB_PATH.read_text(encoding="utf-8")
+
+        self.assertIn("CREATE TABLE IF NOT EXISTS music_favorites", db_source)
+        self.assertIn("PRIMARY KEY (guild_id, slot)", db_source)
+
+    def test_music_panel_views_include_favorite_controls(self):
+        source = MUSIC_PATH.read_text(encoding="utf-8")
+
+        self.assertIn("MusicFavoriteManageView", source)
+        self.assertIn("FavoriteSearchModal", source)
+        self.assertIn("music_favorite_manage", source)
+        self.assertIn("music_favorite_play_", source)
+        self.assertIn("_play_music_favorite", source)
+        self.assertIn("_save_current_track_as_favorite", source)
 
 
 if __name__ == "__main__":

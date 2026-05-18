@@ -1,4 +1,5 @@
 import unittest
+from pathlib import Path
 
 import util.youtube_websub as youtube_websub
 
@@ -33,6 +34,8 @@ SAMPLE_ATOM = """<?xml version="1.0" encoding="UTF-8"?>
   </entry>
 </feed>
 """
+
+LOOP_PATH = Path("cogs/loop.py")
 
 
 class YouTubeWebSubTests(unittest.TestCase):
@@ -143,6 +146,51 @@ class YouTubeWebSubTests(unittest.TestCase):
 
         self.assertEqual(status.status, YouTubeVideoStatus.UPLOAD)
         self.assertEqual(status.published_at, "2026-05-18T10:00:00Z")
+
+    def test_classifies_short_upload_candidate_separately_from_uploads(self):
+        shorts_status = getattr(YouTubeVideoStatus, "SHORTS", None)
+        self.assertIsNotNone(shorts_status)
+
+        status = classify_video_item(
+            {
+                "id": "SHORT123",
+                "snippet": {
+                    "title": "짧은 업로드",
+                    "channelId": "UC_TEST",
+                    "publishedAt": "2026-05-18T10:00:00Z",
+                    "liveBroadcastContent": "none",
+                },
+                "contentDetails": {
+                    "duration": "PT2M59S",
+                },
+            }
+        )
+
+        self.assertEqual(status.status, shorts_status)
+
+    def test_classifies_upload_over_three_minutes_as_regular_upload(self):
+        status = classify_video_item(
+            {
+                "id": "UPLOAD123",
+                "snippet": {
+                    "title": "3분 초과 업로드",
+                    "channelId": "UC_TEST",
+                    "publishedAt": "2026-05-18T10:00:00Z",
+                    "liveBroadcastContent": "none",
+                },
+                "contentDetails": {
+                    "duration": "PT3M1S",
+                },
+            }
+        )
+
+        self.assertEqual(status.status, YouTubeVideoStatus.UPLOAD)
+
+    def test_loop_fetches_content_details_and_skips_shorts(self):
+        source = LOOP_PATH.read_text(encoding="utf-8")
+
+        self.assertIn("snippet,liveStreamingDetails,status,contentDetails", source)
+        self.assertIn("shorts_skipped", source)
 
     def test_upload_alert_respects_enabled_at_cutoff(self):
         self.assertFalse(

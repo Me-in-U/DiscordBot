@@ -131,6 +131,21 @@ async def create_tables():
         ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
         """,
         """
+        CREATE TABLE IF NOT EXISTS music_favorites (
+            guild_id BIGINT UNSIGNED NOT NULL,
+            slot TINYINT UNSIGNED NOT NULL,
+            title VARCHAR(255) NOT NULL,
+            url VARCHAR(1024) NOT NULL,
+            duration INT NOT NULL DEFAULT 0,
+            uploader VARCHAR(255),
+            thumbnail VARCHAR(1024),
+            updated_by BIGINT UNSIGNED,
+            updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+            PRIMARY KEY (guild_id, slot),
+            INDEX idx_music_favorites_guild_id (guild_id)
+        ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+        """,
+        """
         CREATE TABLE IF NOT EXISTS counter_1557 (
             user_id BIGINT UNSIGNED PRIMARY KEY,
             count INT NOT NULL DEFAULT 0
@@ -192,6 +207,7 @@ async def create_tables():
             await _ensure_bigint_unsigned(conn, "scheduled_messages", "user_id")
             await _ensure_bigint_unsigned(conn, "panel_messages", "guild_id")
             await _ensure_bigint_unsigned(conn, "panel_messages", "message_id")
+            await _ensure_bigint_unsigned(conn, "music_favorites", "guild_id")
             await _ensure_bigint_unsigned(conn, "counter_1557", "user_id")
             await _ensure_bigint_unsigned(conn, "youtube_subscriptions", "id")
             await _ensure_bigint_unsigned(conn, "youtube_subscriptions", "guild_id")

@@ -17,10 +17,19 @@ import discord
 import yt_dlp as youtube_dl
 from discord import Embed, Message, Object, TextChannel, app_commands
 from discord.ext import commands
-from discord.ui import Button, View, button
+from discord.ui import Button, View
 from discord.utils import utcnow
 from util.channel_settings import get_channel
 from util.db import execute_query, fetch_all
+from util.music_favorites import (
+    MUSIC_FAVORITE_SLOT_MAX,
+    MusicFavorite,
+    build_music_favorite_button_label,
+    get_music_favorite,
+    list_music_favorites,
+    upsert_music_favorite,
+    validate_music_favorite_slot,
+)
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -408,6 +417,17 @@ def build_queue_preview(
     return f"대기열({len(queue)}개)", "\n".join(lines)
 
 
+def _favorite_by_slot(favorites: list[MusicFavorite]) -> dict[int, MusicFavorite]:
+    return {favorite.slot: favorite for favorite in favorites}
+
+
+def _normalize_search_entry_url(entry: dict) -> str:
+    raw_url = entry.get("webpage_url") or entry.get("url") or ""
+    if raw_url.startswith("/watch"):
+        return f"https://www.youtube.com{raw_url}"
+    return raw_url
+
+
 class YTDLSource:
     def __init__(
         self,
@@ -564,10 +584,17 @@ class YTDLSource:
 
 # 검색 결과 뷰
 class SearchResultView(View):
-    def __init__(self, cog, videos: list[dict]):
+    def __init__(
+        self,
+        cog,
+        videos: list[dict],
+        *,
+        favorite_slot: int | None = None,
+    ):
         # 검색 결과를 최대 10개까지 숫자 버튼으로 제공
         super().__init__(timeout=120)
         self.cog = cog
+        self.favorite_slot = favorite_slot
 
         vids = list(videos[:10])
         if not vids:
@@ -600,31 +627,197 @@ class SearchResultView(View):
                     view=None,
                     delete_after=0.1,
                 )
+                if self.favorite_slot is not None:
+                    await self.cog._save_search_entry_as_favorite(
+                        interaction,
+                        self.favorite_slot,
+                        _entry,
+                    )
+                    return
                 await self.cog._play_from_search_pick(interaction, _entry)
 
             btn.callback = _on_pick
             self.add_item(btn)
 
 
+def _add_music_favorite_buttons(
+    view: View,
+    cog: "MusicCog",
+    favorites: list[MusicFavorite],
+    *,
+    row: int,
+) -> None:
+    favorite_map = _favorite_by_slot(favorites)
+    for slot in range(1, MUSIC_FAVORITE_SLOT_MAX + 1):
+        favorite = favorite_map.get(slot)
+        btn = Button(
+            label=build_music_favorite_button_label(slot, favorite),
+            style=discord.ButtonStyle.secondary,
+            custom_id=f"music_favorite_play_{slot}",
+            row=row,
+            disabled=favorite is None,
+        )
+
+        async def _on_favorite(
+            interaction: discord.Interaction,
+            _slot: int = slot,
+        ):
+            await cog._play_music_favorite(interaction, _slot)
+
+        btn.callback = _on_favorite
+        view.add_item(btn)
+
+
+class FavoriteSearchModal(discord.ui.Modal, title="즐겨찾기 음악 검색"):
+    query = discord.ui.TextInput(
+        label="저장할 음악 제목이나 링크",
+        placeholder='예: "신창섭 다해줬잖아" or https://www.youtube.com/watch?v=...',
+    )
+
+    def __init__(self, cog: "MusicCog", slot: int):
+        super().__init__()
+        self.cog = cog
+        self.slot = validate_music_favorite_slot(slot)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await self.cog._search_music_for_favorite_slot(
+            interaction,
+            self.slot,
+            str(self.query.value or ""),
+        )
+
+
+class MusicFavoriteSlotSelect(discord.ui.Select):
+    def __init__(self, parent: "MusicFavoriteManageView"):
+        self.parent = parent
+        favorite_map = _favorite_by_slot(parent.favorites)
+        options = []
+        for slot in range(1, MUSIC_FAVORITE_SLOT_MAX + 1):
+            favorite = favorite_map.get(slot)
+            label = build_music_favorite_button_label(slot, favorite)
+            options.append(
+                discord.SelectOption(
+                    label=label,
+                    value=str(slot),
+                    default=slot == parent.selected_slot,
+                )
+            )
+        super().__init__(
+            placeholder="수정할 즐겨찾기 번호 선택",
+            min_values=1,
+            max_values=1,
+            options=options,
+            row=0,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        self.parent.selected_slot = int(self.values[0])
+        for option in self.options:
+            option.default = option.value == self.values[0]
+        await interaction.response.edit_message(
+            content=self.parent.status_text(),
+            view=self.parent,
+        )
+
+
+class MusicFavoriteManageView(View):
+    def __init__(
+        self,
+        cog: "MusicCog",
+        *,
+        guild_id: int,
+        favorites: list[MusicFavorite],
+        current_track: MusicFavorite | None = None,
+    ):
+        super().__init__(timeout=120)
+        self.cog = cog
+        self.guild_id = int(guild_id)
+        self.favorites = list(favorites)
+        self.current_track = current_track
+        self.selected_slot = 1
+        self.add_item(MusicFavoriteSlotSelect(self))
+
+        search_btn = Button(
+            label="🔎 검색해서 저장",
+            style=discord.ButtonStyle.primary,
+            custom_id="music_favorite_search",
+            row=1,
+        )
+        current_btn = Button(
+            label="⭐ 현재곡 저장",
+            style=discord.ButtonStyle.success,
+            custom_id="music_favorite_current",
+            row=1,
+            disabled=current_track is None,
+        )
+        search_btn.callback = self._on_search
+        current_btn.callback = self._on_current
+        self.add_item(search_btn)
+        self.add_item(current_btn)
+
+    def status_text(self) -> str:
+        return f"저장/수정할 즐겨찾기 슬롯: **{self.selected_slot}번**"
+
+    async def _on_search(self, interaction: discord.Interaction):
+        await interaction.response.send_modal(
+            FavoriteSearchModal(self.cog, self.selected_slot)
+        )
+
+    async def _on_current(self, interaction: discord.Interaction):
+        await self.cog._save_current_track_as_favorite(
+            interaction,
+            self.selected_slot,
+        )
+
+
 # ! 기본 임베드에 붙을 뷰
 class MusicHelperView(View):
-    def __init__(self, cog: "MusicCog"):
+    def __init__(
+        self,
+        cog: "MusicCog",
+        favorites: list[MusicFavorite] | None = None,
+    ):
         super().__init__(timeout=None)
         self.cog = cog
+        favorites = favorites or []
 
-    @button(
-        label="🔍 검색", style=discord.ButtonStyle.primary, custom_id="music_search"
-    )
-    async def search_btn(self, interaction: discord.Interaction, button: Button):
+        search_btn = Button(
+            label="🔍 검색",
+            style=discord.ButtonStyle.primary,
+            custom_id="music_search",
+            row=0,
+        )
+        favorite_btn = Button(
+            label="⭐ 즐겨찾기",
+            style=discord.ButtonStyle.secondary,
+            custom_id="music_favorite_manage",
+            row=0,
+        )
+        search_btn.callback = self._on_search
+        favorite_btn.callback = self._on_favorite_manage
+        self.add_item(search_btn)
+        self.add_item(favorite_btn)
+        _add_music_favorite_buttons(self, cog, favorites, row=1)
+
+    async def _on_search(self, interaction: discord.Interaction):
         await interaction.response.send_modal(SearchModal(self.cog))
+
+    async def _on_favorite_manage(self, interaction: discord.Interaction):
+        await self.cog._open_music_favorite_manager(interaction)
 
 
 # ! 음악 재생시 붙을 뷰
 class MusicControlView(View):
-    def __init__(self, cog: "MusicCog", state: "GuildMusicState"):
+    def __init__(
+        self,
+        cog: "MusicCog",
+        state: "GuildMusicState",
+        favorites: list[MusicFavorite] | None = None,
+    ):
         super().__init__(timeout=None)
         self.cog = cog
         self.state = state
+        self.favorites = favorites or []
 
         # ▶️ 다시재생 또는 ⏸️ 일시정지 버튼
         if state.paused_at:
@@ -648,6 +841,7 @@ class MusicControlView(View):
 
         # 나머지 버튼들
         self.add_control_buttons()
+        _add_music_favorite_buttons(self, cog, self.favorites, row=3)
 
     def add_control_buttons(self):
         skip_btn = Button(
@@ -686,6 +880,12 @@ class MusicControlView(View):
             custom_id="music_search_2",
             row=2,
         )
+        favorite_btn = Button(
+            label="⭐ 즐겨찾기",
+            style=discord.ButtonStyle.secondary,
+            custom_id="music_favorite_manage",
+            row=2,
+        )
 
         skip_btn.callback = self._on_skip
         stop_btn.callback = self._on_stop
@@ -693,8 +893,17 @@ class MusicControlView(View):
         seek_btn.callback = self._on_seek
         loop_btn.callback = self._on_loop
         search_btn.callback = self._on_search
+        favorite_btn.callback = self._on_favorite_manage
 
-        for b in [skip_btn, stop_btn, queue_btn, seek_btn, loop_btn, search_btn]:
+        for b in [
+            skip_btn,
+            stop_btn,
+            queue_btn,
+            seek_btn,
+            loop_btn,
+            search_btn,
+            favorite_btn,
+        ]:
             self.add_item(b)
 
     # === 콜백 함수들 ===
@@ -721,6 +930,9 @@ class MusicControlView(View):
 
     async def _on_search(self, interaction: discord.Interaction):
         await interaction.response.send_modal(SearchModal(self.cog))
+
+    async def _on_favorite_manage(self, interaction: discord.Interaction):
+        await self.cog._open_music_favorite_manager(interaction)
 
 
 # ! 구간 탐색 모달
@@ -779,6 +991,7 @@ class MusicCog(commands.Cog):
         self._warn_cooldown = 10.0  # 초
         # 부팅시 1회 정리 수행 여부
         self._purged_guilds: set[int] = set()
+        self._favorite_cache: dict[int, list[MusicFavorite]] = {}
 
     # === 패널 ID 저장/로드 유틸 ===
     async def cog_load(self):
@@ -813,6 +1026,54 @@ class MusicCog(commands.Cog):
         task.add_done_callback(self._bg_tasks.discard)
         return task
 
+    async def _load_music_favorites(
+        self,
+        guild_id: int,
+        *,
+        refresh: bool = False,
+    ) -> list[MusicFavorite]:
+        if not refresh and guild_id in self._favorite_cache:
+            return self._favorite_cache[guild_id]
+        try:
+            favorites = await list_music_favorites(guild_id)
+        except Exception as e:
+            dbg(f"_load_music_favorites: failed guild={guild_id} {type(e)} {e}")
+            favorites = []
+        self._favorite_cache[guild_id] = favorites
+        return favorites
+
+    async def _build_helper_view(self, guild_id: int) -> MusicHelperView:
+        favorites = await self._load_music_favorites(guild_id)
+        return MusicHelperView(self, favorites)
+
+    async def _build_control_view(
+        self,
+        guild_id: int,
+        state: GuildMusicState,
+    ) -> MusicControlView:
+        favorites = await self._load_music_favorites(guild_id)
+        return MusicControlView(self, state, favorites)
+
+    def _current_player_as_favorite(
+        self,
+        guild_id: int,
+        player: Optional["YTDLSource"],
+    ) -> MusicFavorite | None:
+        if player is None:
+            return None
+        url = player.webpage_url or player.data.get("webpage_url") or ""
+        if not url:
+            return None
+        return MusicFavorite(
+            guild_id=guild_id,
+            slot=1,
+            title=player.title or player.data.get("title") or "(제목 정보 없음)",
+            url=url,
+            duration=int(player.data.get("duration") or 0),
+            uploader=player.data.get("uploader"),
+            thumbnail=player.data.get("thumbnail"),
+        )
+
     async def _fill_queue_meta(self, track: "QueuedTrack"):
         """대기열 트랙의 가벼운 메타데이터를 채운다(재생에 영향 없음)."""
         try:
@@ -845,15 +1106,183 @@ class MusicCog(commands.Cog):
         except Exception as e:
             dbg(f"_fill_queue_meta: failed {type(e)} {e}")
 
+    async def _open_music_favorite_manager(
+        self,
+        interaction: discord.Interaction,
+    ) -> None:
+        guild_id = interaction.guild.id
+        favorites = await self._load_music_favorites(guild_id, refresh=True)
+        state = self._get_state(guild_id)
+        current_track = self._current_player_as_favorite(guild_id, state.player)
+        view = MusicFavoriteManageView(
+            self,
+            guild_id=guild_id,
+            favorites=favorites,
+            current_track=current_track,
+        )
+        await interaction.response.send_message(
+            view.status_text(),
+            view=view,
+            ephemeral=True,
+        )
+
+    async def _search_music_for_favorite_slot(
+        self,
+        interaction: discord.Interaction,
+        slot: int,
+        query: str,
+    ) -> None:
+        slot = validate_music_favorite_slot(slot)
+        query = (query or "").strip()
+        if not query:
+            await interaction.response.send_message(
+                "❌ 검색어를 입력해 주세요.",
+                ephemeral=True,
+            )
+            return
+
+        info = await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: search_ytdl.extract_info(f"ytsearch10:{query}", download=False),
+        )
+        raw = info.get("entries", []) or []
+        videos = [
+            entry
+            for entry in raw
+            if isinstance(entry.get("url"), str) and "watch?v=" in entry["url"]
+        ][:10]
+        if not videos:
+            await interaction.response.send_message(
+                "❌ 검색 결과가 없습니다.",
+                ephemeral=True,
+            )
+            return
+
+        description = "\n".join(
+            f"{index + 1}. {video.get('title', '-')}"
+            for index, video in enumerate(videos)
+        )
+        embed = Embed(
+            title=f"⭐ {slot}번 즐겨찾기에 저장할 음악 선택",
+            description=description,
+            color=0xFFC0CB,
+        )
+        view = SearchResultView(self, videos, favorite_slot=slot)
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+
+    async def _save_music_favorite(
+        self,
+        interaction: discord.Interaction,
+        *,
+        slot: int,
+        title: str,
+        url: str,
+        duration: int = 0,
+        uploader: str | None = None,
+        thumbnail: str | None = None,
+    ) -> None:
+        guild_id = interaction.guild.id
+        await upsert_music_favorite(
+            guild_id=guild_id,
+            slot=slot,
+            title=title,
+            url=url,
+            duration=duration,
+            uploader=uploader,
+            thumbnail=thumbnail,
+            updated_by=interaction.user.id,
+        )
+        await self._load_music_favorites(guild_id, refresh=True)
+        await self._refresh_music_panel_for_favorites(guild_id)
+        msg = await interaction.followup.send(
+            f"⭐ {slot}번 즐겨찾기에 **{title}** 저장했습니다.",
+            ephemeral=True,
+        )
+        self._spawn_bg(self._auto_delete(msg, 5.0))
+
+    async def _save_search_entry_as_favorite(
+        self,
+        interaction: discord.Interaction,
+        slot: int,
+        entry: dict,
+    ) -> None:
+        url = _normalize_search_entry_url(entry)
+        await self._save_music_favorite(
+            interaction,
+            slot=slot,
+            title=entry.get("title") or "(제목 정보 없음)",
+            url=url,
+            duration=int(entry.get("duration") or 0) if entry.get("duration") else 0,
+            uploader=entry.get("uploader") or entry.get("channel") or None,
+            thumbnail=(
+                entry.get("thumbnail")
+                or (entry.get("thumbnails") or [{}])[-1].get("url")
+            ),
+        )
+
+    async def _save_current_track_as_favorite(
+        self,
+        interaction: discord.Interaction,
+        slot: int,
+    ) -> None:
+        await interaction.response.defer(thinking=True, ephemeral=True)
+        guild_id = interaction.guild.id
+        state = self._get_state(guild_id)
+        favorite = self._current_player_as_favorite(guild_id, state.player)
+        if favorite is None:
+            await self._send_auto_delete(
+                interaction,
+                "❌ 현재 재생 중인 곡 정보가 없습니다.",
+            )
+            return
+        await self._save_music_favorite(
+            interaction,
+            slot=slot,
+            title=favorite.title,
+            url=favorite.url,
+            duration=favorite.duration,
+            uploader=favorite.uploader,
+            thumbnail=favorite.thumbnail,
+        )
+
+    async def _refresh_music_panel_for_favorites(self, guild_id: int) -> None:
+        state = self._get_state(guild_id)
+        if state.control_msg is None or state.control_channel is None:
+            return
+        if state.player:
+            state.control_view = await self._build_control_view(guild_id, state)
+            elapsed = int(time.time() - state.start_ts) if state.start_ts else 0
+            embed = self._make_playing_embed(state.player, guild_id, elapsed)
+        else:
+            state.control_view = await self._build_helper_view(guild_id)
+            embed = self._make_default_embed()
+        await self._edit_msg(state, embed, state.control_view)
+
+    async def _play_music_favorite(
+        self,
+        interaction: discord.Interaction,
+        slot: int,
+    ) -> None:
+        slot = validate_music_favorite_slot(slot)
+        favorite = await get_music_favorite(interaction.guild.id, slot)
+        if favorite is None:
+            await interaction.response.send_message(
+                f"❌ {slot}번 즐겨찾기가 비어있습니다.",
+                ephemeral=True,
+            )
+            return
+        await self._play_url_now(
+            interaction,
+            favorite.url,
+            success_prefix="⭐ 즐겨찾기 재생",
+        )
+
     async def _play_from_search_pick(
         self, interaction: discord.Interaction, entry: dict
     ):
         """검색 버튼 선택 시, 가능한 메타를 최대한 채워서 바로 재생/대기열 추가"""
         # yt 검색 결과는 url이 상대 경로일 수 있어 보정
-        raw_url = entry.get("webpage_url") or entry.get("url")
-        if raw_url and raw_url.startswith("/watch"):
-            raw_url = f"https://www.youtube.com{raw_url}"
-        url = raw_url or ""
+        url = _normalize_search_entry_url(entry)
 
         # 이미 재생 중이면 대기열에 메타 포함 추가
         voice_client = interaction.guild.voice_client
@@ -1076,7 +1505,7 @@ class MusicCog(commands.Cog):
                 except Exception as e:
                     dbg(f"_idle_disconnect_after_timeout: disconnect 실패: {type(e)} {e}")
 
-            state.control_view = MusicHelperView(self)
+            state.control_view = await self._build_helper_view(guild_id)
             state.paused_at = None
             state.start_ts = 0.0
             state.is_loop = False
@@ -1105,7 +1534,7 @@ class MusicCog(commands.Cog):
                 await vc.disconnect()
             except Exception as e:
                 dbg(f"_force_stop: disconnect 실패: {type(e)} {e}")
-        state.control_view = MusicHelperView(self)
+        state.control_view = await self._build_helper_view(guild_id)
         embed = self._make_default_embed()
         try:
             await self._edit_msg(state, embed, state.control_view)
@@ -1237,7 +1666,7 @@ class MusicCog(commands.Cog):
         print("[길드 상태 업데이트, 기본 임베드 뷰 생성]")
         embed = self._make_default_embed()
         state.control_channel = control_channel
-        state.control_view = MusicHelperView(self)
+        state.control_view = await self._build_helper_view(guild.id)
 
         # 1) 저장된 ID 우선 시도
         fetched = False
@@ -1338,6 +1767,96 @@ class MusicCog(commands.Cog):
 
     # ?완
     # !노래 재생 or 대기열
+    async def _play_url_now(
+        self,
+        interaction: discord.Interaction,
+        url: str,
+        *,
+        success_prefix: str = "▶ 재생",
+    ) -> None:
+        if not interaction.response.is_done():
+            await interaction.response.defer(thinking=True, ephemeral=True)
+
+        guild_id = interaction.guild.id
+        state = self._get_state(guild_id)
+        voice_client = interaction.guild.voice_client
+        user_channel = self._user_voice_channel(interaction)
+
+        if not voice_client:
+            if not user_channel:
+                await self._send_auto_delete(
+                    interaction,
+                    "❌ 먼저 음성 채널에 들어가 있어야 합니다.",
+                )
+                return
+            voice_client = await user_channel.connect()
+            dbg(f"_play_url_now: connected to voice channel id={user_channel.id}")
+        elif user_channel and voice_client.channel != user_channel:
+            if voice_client.is_playing() or voice_client.is_paused():
+                await self._send_auto_delete(
+                    interaction,
+                    "❌ 같은 음성 채널에 있는 사용자만 음악을 제어할 수 있습니다.",
+                )
+                return
+            await voice_client.move_to(user_channel)
+        elif not user_channel:
+            await self._send_auto_delete(
+                interaction,
+                "❌ 먼저 음성 채널에 들어가 있어야 합니다.",
+            )
+            return
+
+        try:
+            player = await YTDLSource.from_url(
+                url,
+                loop=self.bot.loop,
+                requester=interaction.user,
+            )
+        except FileNotFoundError:
+            await self._send_auto_delete(
+                interaction,
+                "❌ FFmpeg 실행 파일을 찾을 수 없습니다.",
+                delay=8.0,
+            )
+            return
+        except Exception as e:
+            dbg(f"_play_url_now: 소스 준비 실패: {type(e)} {e}")
+            await self._send_auto_delete(
+                interaction,
+                "❌ 스트림 URL을 가져오지 못했습니다. 잠시 후 다시 시도하거나 다른 영상으로 시도해 주세요.",
+                delay=10.0,
+            )
+            return
+
+        replacing = bool(
+            voice_client and (voice_client.is_playing() or voice_client.is_paused())
+        )
+        state.is_stopping = False
+        state.is_skipping = False
+        if replacing:
+            state.is_seeking = True
+            voice_client.stop()
+
+        try:
+            self._cancel_idle_disconnect(state)
+            state.player = player
+            state.start_ts = time.time()
+            state.paused_at = None
+            state.control_view = await self._build_control_view(guild_id, state)
+            self._vc_play(guild_id=guild_id, source=player.source)
+            await self._restart_updater(guild_id)
+            embed = self._make_playing_embed(player, guild_id)
+            await self._edit_msg(state=state, embed=embed, view=state.control_view)
+        finally:
+            if replacing:
+                state.is_seeking = False
+
+        msg = await interaction.followup.send(
+            f"{success_prefix}: **{player.title}**",
+            ephemeral=True,
+        )
+        self._spawn_bg(self._auto_delete(msg, 5.0))
+
     async def _play(self, interaction, url: str, skip_defer: bool = False):
         dbg(
             f"_play: called url={url} guild={interaction.guild.id} user={interaction.user.id}"
@@ -1480,7 +1999,7 @@ class MusicCog(commands.Cog):
         await self._restart_updater(guild_id)
         dbg("_play: playback started and updater restarted")
         embed = self._make_playing_embed(player, guild_id)
-        state.control_view = MusicControlView(self, state)
+        state.control_view = await self._build_control_view(guild_id, state)
         await self._edit_msg(state=state, embed=embed, view=state.control_view)
         msg = await interaction.followup.send(
             f"▶ 재생: **{player.title}**", ephemeral=True
@@ -1510,7 +2029,7 @@ class MusicCog(commands.Cog):
         elapsed = int(time.time() - state.start_ts)
         embed = self._make_playing_embed(state.player, guild_id, elapsed)
         # ! view 재생성
-        state.control_view = MusicControlView(self, state)
+        state.control_view = await self._build_control_view(guild_id, state)
         await self._edit_msg(state, embed, state.control_view)
         # !메시지
         _ = asyncio.create_task(
@@ -1549,7 +2068,7 @@ class MusicCog(commands.Cog):
             elapsed = int(time.time() - state.start_ts)
             embed = self._make_playing_embed(state.player, guild_id, elapsed)
             # ! view 재생성
-            state.control_view = MusicControlView(self, state)
+            state.control_view = await self._build_control_view(guild_id, state)
             await self._edit_msg(state, embed, state.control_view)
             # !메시지
             _ = asyncio.create_task(
@@ -1618,7 +2137,7 @@ class MusicCog(commands.Cog):
         await voice_client.disconnect()
 
         # ! reset panel
-        state.control_view = MusicHelperView(self)
+        state.control_view = await self._build_helper_view(interaction.guild.id)
         embed = self._make_default_embed()
         await self._edit_msg(state, embed, state.control_view)
 
@@ -1961,7 +2480,7 @@ class MusicCog(commands.Cog):
             state.player = None
             state.paused_at = None
             state.start_ts = 0.0
-            state.control_view = MusicHelperView(self)
+            state.control_view = await self._build_helper_view(guild_id)
             await self._edit_msg(state, self._make_default_embed(), state.control_view)
             self._schedule_idle_disconnect(guild_id)
             return

@@ -261,7 +261,7 @@ class LoopTasks(commands.Cog):
             response = (
                 self._youtube.videos()
                 .list(
-                    part="snippet,liveStreamingDetails,status",
+                    part="snippet,liveStreamingDetails,status,contentDetails",
                     id=video_id,
                     maxResults=1,
                 )
@@ -583,6 +583,10 @@ class LoopTasks(commands.Cog):
                 )
                 return "upload_notified"
             return "upload_send_failed"
+
+        if status.status == YouTubeVideoStatus.SHORTS:
+            await self._remove_pending_youtube_video(subscription, video_id)
+            return "shorts_skipped"
 
         await self._remove_pending_youtube_video(subscription, video_id)
         return "not_live"
