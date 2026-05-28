@@ -14,7 +14,7 @@ from util.message_context import (
 
 
 TRANSLATION_PROMPT_ID = "pmpt_68ac23cf2e6c81969b355cc2d2ab11600ddeea74b62910b3"
-TRANSLATION_PROMPT_VERSION = "5"
+TRANSLATION_PROMPT_VERSION = "6"
 
 
 async def translate_target(
