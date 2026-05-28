@@ -30,18 +30,26 @@ class ExplanationActionTests(unittest.TestCase):
 
         self.assertEqual(label, "가" * 50 + "...")
 
-    def test_build_explanation_prompt_uses_prompt_id_and_version(self):
-        prompt = build_explanation_prompt(" 설명할 내용 ")
+    def test_build_explanation_prompt_uses_prompt_id_version_and_context(self):
+        prompt = build_explanation_prompt(
+            " 설명할 내용 ",
+            previous_messages="이전 대화",
+            following_messages="이후 대화",
+        )
 
         self.assertEqual(
             prompt,
             {
                 "id": EXPLANATION_PROMPT_ID,
                 "version": EXPLANATION_PROMPT_VERSION,
-                "variables": {"target_message": "설명할 내용"},
+                "variables": {
+                    "previous_messages": "이전 대화",
+                    "target_message": "설명할 내용",
+                    "following_messages": "이후 대화",
+                },
             },
         )
-        self.assertEqual(EXPLANATION_PROMPT_VERSION, "3")
+        self.assertEqual(EXPLANATION_PROMPT_VERSION, "5")
 
     def test_build_explanation_prompt_uses_image_fallback_text(self):
         prompt = build_explanation_prompt("   ", has_image=True)
@@ -110,10 +118,18 @@ class ExplanationTargetTests(unittest.IsolatedAsyncioTestCase):
             return "Summary: 설정 혼선입니다. Details: DB_HOST 값이 맞지 않습니다."
 
         with patch("cogs.explanation.custom_prompt_model", fake_custom_prompt_model):
-            result = await explain_target("DB_HOST가 docker로 잡혀야 한다", None)
+            result = await explain_target(
+                "DB_HOST가 docker로 잡혀야 한다",
+                None,
+                previous_messages="Alice: 서버 안됨",
+                following_messages="Bob: env 확인해봐",
+            )
 
-        target_message = captured_kwargs["prompt"]["variables"]["target_message"]
+        variables = captured_kwargs["prompt"]["variables"]
+        target_message = variables["target_message"]
         self.assertEqual(target_message, "DB_HOST가 docker로 잡혀야 한다")
+        self.assertEqual(variables["previous_messages"], "Alice: 서버 안됨")
+        self.assertEqual(variables["following_messages"], "Bob: env 확인해봐")
         self.assertNotIn("Discord Markdown", target_message)
         self.assertEqual(
             result,

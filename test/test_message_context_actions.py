@@ -5,6 +5,7 @@ os.environ.setdefault("OPENAI_KEY", "test-key")
 os.environ.setdefault("GOOGLE_API_KEY", "test-key")
 
 from util.message_context import (
+    build_surrounding_message_context,
     build_message_action_target,
     build_message_select_label,
     build_recent_message_option,
@@ -24,16 +25,54 @@ class DummyAttachment:
         self.filename = filename
 
 
+class DummyAuthor:
+    def __init__(self, author_id: int, display_name: str) -> None:
+        self.id = author_id
+        self.display_name = display_name
+
+
 class DummyMessage:
     def __init__(
         self,
         content: str = "",
         attachments: list | None = None,
         message_id: int = 1,
+        author: DummyAuthor | None = None,
     ) -> None:
         self.content = content
         self.attachments = attachments or []
         self.id = message_id
+        self.author = author or DummyAuthor(1, "User")
+        self.channel = None
+
+
+class DummyChannel:
+    def __init__(self, messages: list[DummyMessage]) -> None:
+        self.messages = messages
+        for message in self.messages:
+            message.channel = self
+
+    async def history(
+        self,
+        *,
+        limit: int | None = None,
+        before: DummyMessage | None = None,
+        after: DummyMessage | None = None,
+        oldest_first: bool | None = None,
+    ):
+        messages = self.messages
+        if before is not None:
+            messages = [message for message in messages if message.id < before.id]
+        if after is not None:
+            messages = [message for message in messages if message.id > after.id]
+
+        if not oldest_first:
+            messages = list(reversed(messages))
+        if limit is not None:
+            messages = messages[:limit]
+
+        for message in messages:
+            yield message
 
 
 class MessageContextActionTests(unittest.TestCase):
@@ -125,6 +164,55 @@ class MessageContextActionTests(unittest.TestCase):
 
     def test_build_recent_message_option_excludes_slash_command_text(self):
         self.assertIsNone(build_recent_message_option(DummyMessage("/번역")))
+
+
+class SurroundingMessageContextTests(unittest.IsolatedAsyncioTestCase):
+    async def test_build_surrounding_context_uses_closest_ten_messages_each_side(self):
+        author = DummyAuthor(1, "Alice")
+        target = DummyMessage("해석할 대상", message_id=20, author=author)
+        messages = [
+            *[
+                DummyMessage(f"이전 {index}", message_id=index, author=author)
+                for index in range(1, 13)
+            ],
+            target,
+            *[
+                DummyMessage(f"이후 {index}", message_id=index, author=author)
+                for index in range(21, 34)
+            ],
+        ]
+        DummyChannel(messages)
+
+        context = await build_surrounding_message_context(target)
+
+        self.assertEqual(
+            context.previous_messages,
+            "\n".join(f"Alice: 이전 {index}" for index in range(3, 13)),
+        )
+        self.assertEqual(
+            context.following_messages,
+            "\n".join(f"Alice: 이후 {index}" for index in range(21, 31)),
+        )
+
+    async def test_build_surrounding_context_skips_bot_and_command_messages(self):
+        user = DummyAuthor(1, "Alice")
+        bot = DummyAuthor(2, "Bot")
+        target = DummyMessage("설명할 대상", message_id=5, author=user)
+        DummyChannel(
+            [
+                DummyMessage("이전 정상", message_id=1, author=user),
+                DummyMessage("/해석", message_id=2, author=user),
+                DummyMessage("봇 응답", message_id=3, author=bot),
+                target,
+                DummyMessage("이후 정상", message_id=6, author=user),
+                DummyMessage("봇 후속", message_id=7, author=bot),
+            ]
+        )
+
+        context = await build_surrounding_message_context(target, bot_user=bot)
+
+        self.assertEqual(context.previous_messages, "Alice: 이전 정상")
+        self.assertEqual(context.following_messages, "Alice: 이후 정상")
 
 
 if __name__ == "__main__":

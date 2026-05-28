@@ -47,6 +47,16 @@ class InterpretActionTests(unittest.TestCase):
 
         self.assertEqual(format_interpret_response_for_discord(response), response)
 
+    def test_format_interpret_response_keeps_strict_prompt_format(self):
+        response = (
+            "[해석 3줄 요약]\n"
+            "1. 표면적으로는 상황 확인입니다.\n"
+            "2. 말투는 조심스럽습니다.\n"
+            "3. 최종적으로 추가 설명을 요구하는 메시지입니다."
+        )
+
+        self.assertEqual(format_interpret_response_for_discord(response), response)
+
 
 class InterpretTargetTests(unittest.IsolatedAsyncioTestCase):
     async def test_interpret_target_sends_raw_question_without_developer_message(self):
@@ -62,8 +72,11 @@ class InterpretTargetTests(unittest.IsolatedAsyncioTestCase):
         target_question = captured_kwargs["prompt"]["variables"]["question"]
         self.assertEqual(target_question, "요즘 일찍 들어오네?")
         self.assertNotIn("Discord Markdown", target_question)
+        variables = captured_kwargs["prompt"]["variables"]
+        self.assertEqual(variables["previous_messages"], "")
+        self.assertEqual(variables["following_messages"], "")
         self.assertEqual(captured_kwargs["prompt"]["version"], INTERPRET_PROMPT_VERSION)
-        self.assertEqual(INTERPRET_PROMPT_VERSION, "10")
+        self.assertEqual(INTERPRET_PROMPT_VERSION, "12")
         self.assertEqual(
             result,
             "**의미 분석**\n표면 의미입니다.\n\n**결론**\n최종 해석입니다.",
@@ -77,10 +90,18 @@ class InterpretTargetTests(unittest.IsolatedAsyncioTestCase):
             return "Reasoning: 이미지 맥락입니다."
 
         with patch("cogs.interpret.custom_prompt_model", fake_custom_prompt_model):
-            await interpret_target("   ", "https://cdn.example/image.png")
+            await interpret_target(
+                "   ",
+                "https://cdn.example/image.png",
+                previous_messages="Alice: 이 이미지 봄?",
+                following_messages="Bob: 뭔 뜻임?",
+            )
 
-        target_question = captured_kwargs["prompt"]["variables"]["question"]
+        variables = captured_kwargs["prompt"]["variables"]
+        target_question = variables["question"]
         self.assertEqual(target_question, "첨부 이미지를 해석해줘.")
+        self.assertEqual(variables["previous_messages"], "Alice: 이 이미지 봄?")
+        self.assertEqual(variables["following_messages"], "Bob: 뭔 뜻임?")
         self.assertNotIn("Discord Markdown", target_question)
 
 

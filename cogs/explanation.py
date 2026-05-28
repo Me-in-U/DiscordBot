@@ -11,11 +11,12 @@ from util.message_context import (
     build_message_action_target,
     build_message_select_label,
     build_recent_message_option,
+    build_surrounding_message_context,
 )
 
 
 EXPLANATION_PROMPT_ID = "pmpt_69fabdb4fa308190867e700bb0a2de160eaa5a328b9e0f83"
-EXPLANATION_PROMPT_VERSION = "3"
+EXPLANATION_PROMPT_VERSION = "5"
 _EXPLANATION_RESPONSE_LABEL_PATTERN = re.compile(
     r"(?i)\b(Summary|Details|Explanation|Context|Unclear|요약|설명|주요 내용|맥락|추가 맥락|불확실한 부분)\s*:"
 )
@@ -33,6 +34,8 @@ def build_explanation_option_label(
 def build_explanation_prompt(
     text: str,
     has_image: bool = False,
+    previous_messages: str = "",
+    following_messages: str = "",
     prompt_version: str = EXPLANATION_PROMPT_VERSION,
 ) -> dict:
     normalized_text = str(text or "").strip()
@@ -44,7 +47,11 @@ def build_explanation_prompt(
     return build_prompt(
         EXPLANATION_PROMPT_ID,
         prompt_version,
-        {"target_message": normalized_text},
+        {
+            "previous_messages": str(previous_messages or "").strip(),
+            "target_message": normalized_text,
+            "following_messages": str(following_messages or "").strip(),
+        },
     )
 
 
@@ -90,20 +97,38 @@ def format_explanation_response_for_discord(response: str) -> str:
     return "\n\n".join(sections) if sections else stripped_response
 
 
-def _generate_explanation(text: str, image_url: str | None) -> str:
+def _generate_explanation(
+    text: str,
+    image_url: str | None,
+    previous_messages: str = "",
+    following_messages: str = "",
+) -> str:
     response = custom_prompt_model(
         image_content=build_single_image_content(image_url),
         prompt=build_explanation_prompt(
             text,
             has_image=bool(image_url),
+            previous_messages=previous_messages,
+            following_messages=following_messages,
         ),
     )
     return format_explanation_response_for_discord(response)
 
 
-async def explain_target(text: str, image_url: str | None) -> str:
+async def explain_target(
+    text: str,
+    image_url: str | None,
+    previous_messages: str = "",
+    following_messages: str = "",
+) -> str:
     try:
-        return await asyncio.to_thread(_generate_explanation, text, image_url)
+        return await asyncio.to_thread(
+            _generate_explanation,
+            text,
+            image_url,
+            previous_messages,
+            following_messages,
+        )
     except Exception as e:
         return f"Error: {e}"
 
@@ -122,7 +147,16 @@ async def explain_message_context_menu(
         return
 
     await interaction.response.defer(thinking=True)
-    explained = await explain_target(target.text, target.image_url)
+    context = await build_surrounding_message_context(
+        message,
+        bot_user=getattr(interaction.client, "user", None),
+    )
+    explained = await explain_target(
+        target.text,
+        target.image_url,
+        previous_messages=context.previous_messages,
+        following_messages=context.following_messages,
+    )
     await interaction.followup.send(explained)
 
 
@@ -171,6 +205,7 @@ class ExplanationSelectView(discord.ui.View):
             str(msg["id"]): {
                 "content": msg.get("content", ""),
                 "image_url": msg.get("image_url"),
+                "message": msg.get("message"),
             }
             for msg in options_data
         }
@@ -185,9 +220,17 @@ class ExplanationSelectView(discord.ui.View):
             )
             return
 
+        source_message = self.selected_message.get("message")
+        context = await build_surrounding_message_context(
+            source_message,
+            bot_user=getattr(interaction.client, "user", None),
+        )
+
         result_message = await explain_target(
             self.selected_message.get("content", ""),
             self.selected_message.get("image_url"),
+            previous_messages=context.previous_messages,
+            following_messages=context.following_messages,
         )
         if isinstance(self.original_message, discord.Message):
             try:
@@ -250,6 +293,7 @@ class ExplanationCommands(commands.Cog):
             if option is None:
                 continue
 
+            option["message"] = message
             messages_options.append(option)
             if len(messages_options) >= 20:
                 break

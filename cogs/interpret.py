@@ -11,10 +11,11 @@ from util.message_context import (
     build_message_action_target,
     build_message_select_label,
     build_recent_message_option,
+    build_surrounding_message_context,
 )
 
 INTERPRET_PROMPT_ID = "pmpt_68abf98a25b481938994e409ffd1ecf20db1ff235be9e7ab"
-INTERPRET_PROMPT_VERSION = "10"
+INTERPRET_PROMPT_VERSION = "12"
 _INTERPRET_RESPONSE_LABEL_PATTERN = re.compile(
     r"(?i)\b(Reasoning|Conclusion|Hidden meaning)\s*:"
 )
@@ -24,7 +25,11 @@ def format_interpret_response_for_discord(response: str) -> str:
     stripped_response = response.strip()
     if not stripped_response or stripped_response.startswith("Error:"):
         return response
-    if "**의미 분석**" in stripped_response or "### 의미 분석" in stripped_response:
+    if (
+        "**의미 분석**" in stripped_response
+        or "### 의미 분석" in stripped_response
+        or stripped_response.startswith("[해석 3줄 요약]")
+    ):
         return stripped_response
 
     matches = list(_INTERPRET_RESPONSE_LABEL_PATTERN.finditer(stripped_response))
@@ -52,6 +57,8 @@ def format_interpret_response_for_discord(response: str) -> str:
 async def interpret_target(
     question: str,
     image_url: str | None,
+    previous_messages: str = "",
+    following_messages: str = "",
     prompt_version: str = INTERPRET_PROMPT_VERSION,
 ) -> str:
     normalized_question = question.strip()
@@ -65,7 +72,11 @@ async def interpret_target(
             prompt=build_prompt(
                 INTERPRET_PROMPT_ID,
                 prompt_version,
-                {"question": normalized_question},
+                {
+                    "previous_messages": str(previous_messages or "").strip(),
+                    "question": normalized_question,
+                    "following_messages": str(following_messages or "").strip(),
+                },
             ),
         )
         return format_interpret_response_for_discord(response)
@@ -87,7 +98,16 @@ async def interpret_message_context_menu(
         return
 
     await interaction.response.defer(thinking=True)
-    interpreted = await interpret_target(target.text, target.image_url)
+    context = await build_surrounding_message_context(
+        message,
+        bot_user=getattr(interaction.client, "user", None),
+    )
+    interpreted = await interpret_target(
+        target.text,
+        target.image_url,
+        previous_messages=context.previous_messages,
+        following_messages=context.following_messages,
+    )
     await interaction.followup.send(interpreted)
 
 
@@ -139,6 +159,7 @@ class InterpretSelectView(discord.ui.View):
             str(msg["id"]): {
                 "content": msg["content"],
                 "image_url": msg.get("image_url"),
+                "message": msg.get("message"),
             }
             for msg in options_data
         }
@@ -157,8 +178,18 @@ class InterpretSelectView(discord.ui.View):
         # 뷰가 달린 메시지를 수정
         target_message = self.selected_message.get("content", "")
         image_url = self.selected_message.get("image_url")
+        source_message = self.selected_message.get("message")
+        context = await build_surrounding_message_context(
+            source_message,
+            bot_user=getattr(interaction.client, "user", None),
+        )
 
-        result_message = await interpret_target(target_message, image_url)
+        result_message = await interpret_target(
+            target_message,
+            image_url,
+            previous_messages=context.previous_messages,
+            following_messages=context.following_messages,
+        )
 
         # 원본 메시지를 번역 결과로 덮어쓰기
         if isinstance(self.original_message, discord.Message):
@@ -238,6 +269,7 @@ class InterpretCommands(commands.Cog):
                 if option is None:
                     continue
 
+                option["message"] = message
                 messages_options.append(option)
                 if len(messages_options) >= 20:
                     break
