@@ -181,6 +181,20 @@ async def create_tables():
         ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
         """,
         """
+        CREATE TABLE IF NOT EXISTS dday_events (
+            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            guild_id BIGINT UNSIGNED NOT NULL,
+            title VARCHAR(100) NOT NULL,
+            target_date DATE NOT NULL,
+            show_after BOOLEAN NOT NULL DEFAULT FALSE,
+            created_by BIGINT UNSIGNED NOT NULL,
+            created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+            updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+            INDEX idx_dday_events_guild_date (guild_id, target_date),
+            INDEX idx_dday_events_guild_id (guild_id)
+        ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+        """,
+        """
         CREATE TABLE IF NOT EXISTS special_days (
             id INT AUTO_INCREMENT PRIMARY KEY,
             day_key VARCHAR(10) NOT NULL,
@@ -211,6 +225,9 @@ async def create_tables():
             await _ensure_bigint_unsigned(conn, "counter_1557", "user_id")
             await _ensure_bigint_unsigned(conn, "youtube_subscriptions", "id")
             await _ensure_bigint_unsigned(conn, "youtube_subscriptions", "guild_id")
+            await _ensure_bigint_unsigned(conn, "dday_events", "id")
+            await _ensure_bigint_unsigned(conn, "dday_events", "guild_id")
+            await _ensure_bigint_unsigned(conn, "dday_events", "created_by")
             await _ensure_column(
                 conn,
                 "youtube_subscriptions",
@@ -234,6 +251,24 @@ async def create_tables():
                 "youtube_subscriptions",
                 "notified_upload_video_ids",
                 "JSON",
+            )
+            await _ensure_column(
+                conn,
+                "dday_events",
+                "show_after",
+                "BOOLEAN NOT NULL DEFAULT FALSE",
+            )
+            await _ensure_column(
+                conn,
+                "dday_events",
+                "created_at",
+                "DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)",
+            )
+            await _ensure_column(
+                conn,
+                "dday_events",
+                "updated_at",
+                "DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)",
             )
             await cur.execute(
                 "DELETE FROM setting_data WHERE setting_key = %s",

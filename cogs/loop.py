@@ -18,6 +18,7 @@ from bot import (
 from util.channel_settings import get_channel
 from util.celebration import refresh_celebration_messages
 from util.db import fetch_all, fetch_one, execute_query
+from util.dday import refresh_dday_messages
 from util.env_utils import getenv_clean
 from func.find1557 import clearCount
 from util.youtube_subscriptions import (
@@ -111,6 +112,22 @@ class LoopTasks(commands.Cog):
 
         if success_count:
             print(f"[{datetime.now(SEOUL_TZ)}] 기념일 공지 {success_count}개 채널 갱신 완료.")
+
+        dday_results = await refresh_dday_messages(self.bot)
+        dday_success_count = 0
+        for result in dday_results:
+            if result.status == "ok":
+                dday_success_count += 1
+                continue
+            if result.status == "skipped":
+                continue
+            print(
+                f"DDAY 공지 갱신 실패: guild={result.guild_id} "
+                f"channel={result.channel_id} error={result.error}"
+            )
+
+        if dday_success_count:
+            print(f"[{datetime.now(SEOUL_TZ)}] DDAY 공지 {dday_success_count}개 채널 전송 완료.")
 
         # 유저 메시지 초기화 및 리로드
         self.bot.USER_MESSAGES = {}
