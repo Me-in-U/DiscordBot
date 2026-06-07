@@ -192,6 +192,14 @@ class YouTubeWebSubTests(unittest.TestCase):
         self.assertIn("snippet,liveStreamingDetails,status,contentDetails", source)
         self.assertIn("shorts_skipped", source)
 
+    def test_loop_defines_ten_minute_community_post_check(self):
+        source = LOOP_PATH.read_text(encoding="utf-8")
+
+        self.assertIn("@tasks.loop(minutes=10)", source)
+        self.assertIn("youtube_community_check", source)
+        self.assertIn("community_alert_enabled", source)
+        self.assertIn("update_youtube_community_notification_state", source)
+
     def test_upload_alert_respects_enabled_at_cutoff(self):
         self.assertFalse(
             should_send_youtube_upload_alert(

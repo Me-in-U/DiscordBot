@@ -27,9 +27,16 @@ from util.youtube_subscriptions import (
     find_youtube_subscriptions_by_channel_id,
     get_youtube_subscription,
     list_all_youtube_subscriptions,
+    update_youtube_community_notification_state,
     update_youtube_subscription_state,
     update_youtube_upload_notification_state,
     update_youtube_websub_state,
+)
+from util.youtube_community import (
+    YouTubeCommunityPost,
+    fetch_latest_youtube_community_posts,
+    find_new_youtube_community_posts,
+    trim_notified_community_post_ids,
 )
 from util.youtube_websub import (
     YOUTUBE_HUB_URL,
@@ -65,6 +72,7 @@ class LoopTasks(commands.Cog):
         self._youtube_feed_checked_at: dict[int, datetime] = {}
         self._youtube_feed_seen_updates: dict[int, dict[str, str]] = {}
         self.youtube_notification_check.start()
+        self.youtube_community_check.start()
         self.youtube_websub_renewal.start()
         print("LoopTasks Cog : init 완료!")
 
@@ -212,8 +220,13 @@ class LoopTasks(commands.Cog):
         else:
             subscription = await get_youtube_subscription(subscription_id)
             subscriptions = [subscription] if subscription is not None else []
+        subscriptions = [
+            subscription
+            for subscription in subscriptions
+            if subscription.live_alert_enabled or subscription.upload_alert_enabled
+        ]
         if not subscriptions:
-            return False
+            return True
 
         success_count = 0
         for subscription in subscriptions:
@@ -319,6 +332,16 @@ class LoopTasks(commands.Cog):
             str(video_id)
             for video_id in subscription.notified_upload_video_ids
             if video_id
+        }
+
+    def _get_notified_community_post_ids(
+        self,
+        subscription: YouTubeSubscription,
+    ) -> set[str]:
+        return {
+            str(post_id)
+            for post_id in subscription.notified_community_post_ids
+            if post_id
         }
 
     def _should_poll_youtube_feed(self, subscription_id: int) -> bool:
@@ -442,6 +465,21 @@ class LoopTasks(commands.Cog):
         )
         return replace(subscription, notified_upload_video_ids=notified_ids)
 
+    async def _mark_youtube_community_post_notified(
+        self,
+        subscription: YouTubeSubscription,
+        post_id: str,
+    ) -> YouTubeSubscription:
+        notified_ids = [str(current_id) for current_id in subscription.notified_community_post_ids]
+        if post_id not in notified_ids:
+            notified_ids.append(post_id)
+        notified_ids = trim_notified_community_post_ids(notified_ids)
+        await update_youtube_community_notification_state(
+            subscription.id,
+            notified_community_post_ids=notified_ids,
+        )
+        return replace(subscription, notified_community_post_ids=notified_ids)
+
     async def _remember_pending_youtube_video(
         self,
         subscription: YouTubeSubscription,
@@ -514,6 +552,41 @@ class LoopTasks(commands.Cog):
                 status.title,
                 status.video_id,
             )
+        )
+        return True
+
+    async def _send_youtube_community_notification(
+        self,
+        subscription: YouTubeSubscription,
+        post: YouTubeCommunityPost,
+    ) -> bool:
+        if post.post_id in self._get_notified_community_post_ids(subscription):
+            return False
+
+        target = await self._resolve_youtube_notification_target(
+            subscription,
+            "커뮤니티",
+        )
+        if target is None:
+            return False
+
+        description = _truncate_discord_text(post.text or "본문 없음", 900)
+        embed = discord.Embed(
+            title=f"{subscription.channel_name} 커뮤니티 게시물",
+            description=description,
+            url=post.url,
+            color=discord.Color.red(),
+        )
+        if post.author:
+            embed.set_author(name=post.author)
+        if post.published_time:
+            embed.add_field(name="게시 시각", value=post.published_time, inline=True)
+        if post.attachment_urls:
+            embed.set_image(url=post.attachment_urls[0])
+
+        await target.send(
+            content=f"## 📝 {subscription.channel_name} 새 커뮤니티 게시물\n{post.url}",
+            embed=embed,
         )
         return True
 
@@ -607,6 +680,55 @@ class LoopTasks(commands.Cog):
 
         await self._remove_pending_youtube_video(subscription, video_id)
         return "not_live"
+
+    async def _poll_youtube_community_posts(
+        self,
+        subscription: YouTubeSubscription,
+    ) -> YouTubeSubscription:
+        if not subscription.community_alert_enabled:
+            return subscription
+
+        try:
+            posts = await fetch_latest_youtube_community_posts(
+                subscription.channel_id,
+                limit=10,
+            )
+        except Exception as e:
+            print(
+                "YouTube 커뮤니티 게시물 조회 실패: "
+                f"channel={subscription.channel_id} error={e}"
+            )
+            return subscription
+
+        if not posts:
+            return subscription
+
+        if not subscription.notified_community_post_ids:
+            notified_ids = trim_notified_community_post_ids(
+                [post.post_id for post in posts]
+            )
+            await update_youtube_community_notification_state(
+                subscription.id,
+                notified_community_post_ids=notified_ids,
+            )
+            return replace(subscription, notified_community_post_ids=notified_ids)
+
+        new_posts = find_new_youtube_community_posts(
+            posts,
+            subscription.notified_community_post_ids,
+        )
+        for post in reversed(new_posts):
+            sent = await self._send_youtube_community_notification(
+                subscription,
+                post,
+            )
+            if sent:
+                subscription = await self._mark_youtube_community_post_notified(
+                    subscription,
+                    post.post_id,
+                )
+
+        return subscription
 
     async def handle_youtube_websub_notification(self, atom_xml: str) -> dict:
         entries = parse_youtube_atom_entries(atom_xml)
@@ -726,6 +848,18 @@ class LoopTasks(commands.Cog):
         except Exception as e:
             print(f"YouTube 알림 후보 확인 오류: {e}")
 
+    @tasks.loop(minutes=10)
+    async def youtube_community_check(self):
+        """커뮤니티 알림이 켜진 유튜브 구독의 새 게시물을 확인합니다."""
+        try:
+            subscriptions = await list_all_youtube_subscriptions()
+            for subscription in subscriptions:
+                if not subscription.community_alert_enabled:
+                    continue
+                await self._poll_youtube_community_posts(subscription)
+        except Exception as e:
+            print(f"YouTube 커뮤니티 알림 확인 오류: {e}")
+
     @tasks.loop(hours=12)
     async def youtube_websub_renewal(self):
         """YouTube WebSub 구독을 주기적으로 갱신합니다."""
@@ -741,6 +875,11 @@ class LoopTasks(commands.Cog):
         print("-------------YouTube 알림 체크 대기중...---------------")
         await self.bot.wait_until_ready()
 
+    @youtube_community_check.before_loop
+    async def before_youtube_community_check(self):
+        print("-------------YouTube 커뮤니티 알림 체크 대기중...---------------")
+        await self.bot.wait_until_ready()
+
     @youtube_websub_renewal.before_loop
     async def before_youtube_websub_renewal(self):
         print("-------------YouTube WebSub 구독 갱신 대기중...---------------")
@@ -751,3 +890,10 @@ async def setup(bot):
     """Cog를 봇에 추가합니다."""
     await bot.add_cog(LoopTasks(bot))
     print("LoopTasks Cog : setup 완료!")
+
+
+def _truncate_discord_text(text: str, max_length: int) -> str:
+    normalized = (text or "").strip()
+    if len(normalized) <= max_length:
+        return normalized
+    return normalized[: max_length - 3].rstrip() + "..."

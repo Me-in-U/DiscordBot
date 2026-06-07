@@ -173,6 +173,8 @@ async def create_tables():
             upload_alert_enabled BOOLEAN NOT NULL DEFAULT FALSE,
             upload_alert_enabled_at DATETIME(6),
             notified_upload_video_ids JSON,
+            community_alert_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+            notified_community_post_ids JSON,
             created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
             updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
             UNIQUE KEY uk_youtube_subscriptions_guild_channel (guild_id, channel_id),
@@ -250,6 +252,18 @@ async def create_tables():
                 conn,
                 "youtube_subscriptions",
                 "notified_upload_video_ids",
+                "JSON",
+            )
+            await _ensure_column(
+                conn,
+                "youtube_subscriptions",
+                "community_alert_enabled",
+                "BOOLEAN NOT NULL DEFAULT FALSE",
+            )
+            await _ensure_column(
+                conn,
+                "youtube_subscriptions",
+                "notified_community_post_ids",
                 "JSON",
             )
             await _ensure_column(

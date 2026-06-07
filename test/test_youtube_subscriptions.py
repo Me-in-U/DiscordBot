@@ -64,6 +64,7 @@ class YouTubeSubscriptionTests(unittest.TestCase):
 
         self.assertIn("live_alert_enabled", arg_names)
         self.assertIn("upload_alert_enabled", arg_names)
+        self.assertIn("community_alert_enabled", arg_names)
 
     def test_alert_settings_command_exists(self):
         tree = ast.parse(
@@ -121,6 +122,8 @@ class YouTubeSubscriptionTests(unittest.TestCase):
             "upload_alert_enabled": 1,
             "upload_alert_enabled_at": "2026-05-06T01:00:00+00:00",
             "notified_upload_video_ids": '["UPLOAD0"]',
+            "community_alert_enabled": 1,
+            "notified_community_post_ids": '["POST0"]',
         }
 
         subscription = row_to_subscription(row)
@@ -142,6 +145,8 @@ class YouTubeSubscriptionTests(unittest.TestCase):
                 upload_alert_enabled=True,
                 upload_alert_enabled_at="2026-05-06T01:00:00+00:00",
                 notified_upload_video_ids=["UPLOAD0"],
+                community_alert_enabled=True,
+                notified_community_post_ids=["POST0"],
             ),
         )
 
@@ -162,6 +167,8 @@ class YouTubeSubscriptionTests(unittest.TestCase):
                 "upload_alert_enabled": None,
                 "upload_alert_enabled_at": None,
                 "notified_upload_video_ids": None,
+                "community_alert_enabled": None,
+                "notified_community_post_ids": None,
             }
         )
 
@@ -171,20 +178,34 @@ class YouTubeSubscriptionTests(unittest.TestCase):
         self.assertFalse(subscription.upload_alert_enabled)
         self.assertIsNone(subscription.upload_alert_enabled_at)
         self.assertEqual(subscription.notified_upload_video_ids, [])
+        self.assertFalse(subscription.community_alert_enabled)
+        self.assertEqual(subscription.notified_community_post_ids, [])
 
-    def test_schema_defines_live_and_upload_alert_columns(self):
+    def test_schema_defines_alert_columns(self):
         db_source = DB_PATH.read_text(encoding="utf-8")
 
         self.assertIn("live_alert_enabled", db_source)
         self.assertIn("upload_alert_enabled", db_source)
         self.assertIn("upload_alert_enabled_at", db_source)
         self.assertIn("notified_upload_video_ids", db_source)
+        self.assertIn("community_alert_enabled", db_source)
+        self.assertIn("notified_community_post_ids", db_source)
+
+    def test_alert_settings_can_leave_only_community_enabled(self):
+        source = Path("util/youtube_subscriptions.py").read_text(encoding="utf-8")
+
+        self.assertIn("community_alert_enabled", source)
+        self.assertIn(
+            "if not live_alert_enabled and not upload_alert_enabled and not community_alert_enabled",
+            source,
+        )
 
     def test_help_mentions_upload_alert_and_alert_settings(self):
         help_source = CUSTOM_HELP_PATH.read_text(encoding="utf-8")
 
         self.assertIn("/유튜브구독 알림설정", help_source)
         self.assertIn("영상 알림", help_source)
+        self.assertIn("커뮤니티 알림", help_source)
 
     def test_legacy_live_checker_cog_is_removed(self):
         self.assertFalse(LEGACY_YOUTUBE_CHECKER_COG_PATH.exists())

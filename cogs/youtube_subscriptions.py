@@ -13,8 +13,10 @@ from util.youtube_subscriptions import (
     create_youtube_subscription,
     delete_youtube_subscription,
     list_youtube_subscriptions,
+    update_youtube_community_notification_state,
     update_youtube_subscription_alert_settings,
 )
+from util.youtube_community import fetch_latest_youtube_community_posts
 
 
 YOUTUBE_CHANNEL_TYPE = "youtube"
@@ -244,7 +246,8 @@ class YouTubeSubscriptionAlertSettingsView(discord.ui.View):
                 else discord.ButtonStyle.success
             ),
             disabled=subscription.live_alert_enabled
-            and not subscription.upload_alert_enabled,
+            and not subscription.upload_alert_enabled
+            and not subscription.community_alert_enabled,
         )
         upload_button = discord.ui.Button(
             label=f"영상 알림 {'끄기' if subscription.upload_alert_enabled else '켜기'}",
@@ -254,7 +257,19 @@ class YouTubeSubscriptionAlertSettingsView(discord.ui.View):
                 else discord.ButtonStyle.success
             ),
             disabled=subscription.upload_alert_enabled
-            and not subscription.live_alert_enabled,
+            and not subscription.live_alert_enabled
+            and not subscription.community_alert_enabled,
+        )
+        community_button = discord.ui.Button(
+            label=f"커뮤니티 알림 {'끄기' if subscription.community_alert_enabled else '켜기'}",
+            style=(
+                discord.ButtonStyle.danger
+                if subscription.community_alert_enabled
+                else discord.ButtonStyle.success
+            ),
+            disabled=subscription.community_alert_enabled
+            and not subscription.live_alert_enabled
+            and not subscription.upload_alert_enabled,
         )
 
         async def live_callback(interaction: discord.Interaction) -> None:
@@ -262,6 +277,7 @@ class YouTubeSubscriptionAlertSettingsView(discord.ui.View):
                 interaction,
                 live_alert_enabled=not subscription.live_alert_enabled,
                 upload_alert_enabled=subscription.upload_alert_enabled,
+                community_alert_enabled=subscription.community_alert_enabled,
             )
 
         async def upload_callback(interaction: discord.Interaction) -> None:
@@ -269,12 +285,23 @@ class YouTubeSubscriptionAlertSettingsView(discord.ui.View):
                 interaction,
                 live_alert_enabled=subscription.live_alert_enabled,
                 upload_alert_enabled=not subscription.upload_alert_enabled,
+                community_alert_enabled=subscription.community_alert_enabled,
+            )
+
+        async def community_callback(interaction: discord.Interaction) -> None:
+            await self._update_selected(
+                interaction,
+                live_alert_enabled=subscription.live_alert_enabled,
+                upload_alert_enabled=subscription.upload_alert_enabled,
+                community_alert_enabled=not subscription.community_alert_enabled,
             )
 
         live_button.callback = live_callback
         upload_button.callback = upload_callback
+        community_button.callback = community_callback
         self.add_item(live_button)
         self.add_item(upload_button)
+        self.add_item(community_button)
 
     def _content(self) -> str:
         subscription = self._selected_subscription()
@@ -283,7 +310,7 @@ class YouTubeSubscriptionAlertSettingsView(discord.ui.View):
         return (
             f"`{subscription.channel_name}` 알림 설정\n"
             f"{_format_subscription_alert_summary(subscription)}\n"
-            "라이브 알림과 영상 알림 중 하나 이상은 켜져 있어야 합니다."
+            "라이브 알림, 영상 알림, 커뮤니티 알림 중 하나 이상은 켜져 있어야 합니다."
         )
 
     async def _check_requester(self, interaction: discord.Interaction) -> bool:
@@ -301,6 +328,7 @@ class YouTubeSubscriptionAlertSettingsView(discord.ui.View):
         *,
         live_alert_enabled: bool,
         upload_alert_enabled: bool,
+        community_alert_enabled: bool,
     ) -> None:
         if not await self._check_requester(interaction):
             return
@@ -316,6 +344,7 @@ class YouTubeSubscriptionAlertSettingsView(discord.ui.View):
                 self.selected_subscription_id,
                 live_alert_enabled=live_alert_enabled,
                 upload_alert_enabled=upload_alert_enabled,
+                community_alert_enabled=community_alert_enabled,
             )
         except ValueError as error:
             await interaction.response.send_message(str(error), ephemeral=True)
@@ -327,6 +356,28 @@ class YouTubeSubscriptionAlertSettingsView(discord.ui.View):
                 ephemeral=True,
             )
             return
+
+        if community_alert_enabled and not subscription.community_alert_enabled:
+            try:
+                latest_posts = await fetch_latest_youtube_community_posts(
+                    updated.channel_id
+                )
+                notified_post_ids = [post.post_id for post in latest_posts]
+                await update_youtube_community_notification_state(
+                    updated.id,
+                    notified_community_post_ids=notified_post_ids,
+                )
+                updated = await update_youtube_subscription_alert_settings(
+                    updated.id,
+                    live_alert_enabled=updated.live_alert_enabled,
+                    upload_alert_enabled=updated.upload_alert_enabled,
+                    community_alert_enabled=updated.community_alert_enabled,
+                )
+            except Exception as error:
+                print(
+                    "유튜브 커뮤니티 초기 게시물 상태 저장 실패: "
+                    f"channel={updated.channel_id} error={error}"
+                )
 
         self.subscriptions = [
             updated if subscription.id == updated.id else subscription
@@ -342,7 +393,7 @@ class YouTubeSubscriptionAlertSettingsView(discord.ui.View):
 class YouTubeSubscriptionsCog(commands.Cog):
     youtube_subscription = app_commands.Group(
         name="유튜브구독",
-        description="서버별 유튜브 라이브/영상 알림 구독을 관리합니다.",
+        description="서버별 유튜브 라이브/영상/커뮤니티 알림 구독을 관리합니다.",
     )
 
     def __init__(self, bot: commands.Bot):
@@ -377,11 +428,13 @@ class YouTubeSubscriptionsCog(commands.Cog):
         input_value="유튜브 채널 URL, ID, @handle 또는 검색어",
         live_alert_enabled="라이브 시작 알림을 받을지 선택합니다. 기본값은 켜짐입니다.",
         upload_alert_enabled="새 영상 업로드 알림을 받을지 선택합니다. 기본값은 꺼짐입니다.",
+        community_alert_enabled="새 커뮤니티 게시물 알림을 받을지 선택합니다. 기본값은 꺼짐입니다.",
     )
     @app_commands.rename(
         input_value="입력",
         live_alert_enabled="라이브알림",
         upload_alert_enabled="영상알림",
+        community_alert_enabled="커뮤니티알림",
     )
     async def add_subscription(
         self,
@@ -389,12 +442,13 @@ class YouTubeSubscriptionsCog(commands.Cog):
         input_value: str,
         live_alert_enabled: bool = True,
         upload_alert_enabled: bool = False,
+        community_alert_enabled: bool = False,
     ) -> None:
         if not await self._require_guild_admin(interaction):
             return
-        if not live_alert_enabled and not upload_alert_enabled:
+        if not live_alert_enabled and not upload_alert_enabled and not community_alert_enabled:
             await interaction.response.send_message(
-                "라이브 알림과 영상 알림 중 하나 이상을 켜야 합니다.",
+                "라이브 알림, 영상 알림, 커뮤니티 알림 중 하나 이상을 켜야 합니다.",
                 ephemeral=False,
             )
             return
@@ -410,6 +464,12 @@ class YouTubeSubscriptionsCog(commands.Cog):
         await interaction.response.defer(ephemeral=False, thinking=True)
         try:
             metadata = await resolve_youtube_channel_input(input_value)
+            initial_community_post_ids = []
+            if community_alert_enabled:
+                latest_posts = await fetch_latest_youtube_community_posts(
+                    metadata.channel_id
+                )
+                initial_community_post_ids = [post.post_id for post in latest_posts]
             subscription_id = await create_youtube_subscription(
                 guild_id=guild_id,
                 channel_name=metadata.channel_name,
@@ -418,10 +478,17 @@ class YouTubeSubscriptionsCog(commands.Cog):
                 source_input=input_value.strip(),
                 live_alert_enabled=live_alert_enabled,
                 upload_alert_enabled=upload_alert_enabled,
+                community_alert_enabled=community_alert_enabled,
+                notified_community_post_ids=initial_community_post_ids,
             )
             loop_cog = self.bot.get_cog("LoopTasks")
-            subscribed = False
-            if loop_cog and hasattr(loop_cog, "ensure_youtube_websub_subscription"):
+            websub_required = live_alert_enabled or upload_alert_enabled
+            subscribed = not websub_required
+            if (
+                websub_required
+                and loop_cog
+                and hasattr(loop_cog, "ensure_youtube_websub_subscription")
+            ):
                 subscribed = await loop_cog.ensure_youtube_websub_subscription(
                     subscription_id
                 )
@@ -431,7 +498,8 @@ class YouTubeSubscriptionsCog(commands.Cog):
                 f"채널 ID: `{metadata.channel_id}`\n"
                 f"알림 채널: <#{target_channel_id}>\n"
                 f"라이브 알림: {_format_alert_enabled(live_alert_enabled)} / "
-                f"영상 알림: {_format_alert_enabled(upload_alert_enabled)}"
+                f"영상 알림: {_format_alert_enabled(upload_alert_enabled)} / "
+                f"커뮤니티 알림: {_format_alert_enabled(community_alert_enabled)}"
             )
             if not subscribed:
                 message += "\n⚠️ WebSub callback 설정을 확인해 주세요."
@@ -554,7 +622,8 @@ def _format_alert_enabled(enabled: bool) -> str:
 def _format_subscription_alert_summary(subscription: YouTubeSubscription) -> str:
     return (
         f"라이브: {_format_alert_enabled(subscription.live_alert_enabled)} / "
-        f"영상: {_format_alert_enabled(subscription.upload_alert_enabled)}"
+        f"영상: {_format_alert_enabled(subscription.upload_alert_enabled)} / "
+        f"커뮤니티: {_format_alert_enabled(subscription.community_alert_enabled)}"
     )
 
 

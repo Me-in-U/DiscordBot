@@ -27,6 +27,8 @@ class YouTubeSubscription:
     upload_alert_enabled: bool = False
     upload_alert_enabled_at: str | None = None
     notified_upload_video_ids: list[str] = field(default_factory=list)
+    community_alert_enabled: bool = False
+    notified_community_post_ids: list[str] = field(default_factory=list)
 
 
 def row_to_subscription(row: dict[str, Any]) -> YouTubeSubscription:
@@ -52,6 +54,13 @@ def row_to_subscription(row: dict[str, Any]) -> YouTubeSubscription:
         upload_alert_enabled_at=upload_alert_enabled_at,
         notified_upload_video_ids=_json_string_list(
             row.get("notified_upload_video_ids")
+        ),
+        community_alert_enabled=_optional_bool(
+            row.get("community_alert_enabled"),
+            default=False,
+        ),
+        notified_community_post_ids=_json_string_list(
+            row.get("notified_community_post_ids")
         ),
     )
 
@@ -118,9 +127,11 @@ async def create_youtube_subscription(
     source_input: str,
     live_alert_enabled: bool = True,
     upload_alert_enabled: bool = False,
+    community_alert_enabled: bool = False,
+    notified_community_post_ids: list[str] | None = None,
 ) -> int:
-    if not live_alert_enabled and not upload_alert_enabled:
-        raise ValueError("라이브 알림과 영상 알림 중 하나 이상을 켜야 합니다.")
+    if not live_alert_enabled and not upload_alert_enabled and not community_alert_enabled:
+        raise ValueError("라이브 알림, 영상 알림, 커뮤니티 알림 중 하나 이상을 켜야 합니다.")
 
     existing = await find_youtube_subscription(guild_id, channel_id)
     if existing is not None:
@@ -143,10 +154,13 @@ async def create_youtube_subscription(
             live_alert_enabled,
             upload_alert_enabled,
             upload_alert_enabled_at,
-            notified_upload_video_ids
+            notified_upload_video_ids,
+            community_alert_enabled,
+            notified_community_post_ids
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """
+    initial_post_ids = notified_community_post_ids or []
     return int(
         await execute_query(
             query,
@@ -162,6 +176,8 @@ async def create_youtube_subscription(
                 bool(upload_alert_enabled),
                 upload_alert_enabled_at,
                 "[]",
+                bool(community_alert_enabled),
+                json.dumps(initial_post_ids, ensure_ascii=False),
             ),
         )
     )
@@ -223,14 +239,34 @@ async def update_youtube_upload_notification_state(
     )
 
 
+async def update_youtube_community_notification_state(
+    subscription_id: int,
+    *,
+    notified_community_post_ids: list[str],
+) -> None:
+    query = """
+        UPDATE youtube_subscriptions
+        SET notified_community_post_ids = %s
+        WHERE id = %s
+    """
+    await execute_query(
+        query,
+        (
+            json.dumps(notified_community_post_ids, ensure_ascii=False),
+            int(subscription_id),
+        ),
+    )
+
+
 async def update_youtube_subscription_alert_settings(
     subscription_id: int,
     *,
     live_alert_enabled: bool,
     upload_alert_enabled: bool,
+    community_alert_enabled: bool,
 ) -> YouTubeSubscription | None:
-    if not live_alert_enabled and not upload_alert_enabled:
-        raise ValueError("라이브 알림과 영상 알림 중 하나 이상을 켜야 합니다.")
+    if not live_alert_enabled and not upload_alert_enabled and not community_alert_enabled:
+        raise ValueError("라이브 알림, 영상 알림, 커뮤니티 알림 중 하나 이상을 켜야 합니다.")
 
     subscription = await get_youtube_subscription(subscription_id)
     if subscription is None:
@@ -249,7 +285,8 @@ async def update_youtube_subscription_alert_settings(
         UPDATE youtube_subscriptions
         SET live_alert_enabled = %s,
             upload_alert_enabled = %s,
-            upload_alert_enabled_at = %s
+            upload_alert_enabled_at = %s,
+            community_alert_enabled = %s
         WHERE id = %s
     """
     await execute_query(
@@ -258,6 +295,7 @@ async def update_youtube_subscription_alert_settings(
             bool(live_alert_enabled),
             bool(upload_alert_enabled),
             upload_alert_enabled_at,
+            bool(community_alert_enabled),
             int(subscription_id),
         ),
     )
