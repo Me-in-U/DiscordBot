@@ -8,7 +8,6 @@ import discord
 
 from util.db import execute_query, fetch_all, fetch_one
 
-
 MAX_DDAY_TITLE_LENGTH = 100
 SEOUL_TZ = timezone(timedelta(hours=9))
 
@@ -42,7 +41,9 @@ def parse_dday_date(value: str) -> date:
             return datetime.strptime(text, date_format).date()
         except ValueError:
             continue
-    raise ValueError("날짜는 YYYY-MM-DD, YYYY.MM.DD, YYYY/MM/DD, YYYYMMDD 형식으로 입력해 주세요.")
+    raise ValueError(
+        "날짜는 YYYY-MM-DD, YYYY.MM.DD, YYYY/MM/DD, YYYYMMDD 형식으로 입력해 주세요."
+    )
 
 
 def validate_dday_title(value: str) -> str:
@@ -114,7 +115,7 @@ def build_dday_announcement_embed(
 
     embed = discord.Embed(
         title="📅 오늘의 DDAY",
-        description="기념일 공지 이후 등록된 DDAY를 알려드립니다.",
+        description="DDAY를 알려드립니다.",
         color=discord.Color.gold(),
     )
     for field_name, field_events in _group_events(
@@ -312,9 +313,9 @@ def _group_events(
         if event.target_date < today and event.show_after
     ]
     groups = [
-        ("오늘", today_events),
-        ("다가오는 DDAY", future_events),
-        ("지난 DDAY", past_events),
+        ("오늘 D-0", today_events),
+        ("다가오는 D-DAY", future_events),
+        ("지난 D+DAY", past_events),
     ]
     if include_excluded:
         excluded_events = [
