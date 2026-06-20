@@ -20,6 +20,7 @@ from util.celebration import refresh_celebration_messages
 from util.db import fetch_all, fetch_one, execute_query
 from util.dday import refresh_dday_messages
 from util.env_utils import getenv_clean
+from util.maplestory_events import refresh_sunday_maple_messages
 from func.find1557 import clearCount
 from util.youtube_subscriptions import (
     YouTubeSubscription,
@@ -136,6 +137,26 @@ class LoopTasks(commands.Cog):
 
         if dday_success_count:
             print(f"[{datetime.now(SEOUL_TZ)}] DDAY 공지 {dday_success_count}개 채널 전송 완료.")
+
+        if datetime.now(SEOUL_TZ).weekday() == 6:
+            sunday_maple_results = await refresh_sunday_maple_messages(self.bot)
+            sunday_maple_success_count = 0
+            for result in sunday_maple_results:
+                if result.status == "ok":
+                    sunday_maple_success_count += 1
+                    continue
+                if result.status == "skipped":
+                    continue
+                print(
+                    f"썬데이메이플 공지 전송 실패: guild={result.guild_id} "
+                    f"channel={result.channel_id} error={result.error}"
+                )
+
+            if sunday_maple_success_count:
+                print(
+                    f"[{datetime.now(SEOUL_TZ)}] "
+                    f"썬데이메이플 공지 {sunday_maple_success_count}개 채널 전송 완료."
+                )
 
         # 유저 메시지 초기화 및 리로드
         self.bot.USER_MESSAGES = {}

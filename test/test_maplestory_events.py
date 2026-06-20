@@ -1,12 +1,16 @@
 import asyncio
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from util.maplestory_events import (
+    MapleStoryEvent,
     SUNDAY_MAPLE_EVENT_TITLE,
+    build_sunday_maple_event_embeds,
     fetch_sunday_maple_event,
     parse_maplestory_event_detail,
     parse_maplestory_ongoing_event_url,
+    refresh_sunday_maple_messages,
 )
 
 
@@ -113,12 +117,96 @@ class MapleStoryEventTests(unittest.TestCase):
 
         self.assertIsNone(asyncio.run(fetch_sunday_maple_event(fetch_html=fake_fetch)))
 
+    def test_builds_sunday_maple_embeds_for_event_images(self):
+        event = MapleStoryEvent(
+            title=SUNDAY_MAPLE_EVENT_TITLE,
+            url="https://maplestory.nexon.com/News/Event/Ongoing/1350",
+            period="2026년 06월 21일 00시 00분 ~ 2026년 06월 21일 00시 00분",
+            image_urls=[
+                "https://lwi.nexon.com/maplestory/2026/0621_board/21E9057CA56D8A9C.png"
+            ],
+        )
+
+        embeds = build_sunday_maple_event_embeds(event)
+
+        self.assertEqual(len(embeds), 1)
+        self.assertEqual(embeds[0].title, SUNDAY_MAPLE_EVENT_TITLE)
+        self.assertEqual(embeds[0].url, event.url)
+        self.assertEqual(embeds[0].image.url, event.image_urls[0])
+
+    def test_refresh_sunday_maple_messages_sends_to_celebration_channels(self):
+        event = MapleStoryEvent(
+            title=SUNDAY_MAPLE_EVENT_TITLE,
+            url="https://maplestory.nexon.com/News/Event/Ongoing/1350",
+            period="2026년 06월 21일 00시 00분 ~ 2026년 06월 21일 00시 00분",
+            image_urls=[
+                "https://lwi.nexon.com/maplestory/2026/0621_board/21E9057CA56D8A9C.png"
+            ],
+        )
+        channel = _FakeTextChannel(channel_id=1234)
+
+        async def fake_fetch_event():
+            return event
+
+        async def fake_get_channels(bot, guild_id=None):
+            return {10: channel}
+
+        with patch("util.celebration.get_celebration_channels", fake_get_channels):
+            results = asyncio.run(
+                refresh_sunday_maple_messages(
+                    bot=object(),
+                    fetch_event=fake_fetch_event,
+                )
+            )
+
+        self.assertEqual(results[0].guild_id, 10)
+        self.assertEqual(results[0].channel_id, 1234)
+        self.assertEqual(results[0].action, "sent")
+        self.assertEqual(results[0].status, "ok")
+        self.assertEqual(len(channel.sent_messages), 1)
+        self.assertEqual(channel.sent_messages[0]["embeds"][0].title, SUNDAY_MAPLE_EVENT_TITLE)
+
+    def test_refresh_sunday_maple_messages_skips_when_event_is_absent(self):
+        channel = _FakeTextChannel(channel_id=1234)
+
+        async def fake_fetch_event():
+            return None
+
+        async def fake_get_channels(bot, guild_id=None):
+            return {10: channel}
+
+        with patch("util.celebration.get_celebration_channels", fake_get_channels):
+            results = asyncio.run(
+                refresh_sunday_maple_messages(
+                    bot=object(),
+                    fetch_event=fake_fetch_event,
+                )
+            )
+
+        self.assertEqual(results[0].action, "event_absent")
+        self.assertEqual(results[0].status, "skipped")
+        self.assertEqual(channel.sent_messages, [])
+
     def test_slash_command_and_help_mention_sunday_maple(self):
         cog_source = Path("cogs/maplestory.py").read_text(encoding="utf-8")
         help_source = Path("cogs/custom_help.py").read_text(encoding="utf-8")
 
         self.assertIn('name="썬데이메이플"', cog_source)
         self.assertIn("/썬데이메이플", help_source)
+
+
+class _FakeSentMessage:
+    id = 9876
+
+
+class _FakeTextChannel:
+    def __init__(self, channel_id: int):
+        self.id = channel_id
+        self.sent_messages = []
+
+    async def send(self, **kwargs):
+        self.sent_messages.append(kwargs)
+        return _FakeSentMessage()
 
 
 if __name__ == "__main__":

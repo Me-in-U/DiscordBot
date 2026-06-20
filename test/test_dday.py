@@ -97,7 +97,7 @@ class DdayUtilityTests(unittest.TestCase):
         self.assertEqual(embed.title, "📅 DDAY 목록")
         self.assertEqual(
             [field.name for field in embed.fields],
-            ["오늘", "다가오는 DDAY", "지난 DDAY", "자동 공지 제외"],
+            ["오늘 D-0", "다가오는 D-DAY", "지난 D+DAY", "자동 공지 제외"],
         )
 
 
@@ -151,7 +151,7 @@ class DdaySchemaAndCommandTests(unittest.TestCase):
         self.assertEqual(renames["title"], "제목")
         self.assertEqual(renames["show_after"], "지난날짜표시")
 
-    def test_loop_refreshes_dday_after_celebration(self):
+    def test_loop_refreshes_dday_and_sunday_maple_after_celebration(self):
         loop_source = LOOP_PATH.read_text(encoding="utf-8")
         tree = ast.parse(loop_source, filename=str(LOOP_PATH))
         new_day_clear = next(
@@ -164,10 +164,13 @@ class DdaySchemaAndCommandTests(unittest.TestCase):
 
         celebration_index = source.index("refresh_celebration_messages")
         dday_index = source.index("refresh_dday_messages")
+        sunday_maple_index = source.index("refresh_sunday_maple_messages")
         reload_index = source.index("self.bot.USER_MESSAGES")
 
         self.assertLess(celebration_index, dday_index)
-        self.assertLess(dday_index, reload_index)
+        self.assertLess(dday_index, sunday_maple_index)
+        self.assertLess(sunday_maple_index, reload_index)
+        self.assertIn("weekday() == 6", source)
 
     def test_help_mentions_dday_commands(self):
         help_source = Path("cogs/custom_help.py").read_text(encoding="utf-8")

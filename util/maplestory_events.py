@@ -8,6 +8,7 @@ from html.parser import HTMLParser
 from urllib.parse import urljoin
 
 import aiohttp
+import discord
 
 
 MAPLESTORY_BASE_URL = "https://maplestory.nexon.com"
@@ -40,6 +41,7 @@ _VOID_TAGS = {
 }
 
 FetchHtml = Callable[[str], Awaitable[str]]
+FetchEvent = Callable[[], Awaitable["MapleStoryEvent | None"]]
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,6 +50,16 @@ class MapleStoryEvent:
     url: str
     period: str = ""
     image_urls: list[str] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class SundayMapleUpdateResult:
+    guild_id: int
+    channel_id: int | None = None
+    message_id: int | None = None
+    action: str | None = None
+    status: str = "ok"
+    error: str | None = None
 
 
 def parse_maplestory_ongoing_event_url(
@@ -85,6 +97,96 @@ async def fetch_sunday_maple_event(
         detail_html,
         event_url=event_url,
     )
+
+
+def build_sunday_maple_event_embeds(event: MapleStoryEvent) -> list[discord.Embed]:
+    embeds: list[discord.Embed] = []
+    for index, image_url in enumerate(event.image_urls[:10], start=1):
+        embed = discord.Embed(
+            title=event.title if index == 1 else f"{event.title} ({index})",
+            url=event.url,
+            description=event.period or None,
+            color=discord.Color.green(),
+        )
+        embed.set_image(url=image_url)
+        embed.set_footer(text="출처: 메이플스토리 공식 이벤트")
+        embeds.append(embed)
+    return embeds
+
+
+async def refresh_sunday_maple_messages(
+    bot: discord.Client,
+    guild_id: int | None = None,
+    *,
+    fetch_event: FetchEvent | None = None,
+) -> list[SundayMapleUpdateResult]:
+    from util.celebration import get_celebration_channels
+
+    channels = await get_celebration_channels(bot, guild_id)
+    if not channels:
+        return []
+
+    fetch = fetch_event or fetch_sunday_maple_event
+    try:
+        event = await fetch()
+    except Exception as exc:
+        return [
+            SundayMapleUpdateResult(
+                guild_id=current_guild_id,
+                channel_id=channel.id,
+                status="error",
+                action="fetch_failed",
+                error=str(exc),
+            )
+            for current_guild_id, channel in channels.items()
+        ]
+
+    if event is None:
+        return [
+            SundayMapleUpdateResult(
+                guild_id=current_guild_id,
+                channel_id=channel.id,
+                status="skipped",
+                action="event_absent",
+            )
+            for current_guild_id, channel in channels.items()
+        ]
+
+    embeds = build_sunday_maple_event_embeds(event)
+    if not embeds:
+        return [
+            SundayMapleUpdateResult(
+                guild_id=current_guild_id,
+                channel_id=channel.id,
+                status="skipped",
+                action="missing_images",
+            )
+            for current_guild_id, channel in channels.items()
+        ]
+
+    results: list[SundayMapleUpdateResult] = []
+    for current_guild_id, channel in channels.items():
+        try:
+            sent_message = await channel.send(embeds=embeds)
+            results.append(
+                SundayMapleUpdateResult(
+                    guild_id=current_guild_id,
+                    channel_id=channel.id,
+                    message_id=sent_message.id,
+                    action="sent",
+                )
+            )
+        except Exception as exc:
+            results.append(
+                SundayMapleUpdateResult(
+                    guild_id=current_guild_id,
+                    channel_id=channel.id,
+                    status="error",
+                    error=str(exc),
+                )
+            )
+
+    return results
 
 
 async def _fetch_html(url: str) -> str:

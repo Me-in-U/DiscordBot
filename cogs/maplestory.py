@@ -4,7 +4,10 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from util.maplestory_events import MapleStoryEvent, fetch_sunday_maple_event
+from util.maplestory_events import (
+    build_sunday_maple_event_embeds,
+    fetch_sunday_maple_event,
+)
 
 
 class MapleStoryCommands(commands.Cog):
@@ -45,21 +48,7 @@ class MapleStoryCommands(commands.Cog):
             )
             return
 
-        await interaction.followup.send(embeds=self._build_event_embeds(event))
-
-    def _build_event_embeds(self, event: MapleStoryEvent) -> list[discord.Embed]:
-        embeds: list[discord.Embed] = []
-        for index, image_url in enumerate(event.image_urls[:10], start=1):
-            embed = discord.Embed(
-                title=event.title if index == 1 else f"{event.title} ({index})",
-                url=event.url,
-                description=event.period or None,
-                color=discord.Color.green(),
-            )
-            embed.set_image(url=image_url)
-            embed.set_footer(text="출처: 메이플스토리 공식 이벤트")
-            embeds.append(embed)
-        return embeds
+        await interaction.followup.send(embeds=build_sunday_maple_event_embeds(event))
 
 
 async def setup(bot: commands.Bot):
