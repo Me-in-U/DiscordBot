@@ -9,7 +9,7 @@ from common.openai_prompt import build_prompt
 
 
 SEARCH_PROMPT_ID = "pmpt_68b25c89c1a48193a60de5a3cb23a1eb0c25a13613efd1bf"
-SEARCH_PROMPT_VERSION = "4"
+SEARCH_PROMPT_VERSION = "5"
 
 
 class SearchCommands(commands.Cog):
