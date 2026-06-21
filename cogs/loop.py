@@ -20,7 +20,10 @@ from util.celebration import refresh_celebration_messages
 from util.db import fetch_all, fetch_one, execute_query
 from util.dday import refresh_dday_messages
 from util.env_utils import getenv_clean
-from util.maplestory_events import refresh_sunday_maple_messages
+from util.maplestory_events import (
+    refresh_maplestory_notice_messages,
+    refresh_sunday_maple_messages,
+)
 from func.find1557 import clearCount
 from util.youtube_subscriptions import (
     YouTubeSubscription,
@@ -74,6 +77,7 @@ class LoopTasks(commands.Cog):
         self._youtube_feed_seen_updates: dict[int, dict[str, str]] = {}
         self.youtube_notification_check.start()
         self.youtube_community_check.start()
+        self.maplestory_notice_check.start()
         self.youtube_websub_renewal.start()
         print("LoopTasks Cog : init 완료!")
 
@@ -881,6 +885,28 @@ class LoopTasks(commands.Cog):
         except Exception as e:
             print(f"YouTube 커뮤니티 알림 확인 오류: {e}")
 
+    @tasks.loop(minutes=3)
+    async def maplestory_notice_check(self):
+        """메이플스토리 새 공지와 수정 공지를 확인합니다."""
+        try:
+            results = await refresh_maplestory_notice_messages(self.bot)
+            sent_count = 0
+            for result in results:
+                if result.status == "ok" and result.action == "sent":
+                    sent_count += 1
+                    continue
+                if result.status == "skipped":
+                    continue
+                print(
+                    f"메이플스토리 공지 알림 실패: guild={result.guild_id} "
+                    f"channel={result.channel_id} notice={result.notice_id} "
+                    f"action={result.action} error={result.error}"
+                )
+            if sent_count:
+                print(f"메이플스토리 공지 알림 {sent_count}건 전송 완료")
+        except Exception as e:
+            print(f"메이플스토리 공지 확인 오류: {e}")
+
     @tasks.loop(hours=12)
     async def youtube_websub_renewal(self):
         """YouTube WebSub 구독을 주기적으로 갱신합니다."""
@@ -899,6 +925,11 @@ class LoopTasks(commands.Cog):
     @youtube_community_check.before_loop
     async def before_youtube_community_check(self):
         print("-------------YouTube 커뮤니티 알림 체크 대기중...---------------")
+        await self.bot.wait_until_ready()
+
+    @maplestory_notice_check.before_loop
+    async def before_maplestory_notice_check(self):
+        print("-------------메이플스토리 공지 알림 체크 대기중...---------------")
         await self.bot.wait_until_ready()
 
     @youtube_websub_renewal.before_loop

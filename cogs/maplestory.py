@@ -4,9 +4,12 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from util.channel_settings import set_channel
 from util.maplestory_events import (
+    MAPLESTORY_NOTICE_CHANNEL_TYPE,
     build_sunday_maple_event_embeds,
     fetch_sunday_maple_event,
+    seed_maplestory_notice_state_for_guild,
 )
 
 
@@ -18,6 +21,27 @@ class MapleStoryCommands(commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         print("DISCORD_CLIENT -> MapleStoryCommands Cog : on ready!")
+
+    async def _require_guild_admin(self, interaction: discord.Interaction) -> bool:
+        if interaction.guild_id is None:
+            await interaction.response.send_message(
+                "이 명령어는 길드에서만 사용할 수 있습니다.",
+                ephemeral=True,
+            )
+            return False
+        if not isinstance(interaction.user, discord.Member):
+            await interaction.response.send_message(
+                "길드 멤버만 사용할 수 있습니다.",
+                ephemeral=True,
+            )
+            return False
+        if interaction.user.guild_permissions.administrator:
+            return True
+        await interaction.response.send_message(
+            "관리자 권한이 있는 사용자만 메이플 공지 구독을 설정할 수 있습니다.",
+            ephemeral=True,
+        )
+        return False
 
     @app_commands.command(
         name="썬데이메이플",
@@ -49,6 +73,61 @@ class MapleStoryCommands(commands.Cog):
             return
 
         await interaction.followup.send(embeds=build_sunday_maple_event_embeds(event))
+
+    @app_commands.command(
+        name="메이플공지구독",
+        description="현재 채널에서 메이플스토리 새 공지와 수정 공지 알림을 받거나 해제합니다.",
+    )
+    @app_commands.describe(status="true면 현재 채널로 구독하고 false면 구독을 해제합니다.")
+    @app_commands.rename(status="상태")
+    async def configure_maplestory_notice_subscription(
+        self,
+        interaction: discord.Interaction,
+        status: bool,
+    ) -> None:
+        if not await self._require_guild_admin(interaction):
+            return
+
+        guild_id = int(interaction.guild_id)
+        if not status:
+            await set_channel(guild_id, MAPLESTORY_NOTICE_CHANNEL_TYPE, None)
+            await interaction.response.send_message(
+                "메이플스토리 공지 구독을 해제했습니다.",
+                ephemeral=True,
+            )
+            return
+
+        if interaction.channel_id is None:
+            await interaction.response.send_message(
+                "현재 채널을 확인할 수 없어 구독을 설정하지 못했습니다.",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        await set_channel(
+            guild_id,
+            MAPLESTORY_NOTICE_CHANNEL_TYPE,
+            int(interaction.channel_id),
+        )
+
+        try:
+            seeded_count = await seed_maplestory_notice_state_for_guild(guild_id)
+        except Exception:
+            traceback.print_exc()
+            await interaction.followup.send(
+                "메이플스토리 공지 구독을 설정했습니다.\n"
+                "다만 최신 공지 초기 상태 저장에 실패해 다음 확인 때 초기화됩니다.",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.followup.send(
+            "메이플스토리 공지 구독을 설정했습니다.\n"
+            f"알림 채널: <#{int(interaction.channel_id)}>\n"
+            f"현재 최신 공지 {seeded_count}개는 전송하지 않고 이후 새 공지/수정 공지만 알립니다.",
+            ephemeral=True,
+        )
 
 
 async def setup(bot: commands.Bot):

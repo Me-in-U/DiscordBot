@@ -5,9 +5,15 @@ from unittest.mock import patch
 
 from util.maplestory_events import (
     MapleStoryEvent,
+    MapleStoryNotice,
     SUNDAY_MAPLE_EVENT_TITLE,
+    build_maplestory_notice_message,
     build_sunday_maple_event_embeds,
     fetch_sunday_maple_event,
+    find_maplestory_notice_updates,
+    maplestory_notice_state_from_notices,
+    parse_maplestory_notice_detail,
+    parse_maplestory_notice_list,
     parse_maplestory_event_detail,
     parse_maplestory_ongoing_event_url,
     refresh_sunday_maple_messages,
@@ -52,6 +58,46 @@ DETAIL_HTML = """
 <div class="event_view_roll">
     <img src="https://file.nexon.com/NxFile/download/FileDownloader.aspx?oidFile=5557534578324800538" alt="스페셜 썬데이 메이플">
 </div>
+"""
+
+NOTICE_LIST_HTML = """
+<ul class="news_board">
+    <li>
+        <p>
+            <a href="/News/Notice/All/149371">
+                <em><img src="notice_icon03.png" alt="[점검]" /></em>
+                <span>[패치완료] 6/22(월) ver1.2.416 마이너(6) 패치(16:55 적용)</span>
+                <img class="new" alt="" src="new.png" />
+            </a>
+        </p>
+    </li>
+    <li>
+        <p>
+            <a href="/News/Notice/All/149370">
+                <em><img src="notice_icon01.png" alt="[공지]" /></em>
+                <span>6/22(월) 사과 보상 안내</span>
+            </a>
+        </p>
+    </li>
+</ul>
+"""
+
+NOTICE_DETAIL_HTML = """
+<p class="qs_title" style="margin-top:30px">
+    <em class="notice_icon"><img src="notice_icon01.png" alt="[공지]" /></em>
+    <span>6/22(월) 사과 보상 안내</span>
+</p>
+<div class="qs_info_wrap">
+    <div class="qs_info"><p class="last">PM 04:24</p></div>
+</div>
+<div class="qs_text">
+    <div class="new_board_con">
+        <p>안녕하세요. 메이플스토리 입니다.</p>
+        <p>불편을 드려 죄송합니다. 7/1(수)까지 수령해 주세요.</p>
+        <p>더 나은 서비스 제공을 위해 최선을 다하겠습니다.</p>
+    </div>
+</div>
+<div class="page_move"></div>
 """
 
 
@@ -193,6 +239,86 @@ class MapleStoryEventTests(unittest.TestCase):
 
         self.assertIn('name="썬데이메이플"', cog_source)
         self.assertIn("/썬데이메이플", help_source)
+
+    def test_parses_maplestory_notice_list_with_canonical_urls(self):
+        notices = parse_maplestory_notice_list(NOTICE_LIST_HTML)
+
+        self.assertEqual([notice.notice_id for notice in notices], ["149371", "149370"])
+        self.assertEqual(notices[0].category, "[점검]")
+        self.assertEqual(
+            notices[0].title,
+            "[패치완료] 6/22(월) ver1.2.416 마이너(6) 패치(16:55 적용)",
+        )
+        self.assertEqual(
+            notices[1].url,
+            "https://maplestory.nexon.com/News/Notice/149370",
+        )
+
+    def test_parses_maplestory_notice_detail_summary(self):
+        base_notice = MapleStoryNotice(
+            notice_id="149370",
+            category="[공지]",
+            title="목록 제목",
+            url="https://maplestory.nexon.com/News/Notice/149370",
+        )
+
+        notice = parse_maplestory_notice_detail(NOTICE_DETAIL_HTML, base_notice)
+
+        self.assertEqual(notice.title, "6/22(월) 사과 보상 안내")
+        self.assertEqual(notice.category, "[공지]")
+        self.assertEqual(
+            notice.summary,
+            "불편을 드려 죄송합니다. 7/1(수)까지 수령해 주세요. 더 나은 서비스 제공을 위해 최선을 다하겠습니다.",
+        )
+
+    def test_maplestory_notice_updates_include_same_id_fingerprint_changes(self):
+        original = MapleStoryNotice(
+            notice_id="149371",
+            category="[점검]",
+            title="6/22(월) 서버점검",
+            url="https://maplestory.nexon.com/News/Notice/149371",
+            summary="오후 4시부터 점검을 진행합니다.",
+        )
+        changed = MapleStoryNotice(
+            notice_id="149371",
+            category="[점검]",
+            title="[점검완료] 6/22(월) 서버점검",
+            url="https://maplestory.nexon.com/News/Notice/149371",
+            summary="오후 4시 55분 점검이 완료되었습니다.",
+        )
+        state = maplestory_notice_state_from_notices([original])
+
+        updates = find_maplestory_notice_updates([changed], state)
+
+        self.assertEqual(updates, [changed])
+
+    def test_builds_maplestory_notice_message(self):
+        notice = MapleStoryNotice(
+            notice_id="149370",
+            category="[공지]",
+            title="6/22(월) 사과 보상 안내",
+            url="https://maplestory.nexon.com/News/Notice/149370",
+            summary="불편을 드려 죄송합니다. 7/1(수)까지 수령해 주세요.",
+        )
+
+        self.assertEqual(
+            build_maplestory_notice_message(notice),
+            "# 공지\n\n"
+            "6/22(월) 사과 보상 안내\n"
+            "불편을 드려 죄송합니다. 7/1(수)까지 수령해 주세요.\n\n"
+            "[바로가기](https://maplestory.nexon.com/News/Notice/149370)",
+        )
+
+    def test_slash_command_help_and_loop_include_maplestory_notice_subscription(self):
+        cog_source = Path("cogs/maplestory.py").read_text(encoding="utf-8")
+        help_source = Path("cogs/custom_help.py").read_text(encoding="utf-8")
+        loop_source = Path("cogs/loop.py").read_text(encoding="utf-8")
+
+        self.assertIn('name="메이플공지구독"', cog_source)
+        self.assertIn('status="상태"', cog_source)
+        self.assertIn("/메이플공지구독", help_source)
+        self.assertIn("@tasks.loop(minutes=3)", loop_source)
+        self.assertIn("maplestory_notice_check", loop_source)
 
 
 class _FakeSentMessage:
