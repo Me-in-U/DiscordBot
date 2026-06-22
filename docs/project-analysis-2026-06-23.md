@@ -418,30 +418,31 @@
 - migration 실패 시 deploy 단계에서 중단된다.
 - 현재 schema version이 로그 또는 health/debug 경로에서 확인 가능하다.
 
-### P2. 의존성 문서와 실제 설치 경로가 불일치한다
+### P2. 의존성 문서와 실제 설치 경로 정합성을 유지해야 한다
 
 #### 근거
 
-- README는 `pip install -r requirements.txt`를 안내한다.
-- AGENTS는 `pip_install.txt`를 사용하라고 안내한다.
-- `pip_install.txt`는 requirements 파일 형식이 아니라 `pip install ...` 명령 모음에 가깝다.
+- README, AGENTS, Dockerfile.deps, Jenkinsfile은 현재 `requirements.txt`를 기본 설치 진입점으로 가리킨다.
+- AGENTS는 `pip_install.txt`를 legacy/manual notes로 명시한다.
+- `pip_install.txt`는 아직 남아 있지만 현재 자동 설치 진입점은 아니다.
 - `requirements.txt`는 버전 pin이 거의 없어 재현성이 약하다.
 
 #### 영향
 
-- 새 환경에서 설치 방식이 달라져 재현성이 떨어진다.
-- GPU 관련 패키지와 일반 런타임 의존성이 섞여 설치 실패 가능성이 커진다.
+- 문서와 Docker/Jenkins의 기본 진입점 불일치는 해소되었다.
+- 다만 `pip_install.txt`가 legacy 파일로 남아 있어 신규 기여자가 보조 파일의 의미를 오해할 수 있다.
+- 버전 pin이 약해 새 환경에서 재현성이 여전히 낮을 수 있다.
 
 #### 개선 방향
 
-- 운영 기준을 `requirements.txt`로 통일한다.
-- `pip_install.txt`는 삭제하거나 `scripts/install-dev.ps1` 같은 스크립트로 변경한다.
+- 운영 기준은 `requirements.txt`로 유지한다.
+- `pip_install.txt`는 삭제하거나 `scripts/install-dev.ps1` 같은 명시적 manual/dev 스크립트로 변경한다.
 - 주요 패키지 버전 pin 또는 lock 파일을 도입한다.
 - GPU 관련 NVIDIA 패키지는 optional/dev 문서로 분리한다.
 
 #### 완료 기준
 
-- README, AGENTS, Dockerfile이 같은 의존성 진입점을 가리킨다.
+- README, AGENTS, Dockerfile.deps, Jenkinsfile이 같은 의존성 진입점을 가리킨다.
 - 새 venv에서 문서 명령 그대로 설치와 테스트가 가능하다.
 - GPU optional 설치는 별도 명령으로 분리되어 있다.
 
@@ -685,7 +686,7 @@
 | DDAY helper 패키지 이동 | `util/celebration/dday.py` 353줄, DDAY 대상 테스트 12개 통과 | DDAY 날짜 parsing, 목록 embed, 삭제 UI, refresh orchestration을 celebration 카테고리 패키지로 이동하고, root `util/dday.py` 제거를 테스트로 고정 |
 | env 추적 상태 | `git check-ignore -v .env .env.deploy`; `git ls-files .env .env.deploy` empty | 비밀 파일은 ignore 상태 |
 | Jenkins 테스트 단계 | 기준 커밋 `Jenkinsfile`에는 checkout/validate/deploy만 있었고, 현재 작업트리에는 `Verify` stage 추가 | 배포 전 compile/unittest gate 부재가 해소됨 |
-| 설치 안내 불일치 | README는 `requirements.txt`, AGENTS는 `pip_install.txt` 안내 | 문서 정합성 개선 필요 |
+| 설치 안내 정합성 | README/AGENTS/Dockerfile.deps/Jenkinsfile은 `requirements.txt`를 기본 진입점으로 안내, `pip_install.txt`는 legacy/manual notes로 남음 | 기본 설치 안내 불일치는 해소, legacy 파일 처리와 pin/lock 전략은 후속 과제 |
 
 ## 결론
 
