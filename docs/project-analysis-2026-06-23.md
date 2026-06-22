@@ -14,8 +14,8 @@
 6. Top 5 리스크는 `music.py`, `youtube_summary.py`, `loop.py` 같은 대형 파일이 변경 위험을 키우는 점이다.
 7. 권장 처리 순서는 Jenkins 테스트 게이트, `on_ready` guard, YouTube temp workspace, 민감 로그 제거, 문서 최신화다.
 8. 현재 작업트리에서는 위 1-4번 리스크의 1차 보강과 대형 파일 일부 분리가 구현되었다.
-9. 현재 최신 검증은 `compileall` 통과, unittest 515개 통과다.
-10. 이번 패치로 `cogs/music/`, `cogs/youtube_subscriptions/`, `cogs/maplestory/` package cog 전환과 guild channel settings helper의 `util/guild/` 이동이 반영되었고, root util은 공통 infra 중심으로 축소되었다.
+9. 현재 최신 검증은 `compileall` 통과, unittest 516개 통과다.
+10. 이번 패치로 `cogs/music/`, `cogs/youtube_subscriptions/`, `cogs/maplestory/`, `cogs/lol_scrim/` package cog 전환과 guild channel settings helper의 `util/guild/` 이동이 반영되었고, root util은 공통 infra 중심으로 축소되었다.
 
 ## 기준선
 
@@ -31,7 +31,7 @@
 
 이 문서의 진단은 기준 커밋 `34aab00` 상태를 대상으로 한다. 이후 현재 작업트리에서는 아래 항목이 구현되었다.
 
-최신 검증 결과: `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` 515개 통과.
+최신 검증 결과: `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` 516개 통과.
 
 | 상태 | 항목 | 구현 근거 |
 | --- | --- | --- |
@@ -53,6 +53,7 @@
 | 완료 | YouTube subscriptions helper 패키지 이동 | `util/youtube_subscriptions.py`를 `util/youtube/subscriptions.py`로 이동하고, `cogs.loop`/`cogs.youtube_subscriptions`/YouTube util/test import를 새 카테고리 패키지 경로로 통일했으며 root helper 제거를 경로 계약 테스트로 고정 |
 | 완료 | YouTube subscriptions Cog package 이동 | `cogs/youtube_subscriptions.py`를 `cogs/youtube_subscriptions/__init__.py` package cog로 이동하고, `cogs.youtube_subscriptions` 공개 import와 bot extension 이름은 유지하면서 물리 배치를 YouTube 구독 카테고리 폴더로 통일 |
 | 완료 | MapleStory Cog package 이동 | `cogs/maplestory.py`를 `cogs/maplestory/__init__.py` package cog로 이동하고, `cogs.maplestory` 공개 import와 bot extension 이름은 유지하면서 물리 배치를 MapleStory 카테고리 폴더로 통일 |
+| 완료 | LoL scrim Cog package 이동 | `cogs/lol_scrim.py`를 `cogs/lol_scrim/__init__.py` package cog로 이동하고, `cogs.lol_scrim` 공개 import와 bot extension 이름은 유지하면서 물리 배치를 LoL 내전 카테고리 폴더로 통일 |
 | 완료 | WebSub subscription helper 1차 분리 | `util/youtube/websub_subscription.py`로 callback URL 구성, subscribe/unsubscribe 요청, live/upload 구독 대상 필터링, WebSub 상태 저장 이동 |
 | 완료 | WebSub subscription helper 패키지 이동 | `util/youtube_websub_subscription.py`를 `util/youtube/websub_subscription.py`로 이동하고, `cogs.loop`/test import를 새 카테고리 패키지 경로로 통일했으며 root helper 제거를 경로 계약 테스트로 고정 |
 | 완료 | WebSub notification handler 1차 분리 | `util/youtube/websub_notification.py`로 Atom notification 파싱, 구독 조회, 후보 처리 결과 집계 이동 |
@@ -202,14 +203,14 @@
 | 완료 | YouTube notification state helper 패키지 이동 | `util/youtube_notification_state.py`를 `util/youtube/notification_state.py`로 이동하고, `cogs.loop`/YouTube runner/test import를 새 카테고리 패키지 경로로 통일했으며 root helper 제거를 경로 계약 테스트로 고정 |
 | 완료 | YouTube video status helper 패키지 이동 | `util/youtube_video_status.py`를 `util/youtube/video_status.py`로 이동하고, `cogs.loop`/WebSub surface/test import를 새 카테고리 패키지 경로로 통일했으며 root helper 제거를 경로 계약 테스트로 고정 |
 
-현재까지 guild channel settings helper의 `util/guild/` 패키지 이동과 Music/YouTube subscriptions/MapleStory Cog package 이동이 완료되었다. root `util/music*.py`, root `util/youtube*.py`, root `util/maplestory*.py`, root loop helper, root celebration helper는 더 이상 남지 않았다.
+현재까지 guild channel settings helper의 `util/guild/` 패키지 이동과 Music/YouTube subscriptions/MapleStory/LoL scrim Cog package 이동이 완료되었다. root `util/music*.py`, root `util/youtube*.py`, root `util/maplestory*.py`, root loop helper, root celebration helper는 더 이상 남지 않았다.
 
 ## 현재 구조 요약
 
 - `bot.py`: Discord 클라이언트 초기화, Cog 동적 로드, 메시지 캐시(`USER_MESSAGES`), 파티 상태(`PARTY_LIST`), DB 초기화
 - `cogs/`: Discord 명령과 백그라운드 태스크 구현
   - 대형 Cog: `cogs/music/`, `loop.py`, `voice_chat.py`, `cogs/youtube_subscriptions/`
-  - 패키지 Cog: `cogs/gambling/`, `cogs/maplestory/`, `cogs/music/`, `cogs/youtube_subscriptions/`
+  - 패키지 Cog: `cogs/gambling/`, `cogs/lol_scrim/`, `cogs/maplestory/`, `cogs/music/`, `cogs/youtube_subscriptions/`
 - `api/`: OpenAI, Riot, ECOS 환율/외환보유액 API 래퍼
 - `func/`: YouTube 요약, 1557 감지 등 기능성 helper
 - `util/`: DB, 채널 설정, YouTube 구독, MapleStory, D-day, 로깅 등 공유 유틸
@@ -627,7 +628,7 @@
 | Docker Python | 기준 커밋 `Dockerfile.deps` -> `FROM python:3.12-slim`, 현재 작업트리 -> `FROM python:3.11-slim` | 로컬/운영 Python minor version 불일치가 해소됨 |
 | 테스트 기준선 | `python -m unittest discover -s test` -> 154개 통과 | 현재 회귀 테스트 기준 |
 | 컴파일 기준선 | `python -m compileall -q bot.py api cogs common func util test` 통과 | 문법/import 기본 검증 |
-| 작업트리 최신 검증 | `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` -> 515개 통과 | 구현 진행 후 회귀 확인 |
+| 작업트리 최신 검증 | `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` -> 516개 통과 | 구현 진행 후 회귀 확인 |
 | 파일 수 | PowerShell 파일 집계 -> Python 파일 96개 | 분석 규모 |
 | 대형 파일 기준선 | 기준 커밋 line count: `music.py` 2663, `youtube_summary.py` 1072, `loop.py` 954, `maplestory_events.py` 875 | 분리 우선 후보였던 초기 상태 |
 | 대형 파일 현재 | Python read line count: `cogs/music/__init__.py` 1706, `cogs/youtube_subscriptions/__init__.py` 566, `youtube_summary.py` 191, `loop.py` 309, `util/maplestory/events.py` 251 | 분리 진행 후에도 Music/YouTube subscription Cog entrypoint는 command/action facade 축소 여지가 큼 |
@@ -686,6 +687,7 @@
 | Presence status helper 분리 | `util/loop/presence_status.py` 20줄, `cogs/loop.py` 현재 309줄, presence 대상 테스트 4개 통과 | USER_MESSAGES 캐시 집계와 Discord presence 문구 생성을 loop Cog 본문에서 분리하고, root `util/presence_status.py` 제거를 테스트로 고정 |
 | MapleStory notice loop runner 분리 | `util/maplestory/notice_loop_runner.py` 47줄, `cogs/loop.py` 현재 309줄, MapleStory notice loop 대상 테스트 3개 통과 | 공지 refresh 결과 집계, 실패 로그, 전송 건수 로그를 loop Cog 본문에서 분리하고 3분 polling 위치는 유지하며, root `util/maplestory_notice_loop_runner.py` 제거를 테스트로 고정 |
 | LoL scrim helper 패키지 이동 | `util/lol/scrim.py` 90줄, LoL scrim 대상 테스트 6개 통과 | 내전 추가 인원 파싱, 10인 팀 배정, 팀 슬롯 출력 helper를 LoL 카테고리 패키지로 이동하고, root `util/lol_scrim.py` 제거를 테스트로 고정 |
+| LoL scrim Cog package 이동 | `cogs/lol_scrim/__init__.py` 128줄, LoL scrim 대상 테스트 7개 통과 | 내전 명령 표면을 package cog로 이동하고, `cogs.lol_scrim` extension/import 호환과 root `cogs/lol_scrim.py` 제거를 테스트로 고정 |
 | Message context helper 패키지 이동 | `util/message/context.py` 188줄, message context 대상 테스트 12개 통과 | 메시지 action target, 선택 label, 주변 메시지 context, YouTube 링크 추출 helper를 message 카테고리 패키지로 이동하고, root `util/message_context.py` 제거를 테스트로 고정 |
 | Recent messages helper 패키지 이동 | `util/message/recent.py` 76줄, recent messages 대상 테스트 2개 통과 | USER_MESSAGES 최근 대화 포맷팅 helper를 message 카테고리 패키지로 이동하고, root `util/get_recent_messages.py` 제거와 이미지 payload 포맷을 테스트로 고정 |
 | Celebration announcement helper 패키지 이동 | `util/celebration/announcements.py` 281줄, celebration helper 대상 테스트 2개 통과 | 기념일 메시지 생성, 대상 채널 조회, 기존 메시지 갱신/전송 orchestration을 celebration 카테고리 패키지로 이동하고, root `util/celebration.py` 제거를 테스트로 고정 |

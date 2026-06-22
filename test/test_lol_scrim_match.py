@@ -13,12 +13,18 @@ from util.lol.scrim import (
 
 LOL_SCRIM_PATH = Path("util/lol/scrim.py")
 LEGACY_LOL_SCRIM_PATH = Path("util/lol_scrim.py")
+LOL_SCRIM_COG_PATH = Path("cogs/lol_scrim/__init__.py")
+LEGACY_LOL_SCRIM_COG_PATH = Path("cogs/lol_scrim.py")
 
 
 class LolScrimMatchTests(unittest.TestCase):
     def test_lol_scrim_lives_under_lol_package(self):
         self.assertTrue(LOL_SCRIM_PATH.exists())
         self.assertFalse(LEGACY_LOL_SCRIM_PATH.exists())
+
+    def test_lol_scrim_cog_uses_package_layout(self):
+        self.assertTrue(LOL_SCRIM_COG_PATH.exists())
+        self.assertFalse(LEGACY_LOL_SCRIM_COG_PATH.exists())
 
     def test_parse_extra_players_uses_commas_semicolons_and_newlines(self):
         self.assertEqual(
