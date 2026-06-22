@@ -1,5 +1,6 @@
 import unittest
 import warnings
+from pathlib import Path
 from types import SimpleNamespace
 
 from util.music.favorites import MusicFavorite
@@ -10,10 +11,18 @@ with warnings.catch_warnings():
         message="'audioop' is deprecated and slated for removal in Python 3.13",
         category=DeprecationWarning,
     )
-    from util.music_views import MusicControlView, MusicHelperView, SearchResultView
+    from util.music.views import MusicControlView, MusicHelperView, SearchResultView
+
+
+MUSIC_VIEWS_PATH = Path("util/music/views.py")
+LEGACY_MUSIC_VIEWS_PATH = Path("util/music_views.py")
 
 
 class MusicViewHelperTests(unittest.IsolatedAsyncioTestCase):
+    def test_music_views_helper_lives_under_music_package(self):
+        self.assertTrue(MUSIC_VIEWS_PATH.exists())
+        self.assertFalse(LEGACY_MUSIC_VIEWS_PATH.exists())
+
     async def test_search_result_view_has_finite_timeout_and_number_buttons(self):
         view = SearchResultView(
             _Cog(),

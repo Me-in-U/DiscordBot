@@ -5,7 +5,7 @@ from pathlib import Path
 
 MUSIC_PATH = Path("cogs/music.py")
 MUSIC_LOGGING_PATH = Path("util/music/logging.py")
-MUSIC_VIEWS_PATH = Path("util/music_views.py")
+MUSIC_VIEWS_PATH = Path("util/music/views.py")
 MUSIC_STATE_PATH = Path("util/music/state.py")
 MUSIC_QUEUE_ACTIONS_PATH = Path("util/music/queue_actions.py")
 HELP_PATH = Path("cogs/custom_help.py")

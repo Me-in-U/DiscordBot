@@ -111,7 +111,7 @@ from util.music.source import (
     info_ytdl,
     search_ytdl,
 )
-from util.music_views import (
+from util.music.views import (
     FavoriteSearchModal,
     MusicControlView,
     MusicFavoriteManageView,
