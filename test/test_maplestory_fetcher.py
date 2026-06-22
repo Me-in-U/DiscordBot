@@ -1,5 +1,6 @@
 import unittest
 import warnings
+from pathlib import Path
 
 import aiohttp
 
@@ -31,9 +32,17 @@ NOTICE_DETAIL_HTML = """
 """
 
 
+MAPLESTORY_FETCHER_PATH = Path("util/maplestory/fetcher.py")
+LEGACY_MAPLESTORY_FETCHER_PATH = Path("util/maplestory_fetcher.py")
+
+
 class MapleStoryFetcherModuleTests(unittest.IsolatedAsyncioTestCase):
+    async def test_maplestory_fetcher_lives_under_maplestory_package(self):
+        self.assertTrue(MAPLESTORY_FETCHER_PATH.exists())
+        self.assertFalse(LEGACY_MAPLESTORY_FETCHER_PATH.exists())
+
     async def test_fetch_sunday_maple_event_uses_parser_module(self):
-        from util.maplestory_fetcher import fetch_sunday_maple_event
+        from util.maplestory.fetcher import fetch_sunday_maple_event
 
         requested_urls = []
 
@@ -57,14 +66,14 @@ class MapleStoryFetcherModuleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(event.image_urls, ["https://example.com/body.png"])
 
     async def test_fetch_latest_maplestory_notices_keeps_base_notice_on_detail_failure(self):
-        from util.maplestory_fetcher import fetch_latest_maplestory_notices
+        from util.maplestory.fetcher import fetch_latest_maplestory_notices
 
         async def fake_fetch(url: str) -> str:
             if url.endswith("/News/Notice"):
                 return NOTICE_LIST_HTML
             raise aiohttp.ClientError("detail failed")
 
-        with self.assertLogs("util.maplestory_fetcher", level="WARNING"):
+        with self.assertLogs("util.maplestory.fetcher", level="WARNING"):
             notices = await fetch_latest_maplestory_notices(
                 fetch_html=fake_fetch,
                 limit=1,
@@ -83,7 +92,7 @@ class MapleStoryFetcherModuleTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_fetch_latest_maplestory_notices_hydrates_notice_details(self):
-        from util.maplestory_fetcher import fetch_latest_maplestory_notices
+        from util.maplestory.fetcher import fetch_latest_maplestory_notices
 
         async def fake_fetch(url: str) -> str:
             if url.endswith("/News/Notice"):
@@ -101,7 +110,7 @@ class MapleStoryFetcherModuleTests(unittest.IsolatedAsyncioTestCase):
 
 class MapleStoryFetcherCompatibilityTests(unittest.TestCase):
     def test_legacy_maplestory_events_reexports_fetcher_entrypoints(self):
-        import util.maplestory_fetcher as maplestory_fetcher
+        import util.maplestory.fetcher as maplestory_fetcher
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", DeprecationWarning)
             import util.maplestory_events as maplestory_events

@@ -17,7 +17,7 @@ from util.maplestory.notice_state import (
     normalize_maplestory_notice_state as _normalize_maplestory_notice_state,
     remember_maplestory_notice_in_state as _remember_maplestory_notice_in_state,
 )
-from util.maplestory_fetcher import (
+from util.maplestory.fetcher import (
     FetchHtml,
     MAPLESTORY_HEADERS,
     fetch_latest_maplestory_notices,
