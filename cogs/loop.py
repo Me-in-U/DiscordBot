@@ -13,7 +13,7 @@ from bot import (
 )
 from util.daily_refresh_runner import run_daily_refreshes
 from util.env_utils import getenv_clean
-from util.loop_task_lifecycle import cancel_loop_tasks, start_loop_tasks
+from util.loop.task_lifecycle import cancel_loop_tasks, start_loop_tasks
 from util.maplestory.notice_loop_runner import run_maplestory_notice_loop
 from util.presence_status import build_presence_activity_name
 from util.weekly_1557_reporter import run_weekly_1557_report

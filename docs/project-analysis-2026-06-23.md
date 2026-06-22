@@ -14,8 +14,8 @@
 6. Top 5 리스크는 `music.py`, `youtube_summary.py`, `loop.py` 같은 대형 파일이 변경 위험을 키우는 점이다.
 7. 권장 처리 순서는 Jenkins 테스트 게이트, `on_ready` guard, YouTube temp workspace, 민감 로그 제거, 문서 최신화다.
 8. 현재 작업트리에서는 위 1-4번 리스크의 1차 보강과 대형 파일 일부 분리가 구현되었다.
-9. 현재 최신 검증은 `compileall` 통과, unittest 488개 통과다.
-10. 이번 패치로 MapleStory events orchestration이 `util/maplestory/` 카테고리 패키지로 이동되었고, root MapleStory util 정리가 완료되었다.
+9. 현재 최신 검증은 `compileall` 통과, unittest 489개 통과다.
+10. 이번 패치로 loop task lifecycle helper가 `util/loop/` 카테고리 패키지로 이동되었고, loop util 카테고리 정리가 시작되었다.
 
 ## 기준선
 
@@ -31,7 +31,7 @@
 
 이 문서의 진단은 기준 커밋 `34aab00` 상태를 대상으로 한다. 이후 현재 작업트리에서는 아래 항목이 구현되었다.
 
-최신 검증 결과: `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` 488개 통과.
+최신 검증 결과: `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` 489개 통과.
 
 | 상태 | 항목 | 구현 근거 |
 | --- | --- | --- |
@@ -55,7 +55,8 @@
 | 완료 | WebSub subscription helper 패키지 이동 | `util/youtube_websub_subscription.py`를 `util/youtube/websub_subscription.py`로 이동하고, `cogs.loop`/test import를 새 카테고리 패키지 경로로 통일했으며 root helper 제거를 경로 계약 테스트로 고정 |
 | 완료 | WebSub notification handler 1차 분리 | `util/youtube/websub_notification.py`로 Atom notification 파싱, 구독 조회, 후보 처리 결과 집계 이동 |
 | 완료 | WebSub notification handler 패키지 이동 | `util/youtube_websub_notification.py`를 `util/youtube/websub_notification.py`로 이동하고, `cogs.loop`/test import를 새 카테고리 패키지 경로로 통일했으며 root helper 제거를 경로 계약 테스트로 고정 |
-| 완료 | Loop task lifecycle 1차 분리 | `util/loop_task_lifecycle.py`로 task start/cancel 정책 이동, `LoopTasks.cog_unload()`에서 실행 중인 loop cancel |
+| 완료 | Loop task lifecycle 1차 분리 | `util/loop/task_lifecycle.py`로 task start/cancel 정책 이동, `LoopTasks.cog_unload()`에서 실행 중인 loop cancel |
+| 완료 | Loop task lifecycle helper 패키지 이동 | `util/loop_task_lifecycle.py`를 `util/loop/task_lifecycle.py`로 이동하고, `cogs.loop`/test import를 새 카테고리 패키지 경로로 통일했으며 root helper 제거를 경로 계약 테스트로 고정 |
 | 완료 | YouTube loop runner 1차 분리 | `util/youtube/loop_runner.py`로 YouTube 후보 확인과 커뮤니티 task orchestration 이동, `LoopTasks`는 최상위 try/logging 유지 |
 | 완료 | YouTube loop runner 패키지 이동 | `util/youtube_loop_runner.py`를 `util/youtube/loop_runner.py`로 이동하고, `cogs.loop`/test import와 mock patch 경로를 새 카테고리 패키지 경로로 통일했으며 root helper 제거를 경로 계약 테스트로 고정 |
 | 완료 | Daily refresh runner 1차 분리 | `util/daily_refresh_runner.py`로 기념일/DDAY/썬데이메이플/user message reset orchestration 이동, `new_day_clear`는 runner 호출만 유지 |
@@ -189,7 +190,7 @@
 | 완료 | YouTube notification state helper 패키지 이동 | `util/youtube_notification_state.py`를 `util/youtube/notification_state.py`로 이동하고, `cogs.loop`/YouTube runner/test import를 새 카테고리 패키지 경로로 통일했으며 root helper 제거를 경로 계약 테스트로 고정 |
 | 완료 | YouTube video status helper 패키지 이동 | `util/youtube_video_status.py`를 `util/youtube/video_status.py`로 이동하고, `cogs.loop`/WebSub surface/test import를 새 카테고리 패키지 경로로 통일했으며 root helper 제거를 경로 계약 테스트로 고정 |
 
-이번 패치로 MapleStory events orchestration의 `util/maplestory/` 패키지 이동이 완료되었다. root `util/music*.py`, root `util/youtube*.py`, root `util/maplestory*.py` helper는 더 이상 남지 않았다.
+이번 패치로 loop task lifecycle helper의 `util/loop/` 패키지 이동이 완료되었다. root `util/music*.py`, root `util/youtube*.py`, root `util/maplestory*.py` helper는 더 이상 남지 않았고, loop root util helper의 카테고리 이동이 시작되었다.
 
 ## 현재 구조 요약
 
@@ -613,7 +614,7 @@
 | Docker Python | 기준 커밋 `Dockerfile.deps` -> `FROM python:3.12-slim`, 현재 작업트리 -> `FROM python:3.11-slim` | 로컬/운영 Python minor version 불일치가 해소됨 |
 | 테스트 기준선 | `python -m unittest discover -s test` -> 154개 통과 | 현재 회귀 테스트 기준 |
 | 컴파일 기준선 | `python -m compileall -q bot.py api cogs common func util test` 통과 | 문법/import 기본 검증 |
-| 작업트리 최신 검증 | `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` -> 488개 통과 | 구현 진행 후 회귀 확인 |
+| 작업트리 최신 검증 | `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` -> 489개 통과 | 구현 진행 후 회귀 확인 |
 | 파일 수 | PowerShell 파일 집계 -> Python 파일 96개 | 분석 규모 |
 | 대형 파일 기준선 | 기준 커밋 line count: `music.py` 2663, `youtube_summary.py` 1072, `loop.py` 954, `maplestory_events.py` 875 | 분리 우선 후보였던 초기 상태 |
 | 대형 파일 현재 | Python read line count: `music.py` 1706, `youtube_summary.py` 191, `loop.py` 309, `util/maplestory/events.py` 251 | 분리 진행 후에도 `music.py`는 command/action facade 축소 여지가 큼 |
@@ -650,7 +651,7 @@
 | MapleStory sender 분리 | `util/maplestory/sender.py` 336줄, `util/maplestory/events.py` 현재 251줄, sender 대상 테스트 6개 통과 | embed/message build, 채널 resolve, Discord send helper를 refresh/state orchestration에서 분리하고, root `util/maplestory_sender.py` 제거를 테스트로 고정 |
 | MapleStory events orchestration 패키지 이동 | `util/maplestory/events.py` 251줄, MapleStory events 대상 테스트 16개 및 MapleStory 전체 대상 테스트 35개 통과 | refresh/state orchestration facade를 MapleStory 카테고리 패키지로 이동하고, root `util/maplestory_events.py` 제거를 테스트로 고정 |
 | YouTube notification 상태 분리 | `util/youtube/notification_state.py` 168줄, YouTube notification state 대상 테스트 10개 통과 | pending live 재검사, notified ID 계산, live/upload/pending 상태 저장, pending check timestamp 갱신을 loop orchestration에서 분리하고, root `util/youtube_notification_state.py` 제거를 테스트로 고정 |
-| Loop task lifecycle 분리 | `util/loop_task_lifecycle.py` 31줄 추출, lifecycle 대상 테스트 3개 통과 | 반복 task start/cancel 정책을 Cog 본문에서 분리하고 unload cleanup 추가 |
+| Loop task lifecycle 분리 | `util/loop/task_lifecycle.py` 31줄, lifecycle 대상 테스트 4개 통과 | 반복 task start/cancel 정책을 Cog 본문에서 분리하고 unload cleanup을 추가했으며, root `util/loop_task_lifecycle.py` 제거를 테스트로 고정 |
 | YouTube subscriptions helper 패키지 이동 | `util/youtube/subscriptions.py` 403줄, subscription 대상 테스트 11개 통과 | YouTube subscription row mapping, list/find/create/delete/update, alert state persistence, legacy live checker setting cleanup helper를 YouTube 카테고리 패키지로 이동하고, root `util/youtube_subscriptions.py` 제거를 테스트로 고정 |
 | WebSub core helper 패키지 이동 | `util/youtube/websub.py` 241줄, WebSub core 대상 테스트 22개 통과 | callback URL/payload 생성, Atom feed parsing, live/upload/shorts classification, feed update 중복 처리 helper를 YouTube 카테고리 패키지로 이동하고, root `util/youtube_websub.py` 제거를 테스트로 고정 |
 | WebSub subscription helper 분리 | `util/youtube/websub_subscription.py` 151줄, `cogs/loop.py` 현재 309줄, WebSub subscription 대상 테스트 7개 통과 | callback URL 구성, subscribe/unsubscribe 요청, live/upload 구독 대상 필터링, WebSub 상태 저장을 loop Cog 본문에서 분리하고, root `util/youtube_websub_subscription.py` 제거를 테스트로 고정 |

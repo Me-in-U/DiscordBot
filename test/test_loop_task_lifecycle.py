@@ -1,4 +1,9 @@
 import unittest
+from pathlib import Path
+
+
+LOOP_TASK_LIFECYCLE_PATH = Path("util/loop/task_lifecycle.py")
+LEGACY_LOOP_TASK_LIFECYCLE_PATH = Path("util/loop_task_lifecycle.py")
 
 
 class FakeLoopTask:
@@ -26,8 +31,12 @@ class Owner:
 
 
 class LoopTaskLifecycleTests(unittest.TestCase):
+    def test_loop_task_lifecycle_lives_under_loop_package(self):
+        self.assertTrue(LOOP_TASK_LIFECYCLE_PATH.exists())
+        self.assertFalse(LEGACY_LOOP_TASK_LIFECYCLE_PATH.exists())
+
     def test_start_loop_tasks_starts_only_stopped_tasks(self):
-        from util.loop_task_lifecycle import start_loop_tasks
+        from util.loop.task_lifecycle import start_loop_tasks
 
         owner = Owner()
         start_loop_tasks(owner, ("ready_task", "running_task"))
@@ -37,7 +46,7 @@ class LoopTaskLifecycleTests(unittest.TestCase):
         self.assertEqual(owner.running_task.started, 0)
 
     def test_cancel_loop_tasks_cancels_only_running_tasks(self):
-        from util.loop_task_lifecycle import cancel_loop_tasks
+        from util.loop.task_lifecycle import cancel_loop_tasks
 
         owner = Owner()
         cancel_loop_tasks(owner, ("ready_task", "running_task"))
@@ -47,7 +56,7 @@ class LoopTaskLifecycleTests(unittest.TestCase):
         self.assertFalse(owner.running_task.is_running())
 
     def test_missing_task_name_raises_clear_attribute_error(self):
-        from util.loop_task_lifecycle import start_loop_tasks
+        from util.loop.task_lifecycle import start_loop_tasks
 
         owner = Owner()
         with self.assertRaisesRegex(AttributeError, "missing_task"):
