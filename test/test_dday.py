@@ -152,7 +152,7 @@ class DdaySchemaAndCommandTests(unittest.TestCase):
         self.assertEqual(renames["show_after"], "지난날짜표시")
 
     def test_daily_refresh_runner_refreshes_dday_and_sunday_maple_after_celebration(self):
-        runner_path = Path("util/daily_refresh_runner.py")
+        runner_path = Path("util/loop/daily_refresh_runner.py")
         runner_source = runner_path.read_text(encoding="utf-8")
         tree = ast.parse(runner_source, filename=str(runner_path))
         run_daily_refreshes = next(

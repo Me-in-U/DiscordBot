@@ -11,7 +11,7 @@ from bot import (
     SEOUL_TZ,
     load_recent_messages,
 )
-from util.daily_refresh_runner import run_daily_refreshes
+from util.loop.daily_refresh_runner import run_daily_refreshes
 from util.env_utils import getenv_clean
 from util.loop.task_lifecycle import cancel_loop_tasks, start_loop_tasks
 from util.maplestory.notice_loop_runner import run_maplestory_notice_loop

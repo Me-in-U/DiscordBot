@@ -1,6 +1,7 @@
 import unittest
 import warnings
 from datetime import datetime
+from pathlib import Path
 from types import SimpleNamespace
 
 with warnings.catch_warnings():
@@ -9,10 +10,18 @@ with warnings.catch_warnings():
         message="'audioop' is deprecated and slated for removal in Python 3.13",
         category=DeprecationWarning,
     )
-    from util.daily_refresh_runner import run_daily_refreshes
+    from util.loop.daily_refresh_runner import run_daily_refreshes
+
+
+DAILY_REFRESH_RUNNER_PATH = Path("util/loop/daily_refresh_runner.py")
+LEGACY_DAILY_REFRESH_RUNNER_PATH = Path("util/daily_refresh_runner.py")
 
 
 class DailyRefreshRunnerTests(unittest.IsolatedAsyncioTestCase):
+    async def test_daily_refresh_runner_lives_under_loop_package(self):
+        self.assertTrue(DAILY_REFRESH_RUNNER_PATH.exists())
+        self.assertFalse(LEGACY_DAILY_REFRESH_RUNNER_PATH.exists())
+
     async def test_runs_daily_refreshes_in_order_and_resets_message_cache(self):
         calls: list[str] = []
         bot = SimpleNamespace(USER_MESSAGES={"guild": ["message"]})
