@@ -1,7 +1,8 @@
 import random
 import unittest
+from pathlib import Path
 
-from util.lol_scrim import (
+from util.lol.scrim import (
     MAX_SCRIM_PLAYERS,
     TeamSlot,
     build_lol_scrim_match,
@@ -10,7 +11,15 @@ from util.lol_scrim import (
 )
 
 
+LOL_SCRIM_PATH = Path("util/lol/scrim.py")
+LEGACY_LOL_SCRIM_PATH = Path("util/lol_scrim.py")
+
+
 class LolScrimMatchTests(unittest.TestCase):
+    def test_lol_scrim_lives_under_lol_package(self):
+        self.assertTrue(LOL_SCRIM_PATH.exists())
+        self.assertFalse(LEGACY_LOL_SCRIM_PATH.exists())
+
     def test_parse_extra_players_uses_commas_semicolons_and_newlines(self):
         self.assertEqual(
             parse_extra_players("추가1, 추가2; 추가3\n추가4"),

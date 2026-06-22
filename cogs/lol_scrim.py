@@ -4,7 +4,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from util.lol_scrim import (
+from util.lol.scrim import (
     MAX_SCRIM_PLAYERS,
     LolScrimMatch,
     build_lol_scrim_match,
