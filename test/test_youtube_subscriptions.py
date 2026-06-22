@@ -5,7 +5,8 @@ from pathlib import Path
 from util.youtube.subscriptions import YouTubeSubscription, row_to_subscription
 
 
-YOUTUBE_SUBSCRIPTION_COG_PATH = Path("cogs/youtube_subscriptions.py")
+YOUTUBE_SUBSCRIPTION_COG_PATH = Path("cogs/youtube_subscriptions/__init__.py")
+LEGACY_YOUTUBE_SUBSCRIPTION_COG_PATH = Path("cogs/youtube_subscriptions.py")
 YOUTUBE_SUBSCRIPTIONS_HELPER_PATH = Path("util/youtube/subscriptions.py")
 LEGACY_YOUTUBE_SUBSCRIPTIONS_HELPER_PATH = Path("util/youtube_subscriptions.py")
 LEGACY_YOUTUBE_CHECKER_COG_PATH = Path("cogs/YoutubeCheckerCog.py")
@@ -28,6 +29,10 @@ def _is_ephemeral_true(keyword: ast.keyword) -> bool:
 
 
 class YouTubeSubscriptionTests(unittest.TestCase):
+    def test_youtube_subscription_cog_uses_package_layout(self):
+        self.assertTrue(YOUTUBE_SUBSCRIPTION_COG_PATH.exists())
+        self.assertFalse(LEGACY_YOUTUBE_SUBSCRIPTION_COG_PATH.exists())
+
     def test_youtube_subscriptions_helper_lives_under_youtube_package(self):
         self.assertTrue(YOUTUBE_SUBSCRIPTIONS_HELPER_PATH.exists())
         self.assertFalse(LEGACY_YOUTUBE_SUBSCRIPTIONS_HELPER_PATH.exists())

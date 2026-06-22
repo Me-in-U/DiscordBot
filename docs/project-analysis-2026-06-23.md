@@ -14,8 +14,8 @@
 6. Top 5 리스크는 `music.py`, `youtube_summary.py`, `loop.py` 같은 대형 파일이 변경 위험을 키우는 점이다.
 7. 권장 처리 순서는 Jenkins 테스트 게이트, `on_ready` guard, YouTube temp workspace, 민감 로그 제거, 문서 최신화다.
 8. 현재 작업트리에서는 위 1-4번 리스크의 1차 보강과 대형 파일 일부 분리가 구현되었다.
-9. 현재 최신 검증은 `compileall` 통과, unittest 503개 통과다.
-10. 이번 패치로 `cogs/music/` package cog 전환과 guild channel settings helper의 `util/guild/` 이동이 반영되었고, root util은 공통 infra 중심으로 축소되었다.
+9. 현재 최신 검증은 `compileall` 통과, unittest 504개 통과다.
+10. 이번 패치로 `cogs/music/`, `cogs/youtube_subscriptions/` package cog 전환과 guild channel settings helper의 `util/guild/` 이동이 반영되었고, root util은 공통 infra 중심으로 축소되었다.
 
 ## 기준선
 
@@ -31,7 +31,7 @@
 
 이 문서의 진단은 기준 커밋 `34aab00` 상태를 대상으로 한다. 이후 현재 작업트리에서는 아래 항목이 구현되었다.
 
-최신 검증 결과: `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` 503개 통과.
+최신 검증 결과: `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` 504개 통과.
 
 | 상태 | 항목 | 구현 근거 |
 | --- | --- | --- |
@@ -51,6 +51,7 @@
 | 완료 | WebSub helper 분리 | `util/youtube/websub.py`에 callback URL/payload helper 추가, `cogs/loop.py` WebSub 요청 조립 책임 축소 |
 | 완료 | WebSub core helper 패키지 이동 | `util/youtube_websub.py`를 `util/youtube/websub.py`로 이동하고, feed fallback/notification sender/state/video status/WebSub subscription/test import를 새 카테고리 패키지 경로로 통일했으며 root helper 제거를 경로 계약 테스트로 고정 |
 | 완료 | YouTube subscriptions helper 패키지 이동 | `util/youtube_subscriptions.py`를 `util/youtube/subscriptions.py`로 이동하고, `cogs.loop`/`cogs.youtube_subscriptions`/YouTube util/test import를 새 카테고리 패키지 경로로 통일했으며 root helper 제거를 경로 계약 테스트로 고정 |
+| 완료 | YouTube subscriptions Cog package 이동 | `cogs/youtube_subscriptions.py`를 `cogs/youtube_subscriptions/__init__.py` package cog로 이동하고, `cogs.youtube_subscriptions` 공개 import와 bot extension 이름은 유지하면서 물리 배치를 YouTube 구독 카테고리 폴더로 통일 |
 | 완료 | WebSub subscription helper 1차 분리 | `util/youtube/websub_subscription.py`로 callback URL 구성, subscribe/unsubscribe 요청, live/upload 구독 대상 필터링, WebSub 상태 저장 이동 |
 | 완료 | WebSub subscription helper 패키지 이동 | `util/youtube_websub_subscription.py`를 `util/youtube/websub_subscription.py`로 이동하고, `cogs.loop`/test import를 새 카테고리 패키지 경로로 통일했으며 root helper 제거를 경로 계약 테스트로 고정 |
 | 완료 | WebSub notification handler 1차 분리 | `util/youtube/websub_notification.py`로 Atom notification 파싱, 구독 조회, 후보 처리 결과 집계 이동 |
@@ -206,8 +207,8 @@
 
 - `bot.py`: Discord 클라이언트 초기화, Cog 동적 로드, 메시지 캐시(`USER_MESSAGES`), 파티 상태(`PARTY_LIST`), DB 초기화
 - `cogs/`: Discord 명령과 백그라운드 태스크 구현
-  - 대형 Cog: `music.py`, `loop.py`, `voice_chat.py`, `youtube_subscriptions.py`
-  - 패키지 Cog: `cogs/gambling/`
+  - 대형 Cog: `cogs/music/`, `loop.py`, `voice_chat.py`, `cogs/youtube_subscriptions/`
+  - 패키지 Cog: `cogs/gambling/`, `cogs/music/`, `cogs/youtube_subscriptions/`
 - `api/`: OpenAI, Riot, ECOS 환율/외환보유액 API 래퍼
 - `func/`: YouTube 요약, 1557 감지 등 기능성 helper
 - `util/`: DB, 채널 설정, YouTube 구독, MapleStory, D-day, 로깅 등 공유 유틸
@@ -625,10 +626,10 @@
 | Docker Python | 기준 커밋 `Dockerfile.deps` -> `FROM python:3.12-slim`, 현재 작업트리 -> `FROM python:3.11-slim` | 로컬/운영 Python minor version 불일치가 해소됨 |
 | 테스트 기준선 | `python -m unittest discover -s test` -> 154개 통과 | 현재 회귀 테스트 기준 |
 | 컴파일 기준선 | `python -m compileall -q bot.py api cogs common func util test` 통과 | 문법/import 기본 검증 |
-| 작업트리 최신 검증 | `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` -> 503개 통과 | 구현 진행 후 회귀 확인 |
+| 작업트리 최신 검증 | `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` -> 504개 통과 | 구현 진행 후 회귀 확인 |
 | 파일 수 | PowerShell 파일 집계 -> Python 파일 96개 | 분석 규모 |
 | 대형 파일 기준선 | 기준 커밋 line count: `music.py` 2663, `youtube_summary.py` 1072, `loop.py` 954, `maplestory_events.py` 875 | 분리 우선 후보였던 초기 상태 |
-| 대형 파일 현재 | Python read line count: `cogs/music/__init__.py` 1706, `youtube_summary.py` 191, `loop.py` 309, `util/maplestory/events.py` 251 | 분리 진행 후에도 Music Cog entrypoint는 command/action facade 축소 여지가 큼 |
+| 대형 파일 현재 | Python read line count: `cogs/music/__init__.py` 1706, `cogs/youtube_subscriptions/__init__.py` 566, `youtube_summary.py` 191, `loop.py` 309, `util/maplestory/events.py` 251 | 분리 진행 후에도 Music/YouTube subscription Cog entrypoint는 command/action facade 축소 여지가 큼 |
 | 대형 파일 1차 분리 | `util/music/queue.py` 추출, `test/test_music_queue_helpers.py` 19개 통과 | `music.py` queue 책임 일부 축소 |
 | music queue display/enqueue/action/metadata/metadata-extraction/metadata-runner helper 분리 | `util/music/queue.py` 213줄, `util/music/queue_actions.py` 83줄, `cogs/music/__init__.py` 현재 1706줄, queue helper/action 대상 테스트 28개 통과, command surface 대상 테스트 50개 통과, `test_music*.py` 222개 통과 | 대기열 표시 title/description 조립, `_play` active-voice URL enqueue, `_play_from_search_pick` 검색 선택 URL 보정과 active-voice queue enqueue, yt-dlp metadata dict의 QueuedTrack 반영, metadata 추출 예외 회수/dict 결과 필터링, executor scheduling과 QueuedTrack 반영 sequence, 삭제/비우기/이동/셔플 사용자 응답 문구를 command handler에서 분리하고 `_track_title` import 누락과 queue action/metadata 계약을 테스트로 고정했으며, root `util/music_queue.py`와 `util/music_queue_actions.py` 제거를 테스트로 고정 |
 | music playback/skip/seek/URL action helper 분리 | `util/music/playback_actions.py` 125줄, `cogs/music/__init__.py` 현재 1706줄, playback action 대상 테스트 18개 통과, `test_music*.py` 220개 통과 | 일시정지/다시재생/정지/반복/스킵/구간 이동에 더해 URL 재생의 active voice 대기열 추가/즉시 준비 판단, play_url_now replacement 상태 전이, queue track 반환, 사용자 응답 문구를 command handler에서 분리하고, root `util/music_playback_actions.py` 제거를 테스트로 고정 |
@@ -664,6 +665,7 @@
 | YouTube notification 상태 분리 | `util/youtube/notification_state.py` 168줄, YouTube notification state 대상 테스트 10개 통과 | pending live 재검사, notified ID 계산, live/upload/pending 상태 저장, pending check timestamp 갱신을 loop orchestration에서 분리하고, root `util/youtube_notification_state.py` 제거를 테스트로 고정 |
 | Loop task lifecycle 분리 | `util/loop/task_lifecycle.py` 31줄, lifecycle 대상 테스트 4개 통과 | 반복 task start/cancel 정책을 Cog 본문에서 분리하고 unload cleanup을 추가했으며, root `util/loop_task_lifecycle.py` 제거를 테스트로 고정 |
 | YouTube subscriptions helper 패키지 이동 | `util/youtube/subscriptions.py` 403줄, subscription 대상 테스트 11개 통과 | YouTube subscription row mapping, list/find/create/delete/update, alert state persistence, legacy live checker setting cleanup helper를 YouTube 카테고리 패키지로 이동하고, root `util/youtube_subscriptions.py` 제거를 테스트로 고정 |
+| YouTube subscriptions Cog package 이동 | `cogs/youtube_subscriptions/__init__.py` 566줄, subscription 대상 테스트 12개 통과 | 유튜브 구독 명령 표면을 package cog로 이동하고, `cogs.youtube_subscriptions` extension/import 호환과 root `cogs/youtube_subscriptions.py` 제거를 테스트로 고정 |
 | WebSub core helper 패키지 이동 | `util/youtube/websub.py` 241줄, WebSub core 대상 테스트 22개 통과 | callback URL/payload 생성, Atom feed parsing, live/upload/shorts classification, feed update 중복 처리 helper를 YouTube 카테고리 패키지로 이동하고, root `util/youtube_websub.py` 제거를 테스트로 고정 |
 | WebSub subscription helper 분리 | `util/youtube/websub_subscription.py` 151줄, `cogs/loop.py` 현재 309줄, WebSub subscription 대상 테스트 7개 통과 | callback URL 구성, subscribe/unsubscribe 요청, live/upload 구독 대상 필터링, WebSub 상태 저장을 loop Cog 본문에서 분리하고, root `util/youtube_websub_subscription.py` 제거를 테스트로 고정 |
 | WebSub notification handler 분리 | `util/youtube/websub_notification.py` 49줄, `cogs/loop.py` 현재 309줄, WebSub notification 대상 테스트 2개 통과 | Atom notification 파싱, 구독 조회, 후보 처리 결과 집계를 loop Cog 본문에서 분리하고, root `util/youtube_websub_notification.py` 제거를 테스트로 고정 |
