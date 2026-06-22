@@ -14,8 +14,8 @@
 6. Top 5 리스크는 `music.py`, `youtube_summary.py`, `loop.py` 같은 대형 파일이 변경 위험을 키우는 점이다.
 7. 권장 처리 순서는 Jenkins 테스트 게이트, `on_ready` guard, YouTube temp workspace, 민감 로그 제거, 문서 최신화다.
 8. 현재 작업트리에서는 위 1-4번 리스크의 1차 보강과 대형 파일 일부 분리가 구현되었다.
-9. 현재 최신 검증은 `compileall` 통과, unittest 475개 통과다.
-10. 이번 패치로 WebSub notification handler가 `util/youtube/` 카테고리 패키지로 이동되었고, root YouTube util 정리가 이어졌다.
+9. 현재 최신 검증은 `compileall` 통과, unittest 476개 통과다.
+10. 이번 패치로 WebSub renewal runner가 `util/youtube/` 카테고리 패키지로 이동되었고, root YouTube util 정리가 이어졌다.
 
 ## 기준선
 
@@ -31,7 +31,7 @@
 
 이 문서의 진단은 기준 커밋 `34aab00` 상태를 대상으로 한다. 이후 현재 작업트리에서는 아래 항목이 구현되었다.
 
-최신 검증 결과: `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` 475개 통과.
+최신 검증 결과: `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` 476개 통과.
 
 | 상태 | 항목 | 구현 근거 |
 | --- | --- | --- |
@@ -55,7 +55,8 @@
 | 완료 | Loop task lifecycle 1차 분리 | `util/loop_task_lifecycle.py`로 task start/cancel 정책 이동, `LoopTasks.cog_unload()`에서 실행 중인 loop cancel |
 | 완료 | YouTube loop runner 1차 분리 | `util/youtube_loop_runner.py`로 YouTube 후보 확인과 커뮤니티 task orchestration 이동, `LoopTasks`는 최상위 try/logging 유지 |
 | 완료 | Daily refresh runner 1차 분리 | `util/daily_refresh_runner.py`로 기념일/DDAY/썬데이메이플/user message reset orchestration 이동, `new_day_clear`는 runner 호출만 유지 |
-| 완료 | WebSub renewal runner 1차 분리 | `util/youtube_websub_renewal.py`로 주기적 WebSub 갱신 호출/성공 로그 orchestration 이동 |
+| 완료 | WebSub renewal runner 1차 분리 | `util/youtube/websub_renewal.py`로 주기적 WebSub 갱신 호출/성공 로그 orchestration 이동 |
+| 완료 | WebSub renewal runner 패키지 이동 | `util/youtube_websub_renewal.py`를 `util/youtube/websub_renewal.py`로 이동하고, `cogs.loop`/test import를 새 카테고리 패키지 경로로 통일했으며 root helper 제거를 경로 계약 테스트로 고정 |
 | 완료 | YouTube video candidate runner 1차 분리 | `util/youtube_video_candidate_runner.py`로 live/upcoming/upload/shorts candidate 상태 처리 이동 |
 | 완료 | YouTube video status helper 1차 분리 | `util/youtube/video_status.py`로 Google `videos.list` 요청과 응답 classification 이동 |
 | 완료 | YouTube channel resolver helper 패키지 이동 | `util/youtube_channel_resolver.py`를 `util/youtube/channel_resolver.py`로 이동하고, `cogs.youtube_subscriptions`/test import를 새 카테고리 패키지 경로로 통일했으며 root helper 제거를 경로 계약 테스트로 고정 |
@@ -648,7 +649,7 @@
 | YouTube video candidate runner 분리 | `util/youtube_video_candidate_runner.py` 132줄 추출, `cogs/loop.py` 현재 309줄, video candidate 대상 테스트 3개 통과 | live/upcoming/upload/shorts candidate 상태 처리와 outcome 반환을 loop Cog 본문에서 분리 |
 | YouTube notification sender 분리 | `util/youtube/notification_sender.py` 92줄, `cogs/loop.py` 현재 309줄, sender 대상 테스트 5개 통과 | live/upload 알림 대상 채널 resolve와 메시지 전송을 loop Cog 본문에서 분리하고, root `util/youtube_notification_sender.py` 제거를 테스트로 고정 |
 | Daily refresh runner 분리 | `util/daily_refresh_runner.py` 106줄 추출, `cogs/loop.py` 현재 309줄, daily refresh 대상 테스트 2개 통과 | 기념일/DDAY/썬데이메이플/user message reset orchestration을 loop Cog 본문에서 분리 |
-| WebSub renewal runner 분리 | `util/youtube_websub_renewal.py` 24줄 추출, `cogs/loop.py` 현재 309줄, WebSub renewal 대상 테스트 2개 통과 | 주기적 WebSub 갱신 호출과 성공 로그를 loop Cog 본문에서 분리 |
+| WebSub renewal runner 분리 | `util/youtube/websub_renewal.py` 24줄, `cogs/loop.py` 현재 309줄, WebSub renewal 대상 테스트 3개 통과 | 주기적 WebSub 갱신 호출과 성공 로그를 loop Cog 본문에서 분리하고, root `util/youtube_websub_renewal.py` 제거를 테스트로 고정 |
 | Weekly 1557 report runner 분리 | `util/weekly_1557_reporter.py` 66줄 추출, `cogs/loop.py` 현재 309줄, weekly 1557 대상 테스트 3개 통과 | 주간 1557 리포트 생성, 전송, 카운트 초기화 orchestration을 loop Cog 본문에서 분리 |
 | Presence status helper 분리 | `util/presence_status.py` 20줄 추출, `cogs/loop.py` 현재 309줄, presence 대상 테스트 3개 통과 | USER_MESSAGES 캐시 집계와 Discord presence 문구 생성을 loop Cog 본문에서 분리 |
 | MapleStory notice loop runner 분리 | `util/maplestory_notice_loop_runner.py` 47줄 추출, `cogs/loop.py` 현재 309줄, MapleStory notice loop 대상 테스트 2개 통과 | 공지 refresh 결과 집계, 실패 로그, 전송 건수 로그를 loop Cog 본문에서 분리하고 3분 polling 위치는 유지 |
