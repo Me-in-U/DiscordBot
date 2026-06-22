@@ -1,12 +1,21 @@
 import unittest
+from pathlib import Path
 
-from util.presence_status import (
+from util.loop.presence_status import (
     build_presence_activity_name,
     count_cached_user_messages,
 )
 
 
+PRESENCE_STATUS_PATH = Path("util/loop/presence_status.py")
+LEGACY_PRESENCE_STATUS_PATH = Path("util/presence_status.py")
+
+
 class PresenceStatusTests(unittest.TestCase):
+    def test_presence_status_lives_under_loop_package(self):
+        self.assertTrue(PRESENCE_STATUS_PATH.exists())
+        self.assertFalse(LEGACY_PRESENCE_STATUS_PATH.exists())
+
     def test_counts_only_list_messages_in_guild_user_cache(self):
         user_messages = {
             1: {
