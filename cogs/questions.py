@@ -7,7 +7,7 @@ from discord.ext import commands
 
 from api.chatGPT import custom_prompt_model
 from common.openai_prompt import build_prompt, build_single_image_content
-from util.get_recent_messages import get_recent_messages
+from util.message.recent import get_recent_messages
 from util.logging_utils import log_user_error
 
 

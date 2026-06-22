@@ -16,7 +16,7 @@ from func.youtube_summary import (
     get_youtube_summary_title,
     process_youtube_link,
 )
-from util.get_recent_messages import get_recent_messages
+from util.message.recent import get_recent_messages
 from util.logging_utils import log_user_error
 from util.message.context import extract_first_youtube_link
 
