@@ -16,7 +16,7 @@ from util.youtube_subscriptions import (
     update_youtube_community_notification_state,
     update_youtube_subscription_alert_settings,
 )
-from util.youtube_community import fetch_latest_youtube_community_posts
+from util.youtube.community import fetch_latest_youtube_community_posts
 
 
 YOUTUBE_CHANNEL_TYPE = "youtube"

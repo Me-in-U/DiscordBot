@@ -6,7 +6,7 @@ from dataclasses import replace
 import discord
 
 from util.channel_settings import get_channel
-from util.youtube_community import (
+from util.youtube.community import (
     YouTubeCommunityPost,
     find_new_youtube_community_posts,
     trim_notified_community_post_ids,

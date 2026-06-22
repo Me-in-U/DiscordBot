@@ -1,13 +1,18 @@
 import json
 import unittest
+from pathlib import Path
 
-from util.youtube_community import (
+from util.youtube.community import (
     build_youtube_community_post_url,
     build_youtube_community_posts_url,
     find_new_youtube_community_posts,
     parse_youtube_community_posts_html,
     trim_notified_community_post_ids,
 )
+
+
+YOUTUBE_COMMUNITY_PATH = Path("util/youtube/community.py")
+LEGACY_YOUTUBE_COMMUNITY_PATH = Path("util/youtube_community.py")
 
 
 def _build_posts_html() -> str:
@@ -107,6 +112,10 @@ def _build_posts_html() -> str:
 
 
 class YouTubeCommunityTests(unittest.TestCase):
+    def test_youtube_community_lives_under_youtube_package(self):
+        self.assertTrue(YOUTUBE_COMMUNITY_PATH.exists())
+        self.assertFalse(LEGACY_YOUTUBE_COMMUNITY_PATH.exists())
+
     def test_builds_channel_posts_and_direct_post_urls(self):
         self.assertEqual(
             build_youtube_community_posts_url("UC1234567890123456789012"),

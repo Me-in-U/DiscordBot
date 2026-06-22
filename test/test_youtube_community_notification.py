@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 
-from util.youtube_community import YouTubeCommunityPost
+from util.youtube.community import YouTubeCommunityPost
 from util.youtube.community_notification import (
     mark_youtube_community_post_notified,
     process_youtube_community_notifications,

@@ -14,8 +14,8 @@
 6. Top 5 리스크는 `music.py`, `youtube_summary.py`, `loop.py` 같은 대형 파일이 변경 위험을 키우는 점이다.
 7. 권장 처리 순서는 Jenkins 테스트 게이트, `on_ready` guard, YouTube temp workspace, 민감 로그 제거, 문서 최신화다.
 8. 현재 작업트리에서는 위 1-4번 리스크의 1차 보강과 대형 파일 일부 분리가 구현되었다.
-9. 현재 최신 검증은 `compileall` 통과, unittest 478개 통과다.
-10. 이번 패치로 YouTube loop runner가 `util/youtube/` 카테고리 패키지로 이동되었고, root YouTube util 정리가 이어졌다.
+9. 현재 최신 검증은 `compileall` 통과, unittest 479개 통과다.
+10. 이번 패치로 YouTube community post helper가 `util/youtube/` 카테고리 패키지로 이동되었고, root YouTube util 정리가 이어졌다.
 
 ## 기준선
 
@@ -31,7 +31,7 @@
 
 이 문서의 진단은 기준 커밋 `34aab00` 상태를 대상으로 한다. 이후 현재 작업트리에서는 아래 항목이 구현되었다.
 
-최신 검증 결과: `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` 478개 통과.
+최신 검증 결과: `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` 479개 통과.
 
 | 상태 | 항목 | 구현 근거 |
 | --- | --- | --- |
@@ -69,6 +69,7 @@
 | 완료 | YouTube community notification helper 패키지 이동 | `util/youtube_community_notification.py`를 `util/youtube/community_notification.py`로 이동하고, community polling/WebSub surface/test import를 새 카테고리 패키지 경로로 통일했으며 root helper 제거를 경로 계약 테스트로 고정 |
 | 완료 | YouTube community polling helper 1차 분리 | `util/youtube/community_polling.py`로 커뮤니티 post fetch, fetch 실패 warning, notification processing 위임 이동 |
 | 완료 | YouTube community polling helper 패키지 이동 | `util/youtube_community_polling.py`를 `util/youtube/community_polling.py`로 이동하고, `cogs.loop`/WebSub surface/test import를 새 카테고리 패키지 경로로 통일했으며 root helper 제거를 경로 계약 테스트로 고정 |
+| 완료 | YouTube community post helper 패키지 이동 | `util/youtube_community.py`를 `util/youtube/community.py`로 이동하고, `cogs.youtube_subscriptions`/community notification/community polling/test import를 새 카테고리 패키지 경로로 통일했으며 root helper 제거를 경로 계약 테스트로 고정 |
 | 완료 | YouTube Atom feed fallback 1차 분리 | `util/youtube/feed_fallback.py`로 feed polling throttle, feed fetch, seen update tracking, candidate dispatch 이동 |
 | 완료 | YouTube Atom feed fallback helper 패키지 이동 | `util/youtube_feed_fallback.py`를 `util/youtube/feed_fallback.py`로 이동하고, `cogs.loop`/test import를 새 카테고리 패키지 경로로 통일했으며 root helper 제거를 경로 계약 테스트로 고정 |
 | 완료 | Weekly 1557 report runner 1차 분리 | `util/weekly_1557_reporter.py`로 주간 1557 리포트 생성/전송/초기화 orchestration 이동 |
@@ -179,7 +180,7 @@
 | 완료 | YouTube notification state helper 패키지 이동 | `util/youtube_notification_state.py`를 `util/youtube/notification_state.py`로 이동하고, `cogs.loop`/YouTube runner/test import를 새 카테고리 패키지 경로로 통일했으며 root helper 제거를 경로 계약 테스트로 고정 |
 | 완료 | YouTube video status helper 패키지 이동 | `util/youtube_video_status.py`를 `util/youtube/video_status.py`로 이동하고, `cogs.loop`/WebSub surface/test import를 새 카테고리 패키지 경로로 통일했으며 root helper 제거를 경로 계약 테스트로 고정 |
 
-이번 패치로 YouTube community polling helper의 `util/youtube/` 패키지 이동이 완료되었다. root `util/music*.py` helper는 더 이상 남지 않았고, 다음 작은 후보는 root YouTube util의 카테고리 패키지 이동이다.
+이번 패치로 YouTube community post helper의 `util/youtube/` 패키지 이동이 완료되었다. root `util/music*.py` helper는 더 이상 남지 않았고, root YouTube util의 카테고리 패키지 이동이 계속 진행 중이다.
 
 ## 현재 구조 요약
 
@@ -643,6 +644,7 @@
 | WebSub subscription helper 분리 | `util/youtube_websub_subscription.py` 151줄 추출, `cogs/loop.py` 현재 309줄, WebSub subscription 대상 테스트 6개 통과 | callback URL 구성, subscribe/unsubscribe 요청, live/upload 구독 대상 필터링, WebSub 상태 저장을 loop Cog 본문에서 분리 |
 | WebSub notification handler 분리 | `util/youtube/websub_notification.py` 49줄, `cogs/loop.py` 현재 309줄, WebSub notification 대상 테스트 2개 통과 | Atom notification 파싱, 구독 조회, 후보 처리 결과 집계를 loop Cog 본문에서 분리하고, root `util/youtube_websub_notification.py` 제거를 테스트로 고정 |
 | YouTube community polling helper 분리 | `util/youtube/community_polling.py` 52줄, `cogs/loop.py` 현재 309줄, community polling 대상 테스트 4개 통과 | 커뮤니티 post fetch, fetch 실패 warning, notification processing 위임을 loop Cog 본문에서 분리하고, root `util/youtube_community_polling.py` 제거를 테스트로 고정 |
+| YouTube community post helper 패키지 이동 | `util/youtube/community.py` 200줄, community parser 대상 테스트 5개 통과 | 커뮤니티 posts URL/direct post URL 생성, `ytInitialData` 파싱, 새 post 계산, notified ID trim helper를 YouTube 카테고리 패키지로 이동하고, root `util/youtube_community.py` 제거를 테스트로 고정 |
 | YouTube video status helper 분리 | `util/youtube/video_status.py` 28줄, `cogs/loop.py` 현재 309줄, video status 대상 테스트 3개 통과 | Google `videos.list` 요청과 응답 classification을 loop Cog 본문에서 분리하고, root `util/youtube_video_status.py` 제거를 테스트로 고정 |
 | YouTube channel resolver helper 패키지 이동 | `util/youtube/channel_resolver.py` 102줄, channel resolver 대상 테스트 7개 통과 | YouTube 채널 ID/handle/search 입력 resolve helper를 YouTube 카테고리 패키지로 이동하고, root `util/youtube_channel_resolver.py` 제거를 테스트로 고정 |
 | YouTube community notification 분리 | `util/youtube/community_notification.py` 136줄, `cogs/loop.py` 현재 309줄, community notification 대상 테스트 6개 통과 | 커뮤니티 embed/message build, 최초 post ID seed, 새 게시물 알림 전송과 상태 저장을 loop Cog 본문에서 분리하고, root `util/youtube_community_notification.py` 제거를 테스트로 고정 |

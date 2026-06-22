@@ -7,7 +7,7 @@ from typing import Protocol
 
 import aiohttp
 
-from util.youtube_community import (
+from util.youtube.community import (
     YouTubeCommunityPost,
     fetch_latest_youtube_community_posts,
 )

@@ -3,7 +3,7 @@ from pathlib import Path
 
 import aiohttp
 
-from util.youtube_community import YouTubeCommunityPost
+from util.youtube.community import YouTubeCommunityPost
 from util.youtube.community_polling import poll_youtube_community_posts
 from util.youtube_subscriptions import YouTubeSubscription
 
