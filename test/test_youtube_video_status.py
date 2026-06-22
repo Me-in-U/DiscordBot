@@ -1,10 +1,19 @@
 import unittest
+from pathlib import Path
 
-from util.youtube_video_status import fetch_youtube_video_status
+from util.youtube.video_status import fetch_youtube_video_status
 from util.youtube_websub import YouTubeVideoStatus
 
 
+YOUTUBE_VIDEO_STATUS_PATH = Path("util/youtube/video_status.py")
+LEGACY_YOUTUBE_VIDEO_STATUS_PATH = Path("util/youtube_video_status.py")
+
+
 class YouTubeVideoStatusTests(unittest.IsolatedAsyncioTestCase):
+    def test_youtube_video_status_lives_under_youtube_package(self):
+        self.assertTrue(YOUTUBE_VIDEO_STATUS_PATH.exists())
+        self.assertFalse(LEGACY_YOUTUBE_VIDEO_STATUS_PATH.exists())
+
     async def test_fetch_video_status_requests_video_and_classifies_first_item(self):
         youtube = _FakeYouTube(
             {

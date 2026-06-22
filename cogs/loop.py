@@ -42,7 +42,7 @@ from util.youtube_loop_runner import (
     run_youtube_community_posts,
     run_youtube_notification_candidates,
 )
-from util.youtube_video_status import fetch_youtube_video_status
+from util.youtube.video_status import fetch_youtube_video_status
 from util.youtube_websub_notification import (
     handle_youtube_websub_notification,
 )

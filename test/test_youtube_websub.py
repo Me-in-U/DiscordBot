@@ -39,7 +39,7 @@ SAMPLE_ATOM = """<?xml version="1.0" encoding="UTF-8"?>
 
 LOOP_PATH = Path("cogs/loop.py")
 VIDEO_CANDIDATE_RUNNER_PATH = Path("util/youtube_video_candidate_runner.py")
-VIDEO_STATUS_PATH = Path("util/youtube_video_status.py")
+VIDEO_STATUS_PATH = Path("util/youtube/video_status.py")
 COMMUNITY_POLLING_PATH = Path("util/youtube_community_polling.py")
 
 
