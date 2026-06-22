@@ -1,8 +1,17 @@
 import unittest
+from pathlib import Path
 
+from util.youtube.video_candidate_runner import process_youtube_video_candidate
 from util.youtube_subscriptions import YouTubeSubscription
-from util.youtube_video_candidate_runner import process_youtube_video_candidate
 from util.youtube_websub import YouTubeVideoLiveStatus, YouTubeVideoStatus
+
+
+YOUTUBE_VIDEO_CANDIDATE_RUNNER_PATH = Path(
+    "util/youtube/video_candidate_runner.py"
+)
+LEGACY_YOUTUBE_VIDEO_CANDIDATE_RUNNER_PATH = Path(
+    "util/youtube_video_candidate_runner.py"
+)
 
 
 def _subscription(**overrides) -> YouTubeSubscription:
@@ -42,6 +51,10 @@ def _status(video_id: str, status: YouTubeVideoStatus, **overrides):
 
 
 class YouTubeVideoCandidateRunnerTests(unittest.IsolatedAsyncioTestCase):
+    def test_youtube_video_candidate_runner_lives_under_youtube_package(self):
+        self.assertTrue(YOUTUBE_VIDEO_CANDIDATE_RUNNER_PATH.exists())
+        self.assertFalse(LEGACY_YOUTUBE_VIDEO_CANDIDATE_RUNNER_PATH.exists())
+
     async def test_live_candidate_sends_and_marks_notification(self):
         owner = _Owner(_status("live-1", YouTubeVideoStatus.LIVE))
         subscription = _subscription()

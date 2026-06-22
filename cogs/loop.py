@@ -52,7 +52,7 @@ from util.youtube_websub_subscription import (
     ensure_youtube_websub_subscription,
     unsubscribe_youtube_websub_subscription,
 )
-from util.youtube_video_candidate_runner import process_youtube_video_candidate
+from util.youtube.video_candidate_runner import process_youtube_video_candidate
 
 
 YOUTUBE_PENDING_CHECK_INTERVAL_SECONDS = 300
