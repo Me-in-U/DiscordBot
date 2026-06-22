@@ -30,7 +30,7 @@ from util.youtube_subscriptions import (
     YouTubeSubscription,
     delete_legacy_youtube_live_checker_setting,
 )
-from util.youtube_notification_state import (
+from util.youtube.notification_state import (
     mark_youtube_upload_video_notified,
     mark_youtube_video_notified,
     notified_id_set,

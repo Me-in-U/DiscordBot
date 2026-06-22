@@ -1,7 +1,8 @@
 import unittest
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
-from util.youtube_notification_state import (
+from util.youtube.notification_state import (
     mark_youtube_upload_video_notified,
     mark_youtube_video_notified,
     notified_id_set,
@@ -13,6 +14,10 @@ from util.youtube_notification_state import (
 )
 from util.youtube_subscriptions import YouTubeSubscription
 from util.youtube_websub import YouTubeVideoLiveStatus, YouTubeVideoStatus
+
+
+YOUTUBE_NOTIFICATION_STATE_PATH = Path("util/youtube/notification_state.py")
+LEGACY_YOUTUBE_NOTIFICATION_STATE_PATH = Path("util/youtube_notification_state.py")
 
 
 def _subscription(**overrides) -> YouTubeSubscription:
@@ -61,6 +66,10 @@ class _Recorder:
 
 
 class YouTubeNotificationStateTests(unittest.TestCase):
+    def test_youtube_notification_state_lives_under_youtube_package(self):
+        self.assertTrue(YOUTUBE_NOTIFICATION_STATE_PATH.exists())
+        self.assertFalse(LEGACY_YOUTUBE_NOTIFICATION_STATE_PATH.exists())
+
     def test_notified_id_set_normalizes_truthy_values_to_strings(self):
         self.assertEqual(
             notified_id_set(["VIDEO1", 2, None, "", "VIDEO1"]),
