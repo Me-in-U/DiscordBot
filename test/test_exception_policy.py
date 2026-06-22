@@ -7,7 +7,7 @@ SOURCE_ROOTS = ("api", "bot.py", "cogs", "common", "func", "util")
 USER_ACTION_PATHS = (
     Path("cogs/explanation.py"),
     Path("cogs/interpret.py"),
-    Path("cogs/questions.py"),
+    Path("cogs/questions/__init__.py"),
     Path("cogs/search/__init__.py"),
     Path("cogs/summarize.py"),
     Path("cogs/translation.py"),
