@@ -1,10 +1,15 @@
 import unittest
+from pathlib import Path
 
 import aiohttp
 
 from util.youtube_community import YouTubeCommunityPost
-from util.youtube_community_polling import poll_youtube_community_posts
+from util.youtube.community_polling import poll_youtube_community_posts
 from util.youtube_subscriptions import YouTubeSubscription
+
+
+YOUTUBE_COMMUNITY_POLLING_PATH = Path("util/youtube/community_polling.py")
+LEGACY_YOUTUBE_COMMUNITY_POLLING_PATH = Path("util/youtube_community_polling.py")
 
 
 def _subscription(**overrides) -> YouTubeSubscription:
@@ -31,6 +36,10 @@ def _subscription(**overrides) -> YouTubeSubscription:
 
 
 class YouTubeCommunityPollingTests(unittest.IsolatedAsyncioTestCase):
+    def test_youtube_community_polling_lives_under_youtube_package(self):
+        self.assertTrue(YOUTUBE_COMMUNITY_POLLING_PATH.exists())
+        self.assertFalse(LEGACY_YOUTUBE_COMMUNITY_POLLING_PATH.exists())
+
     async def test_disabled_subscription_skips_fetch_and_processing(self):
         subscription = _subscription(community_alert_enabled=False)
 
