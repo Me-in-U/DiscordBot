@@ -1,7 +1,12 @@
 import unittest
+from pathlib import Path
 
+from util.youtube.websub_notification import handle_youtube_websub_notification
 from util.youtube_subscriptions import YouTubeSubscription
-from util.youtube_websub_notification import handle_youtube_websub_notification
+
+
+YOUTUBE_WEBSUB_NOTIFICATION_PATH = Path("util/youtube/websub_notification.py")
+LEGACY_YOUTUBE_WEBSUB_NOTIFICATION_PATH = Path("util/youtube_websub_notification.py")
 
 
 SAMPLE_ATOM = """<?xml version="1.0" encoding="UTF-8"?>
@@ -49,6 +54,10 @@ def _subscription(**overrides) -> YouTubeSubscription:
 
 
 class YouTubeWebSubNotificationTests(unittest.IsolatedAsyncioTestCase):
+    def test_youtube_websub_notification_lives_under_youtube_package(self):
+        self.assertTrue(YOUTUBE_WEBSUB_NOTIFICATION_PATH.exists())
+        self.assertFalse(LEGACY_YOUTUBE_WEBSUB_NOTIFICATION_PATH.exists())
+
     async def test_handles_atom_notification_and_collects_subscription_results(self):
         subscriptions = [
             _subscription(id=1, guild_id=10),
