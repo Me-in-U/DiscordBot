@@ -9,7 +9,8 @@ MUSIC_VIEWS_PATH = Path("util/music/views.py")
 MUSIC_STATE_PATH = Path("util/music/state.py")
 MUSIC_QUEUE_ACTIONS_PATH = Path("util/music/queue_actions.py")
 HELP_PATH = Path("cogs/custom_help.py")
-CHANNEL_SETTINGS_PATH = Path("cogs/channel_settings.py")
+CHANNEL_SETTINGS_PATH = Path("cogs/channel_settings/__init__.py")
+LEGACY_CHANNEL_SETTINGS_COG_PATH = Path("cogs/channel_settings.py")
 DB_PATH = Path("util/db.py")
 
 
@@ -107,6 +108,10 @@ class MusicCommandSurfaceTests(unittest.TestCase):
 
         self.assertIn('"music": "음악"', text)
         self.assertIn('app_commands.Choice(name="음악", value="music")', text)
+
+    def test_channel_settings_cog_uses_package_layout(self):
+        self.assertTrue(CHANNEL_SETTINGS_PATH.exists())
+        self.assertFalse(LEGACY_CHANNEL_SETTINGS_COG_PATH.exists())
 
     def test_seek_restarts_playback_with_guild_id(self):
         tree = ast.parse(MUSIC_PATH.read_text(encoding="utf-8"))
