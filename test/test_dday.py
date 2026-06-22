@@ -4,7 +4,8 @@ from datetime import date
 from pathlib import Path
 
 
-DDAY_COG_PATH = Path("cogs/dday.py")
+DDAY_COG_PATH = Path("cogs/dday/__init__.py")
+LEGACY_DDAY_COG_PATH = Path("cogs/dday.py")
 DDAY_UTIL_PATH = Path("util/celebration/dday.py")
 LEGACY_DDAY_UTIL_PATH = Path("util/dday.py")
 DB_PATH = Path("util/db.py")
@@ -44,6 +45,10 @@ class DdayUtilityTests(unittest.TestCase):
     def test_dday_helper_lives_under_celebration_package(self):
         self.assertTrue(DDAY_UTIL_PATH.exists())
         self.assertFalse(LEGACY_DDAY_UTIL_PATH.exists())
+
+    def test_dday_cog_uses_package_layout(self):
+        self.assertTrue(DDAY_COG_PATH.exists())
+        self.assertFalse(LEGACY_DDAY_COG_PATH.exists())
 
     def test_parse_dday_date_accepts_supported_formats(self):
         from util.celebration.dday import parse_dday_date
