@@ -6,7 +6,7 @@ from pathlib import Path
 SOURCE_ROOTS = ("api", "bot.py", "cogs", "common", "func", "util")
 USER_ACTION_PATHS = (
     Path("cogs/explanation/__init__.py"),
-    Path("cogs/interpret.py"),
+    Path("cogs/interpret/__init__.py"),
     Path("cogs/questions/__init__.py"),
     Path("cogs/search/__init__.py"),
     Path("cogs/summarize.py"),
