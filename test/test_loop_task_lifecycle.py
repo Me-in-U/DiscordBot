@@ -4,6 +4,8 @@ from pathlib import Path
 
 LOOP_TASK_LIFECYCLE_PATH = Path("util/loop/task_lifecycle.py")
 LEGACY_LOOP_TASK_LIFECYCLE_PATH = Path("util/loop_task_lifecycle.py")
+LOOP_COG_PATH = Path("cogs/loop/__init__.py")
+LEGACY_LOOP_COG_PATH = Path("cogs/loop.py")
 
 
 class FakeLoopTask:
@@ -34,6 +36,10 @@ class LoopTaskLifecycleTests(unittest.TestCase):
     def test_loop_task_lifecycle_lives_under_loop_package(self):
         self.assertTrue(LOOP_TASK_LIFECYCLE_PATH.exists())
         self.assertFalse(LEGACY_LOOP_TASK_LIFECYCLE_PATH.exists())
+
+    def test_loop_cog_uses_package_layout(self):
+        self.assertTrue(LOOP_COG_PATH.exists())
+        self.assertFalse(LEGACY_LOOP_COG_PATH.exists())
 
     def test_start_loop_tasks_starts_only_stopped_tasks(self):
         from util.loop.task_lifecycle import start_loop_tasks

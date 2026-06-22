@@ -358,7 +358,7 @@ class MapleStoryEventTests(unittest.TestCase):
     def test_slash_command_help_and_loop_include_maplestory_notice_subscription(self):
         cog_source = MAPLESTORY_COG_PATH.read_text(encoding="utf-8")
         help_source = Path("cogs/custom_help.py").read_text(encoding="utf-8")
-        loop_source = Path("cogs/loop.py").read_text(encoding="utf-8")
+        loop_source = Path("cogs/loop/__init__.py").read_text(encoding="utf-8")
 
         self.assertIn('name="메이플공지구독"', cog_source)
         self.assertIn('status="상태"', cog_source)

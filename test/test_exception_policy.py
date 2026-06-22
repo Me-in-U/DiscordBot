@@ -69,7 +69,7 @@ class ExceptionPolicyTests(unittest.TestCase):
         self.assertEqual(offenders, [])
 
     def test_major_loop_task_catches_log_exceptions(self):
-        text = Path("cogs/loop.py").read_text(encoding="utf-8")
+        text = Path("cogs/loop/__init__.py").read_text(encoding="utf-8")
 
         self.assertIn('logger.exception("YouTube 알림 후보 확인 오류")', text)
         self.assertIn('logger.exception("YouTube 커뮤니티 알림 확인 오류")', text)

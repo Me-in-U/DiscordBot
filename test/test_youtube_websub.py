@@ -37,7 +37,7 @@ SAMPLE_ATOM = """<?xml version="1.0" encoding="UTF-8"?>
 </feed>
 """
 
-LOOP_PATH = Path("cogs/loop.py")
+LOOP_PATH = Path("cogs/loop/__init__.py")
 YOUTUBE_WEBSUB_PATH = Path("util/youtube/websub.py")
 LEGACY_YOUTUBE_WEBSUB_PATH = Path("util/youtube_websub.py")
 VIDEO_CANDIDATE_RUNNER_PATH = Path("util/youtube/video_candidate_runner.py")

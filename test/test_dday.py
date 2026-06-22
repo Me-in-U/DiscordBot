@@ -9,7 +9,7 @@ LEGACY_DDAY_COG_PATH = Path("cogs/dday.py")
 DDAY_UTIL_PATH = Path("util/celebration/dday.py")
 LEGACY_DDAY_UTIL_PATH = Path("util/dday.py")
 DB_PATH = Path("util/db.py")
-LOOP_PATH = Path("cogs/loop.py")
+LOOP_PATH = Path("cogs/loop/__init__.py")
 
 
 def _decorator_name(decorator: ast.expr) -> str:
