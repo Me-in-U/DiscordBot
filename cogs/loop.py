@@ -47,7 +47,7 @@ from util.youtube.websub_notification import (
     handle_youtube_websub_notification,
 )
 from util.youtube.websub_renewal import run_youtube_websub_renewal
-from util.youtube_websub_subscription import (
+from util.youtube.websub_subscription import (
     build_configured_youtube_websub_callback_url,
     ensure_youtube_websub_subscription,
     unsubscribe_youtube_websub_subscription,

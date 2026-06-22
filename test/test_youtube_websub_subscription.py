@@ -1,14 +1,19 @@
 import unittest
 from datetime import datetime, timezone
+from pathlib import Path
 
-from util.youtube_subscriptions import YouTubeSubscription
-from util.youtube_websub_subscription import (
+from util.youtube.websub_subscription import (
     DEFAULT_WEBSUB_LEASE_SECONDS,
     build_configured_youtube_websub_callback_url,
     ensure_youtube_websub_subscription,
     request_youtube_websub_subscription,
     unsubscribe_youtube_websub_subscription,
 )
+from util.youtube_subscriptions import YouTubeSubscription
+
+
+YOUTUBE_WEBSUB_SUBSCRIPTION_PATH = Path("util/youtube/websub_subscription.py")
+LEGACY_YOUTUBE_WEBSUB_SUBSCRIPTION_PATH = Path("util/youtube_websub_subscription.py")
 
 
 def _subscription(**overrides) -> YouTubeSubscription:
@@ -35,6 +40,10 @@ def _subscription(**overrides) -> YouTubeSubscription:
 
 
 class YouTubeWebSubSubscriptionTests(unittest.IsolatedAsyncioTestCase):
+    def test_youtube_websub_subscription_lives_under_youtube_package(self):
+        self.assertTrue(YOUTUBE_WEBSUB_SUBSCRIPTION_PATH.exists())
+        self.assertFalse(LEGACY_YOUTUBE_WEBSUB_SUBSCRIPTION_PATH.exists())
+
     def test_build_configured_callback_url_handles_missing_values_and_token(self):
         self.assertEqual(build_configured_youtube_websub_callback_url("", "token"), "")
         self.assertEqual(
