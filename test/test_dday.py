@@ -10,6 +10,7 @@ DDAY_UTIL_PATH = Path("util/celebration/dday.py")
 LEGACY_DDAY_UTIL_PATH = Path("util/dday.py")
 DB_PATH = Path("util/db.py")
 LOOP_PATH = Path("cogs/loop/__init__.py")
+CUSTOM_HELP_PATH = Path("cogs/custom_help/__init__.py")
 
 
 def _decorator_name(decorator: ast.expr) -> str:
@@ -185,7 +186,7 @@ class DdaySchemaAndCommandTests(unittest.TestCase):
         self.assertIn("weekday() == 6", source)
 
     def test_help_mentions_dday_commands(self):
-        help_source = Path("cogs/custom_help.py").read_text(encoding="utf-8")
+        help_source = CUSTOM_HELP_PATH.read_text(encoding="utf-8")
 
         self.assertIn("`/dday추가", help_source)
         self.assertIn("`/dday삭제`", help_source)

@@ -25,6 +25,7 @@ MAPLESTORY_EVENTS_PATH = Path("util/maplestory/events.py")
 LEGACY_MAPLESTORY_EVENTS_PATH = Path("util/maplestory_events.py")
 MAPLESTORY_COG_PATH = Path("cogs/maplestory/__init__.py")
 LEGACY_MAPLESTORY_COG_PATH = Path("cogs/maplestory.py")
+CUSTOM_HELP_PATH = Path("cogs/custom_help/__init__.py")
 
 
 LIST_HTML = """
@@ -250,7 +251,7 @@ class MapleStoryEventTests(unittest.TestCase):
 
     def test_slash_command_and_help_mention_sunday_maple(self):
         cog_source = MAPLESTORY_COG_PATH.read_text(encoding="utf-8")
-        help_source = Path("cogs/custom_help.py").read_text(encoding="utf-8")
+        help_source = CUSTOM_HELP_PATH.read_text(encoding="utf-8")
 
         self.assertIn('name="썬데이메이플"', cog_source)
         self.assertIn("/썬데이메이플", help_source)
@@ -357,7 +358,7 @@ class MapleStoryEventTests(unittest.TestCase):
 
     def test_slash_command_help_and_loop_include_maplestory_notice_subscription(self):
         cog_source = MAPLESTORY_COG_PATH.read_text(encoding="utf-8")
-        help_source = Path("cogs/custom_help.py").read_text(encoding="utf-8")
+        help_source = CUSTOM_HELP_PATH.read_text(encoding="utf-8")
         loop_source = Path("cogs/loop/__init__.py").read_text(encoding="utf-8")
 
         self.assertIn('name="메이플공지구독"', cog_source)

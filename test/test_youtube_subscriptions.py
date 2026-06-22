@@ -10,7 +10,7 @@ LEGACY_YOUTUBE_SUBSCRIPTION_COG_PATH = Path("cogs/youtube_subscriptions.py")
 YOUTUBE_SUBSCRIPTIONS_HELPER_PATH = Path("util/youtube/subscriptions.py")
 LEGACY_YOUTUBE_SUBSCRIPTIONS_HELPER_PATH = Path("util/youtube_subscriptions.py")
 LEGACY_YOUTUBE_CHECKER_COG_PATH = Path("cogs/YoutubeCheckerCog.py")
-CUSTOM_HELP_PATH = Path("cogs/custom_help.py")
+CUSTOM_HELP_PATH = Path("cogs/custom_help/__init__.py")
 DB_PATH = Path("util/db.py")
 PUBLIC_COMMAND_METHODS = {
     "add_subscription",
