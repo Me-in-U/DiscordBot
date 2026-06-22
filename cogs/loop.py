@@ -22,7 +22,7 @@ from util.youtube_feed_fallback import (
     YouTubeFeedFallbackState,
     poll_youtube_feed_fallback,
 )
-from util.youtube_notification_sender import (
+from util.youtube.notification_sender import (
     send_youtube_live_notification,
     send_youtube_upload_notification,
 )

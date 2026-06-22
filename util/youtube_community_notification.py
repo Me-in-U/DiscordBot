@@ -11,7 +11,7 @@ from util.youtube_community import (
     find_new_youtube_community_posts,
     trim_notified_community_post_ids,
 )
-from util.youtube_notification_sender import (
+from util.youtube.notification_sender import (
     GetChannelSetting,
     resolve_youtube_notification_target,
 )

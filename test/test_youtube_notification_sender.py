@@ -1,12 +1,17 @@
 import unittest
+from pathlib import Path
 
-from util.youtube_notification_sender import (
+from util.youtube.notification_sender import (
     resolve_youtube_notification_target,
     send_youtube_live_notification,
     send_youtube_upload_notification,
 )
 from util.youtube_subscriptions import YouTubeSubscription
 from util.youtube_websub import YouTubeVideoLiveStatus, YouTubeVideoStatus
+
+
+YOUTUBE_NOTIFICATION_SENDER_PATH = Path("util/youtube/notification_sender.py")
+LEGACY_YOUTUBE_NOTIFICATION_SENDER_PATH = Path("util/youtube_notification_sender.py")
 
 
 def _subscription(**overrides) -> YouTubeSubscription:
@@ -42,6 +47,10 @@ def _status(video_id: str, title: str = "영상") -> YouTubeVideoLiveStatus:
 
 
 class YouTubeNotificationSenderTests(unittest.IsolatedAsyncioTestCase):
+    def test_youtube_notification_sender_lives_under_youtube_package(self):
+        self.assertTrue(YOUTUBE_NOTIFICATION_SENDER_PATH.exists())
+        self.assertFalse(LEGACY_YOUTUBE_NOTIFICATION_SENDER_PATH.exists())
+
     async def test_resolves_configured_channel_from_cache(self):
         channel = _Channel()
         bot = _Bot(cached_channel=channel)
