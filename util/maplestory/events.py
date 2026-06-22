@@ -63,7 +63,7 @@ async def refresh_sunday_maple_messages(
     *,
     fetch_event: FetchEvent | None = None,
 ) -> list[SundayMapleUpdateResult]:
-    from util.celebration import get_celebration_channels
+    from util.celebration.announcements import get_celebration_channels
 
     channels = await get_celebration_channels(bot, guild_id)
     if not channels:

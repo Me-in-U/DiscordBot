@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Protocol
 
-from util.celebration import refresh_celebration_messages
+from util.celebration.announcements import refresh_celebration_messages
 from util.dday import refresh_dday_messages
 from util.maplestory.events import refresh_sunday_maple_messages
 

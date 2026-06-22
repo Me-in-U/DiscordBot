@@ -206,7 +206,7 @@ class MapleStoryEventTests(unittest.TestCase):
         async def fake_get_channels(bot, guild_id=None):
             return {10: channel}
 
-        with patch("util.celebration.get_celebration_channels", fake_get_channels):
+        with patch("util.celebration.announcements.get_celebration_channels", fake_get_channels):
             results = asyncio.run(
                 refresh_sunday_maple_messages(
                     bot=object(),
@@ -230,7 +230,7 @@ class MapleStoryEventTests(unittest.TestCase):
         async def fake_get_channels(bot, guild_id=None):
             return {10: channel}
 
-        with patch("util.celebration.get_celebration_channels", fake_get_channels):
+        with patch("util.celebration.announcements.get_celebration_channels", fake_get_channels):
             results = asyncio.run(
                 refresh_sunday_maple_messages(
                     bot=object(),

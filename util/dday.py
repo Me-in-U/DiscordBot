@@ -197,7 +197,7 @@ async def refresh_dday_messages(
     bot: discord.Client,
     guild_id: int | None = None,
 ) -> list[DdayUpdateResult]:
-    from util.celebration import get_celebration_channels
+    from util.celebration.announcements import get_celebration_channels
 
     channels = await get_celebration_channels(bot, guild_id)
     current_date = _today()

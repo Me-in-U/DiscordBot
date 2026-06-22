@@ -2,7 +2,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from util.celebration import refresh_celebration_messages
+from util.celebration.announcements import refresh_celebration_messages
 
 
 class CelebrationUpdate(commands.Cog):

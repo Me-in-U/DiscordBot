@@ -8,7 +8,7 @@ from xml.etree import ElementTree
 from aiohttp import web
 from discord.ext import commands
 
-from util.celebration import refresh_celebration_messages
+from util.celebration.announcements import refresh_celebration_messages
 from util.db import DB_SCHEMA_VERSION
 from util.env_utils import getenv_clean
 
