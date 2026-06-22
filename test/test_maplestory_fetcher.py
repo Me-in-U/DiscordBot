@@ -3,7 +3,7 @@ import warnings
 
 import aiohttp
 
-from util.maplestory_parser import MapleStoryNotice
+from util.maplestory.parser import MapleStoryNotice
 
 
 LIST_HTML = """

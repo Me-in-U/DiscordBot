@@ -1,5 +1,6 @@
 import unittest
 import warnings
+from pathlib import Path
 
 
 LIST_HTML = """
@@ -31,9 +32,17 @@ NOTICE_HTML = """
 """
 
 
+MAPLESTORY_PARSER_PATH = Path("util/maplestory/parser.py")
+LEGACY_MAPLESTORY_PARSER_PATH = Path("util/maplestory_parser.py")
+
+
 class MapleStoryParserModuleTests(unittest.TestCase):
+    def test_maplestory_parser_lives_under_maplestory_package(self):
+        self.assertTrue(MAPLESTORY_PARSER_PATH.exists())
+        self.assertFalse(LEGACY_MAPLESTORY_PARSER_PATH.exists())
+
     def test_parser_module_exposes_event_and_notice_parsers(self):
-        from util.maplestory_parser import (
+        from util.maplestory.parser import (
             SUNDAY_MAPLE_EVENT_TITLE,
             MapleStoryNotice,
             parse_maplestory_event_detail,
@@ -71,7 +80,7 @@ class MapleStoryParserModuleTests(unittest.TestCase):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", DeprecationWarning)
             import util.maplestory_events as maplestory_events
-        import util.maplestory_parser as maplestory_parser
+        import util.maplestory.parser as maplestory_parser
 
         self.assertIs(maplestory_events.MapleStoryEvent, maplestory_parser.MapleStoryEvent)
         self.assertIs(

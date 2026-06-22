@@ -23,7 +23,7 @@ from util.maplestory_fetcher import (
     fetch_latest_maplestory_notices,
     fetch_sunday_maple_event,
 )
-from util.maplestory_parser import (
+from util.maplestory.parser import (
     MAPLESTORY_BASE_URL,
     MAPLESTORY_NOTICE_LIST_URL,
     MAPLESTORY_ONGOING_EVENT_LIST_URL,

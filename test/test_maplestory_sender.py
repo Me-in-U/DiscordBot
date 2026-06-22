@@ -1,7 +1,7 @@
 import unittest
 import warnings
 
-from util.maplestory_parser import MapleStoryEvent, MapleStoryNotice
+from util.maplestory.parser import MapleStoryEvent, MapleStoryNotice
 
 
 class FakeSentMessage:

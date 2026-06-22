@@ -6,7 +6,7 @@ from collections.abc import Awaitable, Callable
 
 import aiohttp
 
-from util.maplestory_parser import (
+from util.maplestory.parser import (
     MAPLESTORY_NOTICE_LIST_URL,
     MAPLESTORY_ONGOING_EVENT_LIST_URL,
     MapleStoryEvent,

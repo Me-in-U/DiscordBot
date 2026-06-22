@@ -8,7 +8,7 @@ from dataclasses import dataclass
 
 import discord
 
-from util.maplestory_parser import MapleStoryEvent, MapleStoryNotice
+from util.maplestory.parser import MapleStoryEvent, MapleStoryNotice
 
 
 logger = logging.getLogger(__name__)
