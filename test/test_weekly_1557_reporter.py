@@ -1,10 +1,19 @@
 import unittest
 from datetime import datetime
+from pathlib import Path
 
-from util.weekly_1557_reporter import run_weekly_1557_report
+from util.loop.weekly_1557_reporter import run_weekly_1557_report
+
+
+WEEKLY_1557_REPORTER_PATH = Path("util/loop/weekly_1557_reporter.py")
+LEGACY_WEEKLY_1557_REPORTER_PATH = Path("util/weekly_1557_reporter.py")
 
 
 class Weekly1557ReporterTests(unittest.IsolatedAsyncioTestCase):
+    async def test_weekly_1557_reporter_lives_under_loop_package(self):
+        self.assertTrue(WEEKLY_1557_REPORTER_PATH.exists())
+        self.assertFalse(LEGACY_WEEKLY_1557_REPORTER_PATH.exists())
+
     async def test_skips_report_on_non_monday(self):
         bot = _Bot(channel=_Channel())
         calls: list[str] = []
