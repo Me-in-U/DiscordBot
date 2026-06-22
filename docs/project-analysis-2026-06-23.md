@@ -14,8 +14,8 @@
 6. Top 5 리스크는 `music.py`, `youtube_summary.py`, `loop.py` 같은 대형 파일이 변경 위험을 키우는 점이다.
 7. 권장 처리 순서는 Jenkins 테스트 게이트, `on_ready` guard, YouTube temp workspace, 민감 로그 제거, 문서 최신화다.
 8. 현재 작업트리에서는 위 1-4번 리스크의 1차 보강과 대형 파일 일부 분리가 구현되었다.
-9. 현재 최신 검증은 `compileall` 통과, unittest 477개 통과다.
-10. 이번 패치로 YouTube video candidate runner가 `util/youtube/` 카테고리 패키지로 이동되었고, root YouTube util 정리가 이어졌다.
+9. 현재 최신 검증은 `compileall` 통과, unittest 478개 통과다.
+10. 이번 패치로 YouTube loop runner가 `util/youtube/` 카테고리 패키지로 이동되었고, root YouTube util 정리가 이어졌다.
 
 ## 기준선
 
@@ -31,7 +31,7 @@
 
 이 문서의 진단은 기준 커밋 `34aab00` 상태를 대상으로 한다. 이후 현재 작업트리에서는 아래 항목이 구현되었다.
 
-최신 검증 결과: `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` 477개 통과.
+최신 검증 결과: `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` 478개 통과.
 
 | 상태 | 항목 | 구현 근거 |
 | --- | --- | --- |
@@ -53,7 +53,8 @@
 | 완료 | WebSub notification handler 1차 분리 | `util/youtube/websub_notification.py`로 Atom notification 파싱, 구독 조회, 후보 처리 결과 집계 이동 |
 | 완료 | WebSub notification handler 패키지 이동 | `util/youtube_websub_notification.py`를 `util/youtube/websub_notification.py`로 이동하고, `cogs.loop`/test import를 새 카테고리 패키지 경로로 통일했으며 root helper 제거를 경로 계약 테스트로 고정 |
 | 완료 | Loop task lifecycle 1차 분리 | `util/loop_task_lifecycle.py`로 task start/cancel 정책 이동, `LoopTasks.cog_unload()`에서 실행 중인 loop cancel |
-| 완료 | YouTube loop runner 1차 분리 | `util/youtube_loop_runner.py`로 YouTube 후보 확인과 커뮤니티 task orchestration 이동, `LoopTasks`는 최상위 try/logging 유지 |
+| 완료 | YouTube loop runner 1차 분리 | `util/youtube/loop_runner.py`로 YouTube 후보 확인과 커뮤니티 task orchestration 이동, `LoopTasks`는 최상위 try/logging 유지 |
+| 완료 | YouTube loop runner 패키지 이동 | `util/youtube_loop_runner.py`를 `util/youtube/loop_runner.py`로 이동하고, `cogs.loop`/test import와 mock patch 경로를 새 카테고리 패키지 경로로 통일했으며 root helper 제거를 경로 계약 테스트로 고정 |
 | 완료 | Daily refresh runner 1차 분리 | `util/daily_refresh_runner.py`로 기념일/DDAY/썬데이메이플/user message reset orchestration 이동, `new_day_clear`는 runner 호출만 유지 |
 | 완료 | WebSub renewal runner 1차 분리 | `util/youtube/websub_renewal.py`로 주기적 WebSub 갱신 호출/성공 로그 orchestration 이동 |
 | 완료 | WebSub renewal runner 패키지 이동 | `util/youtube_websub_renewal.py`를 `util/youtube/websub_renewal.py`로 이동하고, `cogs.loop`/test import를 새 카테고리 패키지 경로로 통일했으며 root helper 제거를 경로 계약 테스트로 고정 |
@@ -646,7 +647,7 @@
 | YouTube channel resolver helper 패키지 이동 | `util/youtube/channel_resolver.py` 102줄, channel resolver 대상 테스트 7개 통과 | YouTube 채널 ID/handle/search 입력 resolve helper를 YouTube 카테고리 패키지로 이동하고, root `util/youtube_channel_resolver.py` 제거를 테스트로 고정 |
 | YouTube community notification 분리 | `util/youtube/community_notification.py` 136줄, `cogs/loop.py` 현재 309줄, community notification 대상 테스트 6개 통과 | 커뮤니티 embed/message build, 최초 post ID seed, 새 게시물 알림 전송과 상태 저장을 loop Cog 본문에서 분리하고, root `util/youtube_community_notification.py` 제거를 테스트로 고정 |
 | YouTube Atom feed fallback 분리 | `util/youtube/feed_fallback.py` 160줄, `cogs/loop.py` 현재 309줄, feed fallback 대상 테스트 5개 통과 | Atom feed polling throttle, feed fetch, seen update tracking, 후보 dispatch/refetch를 loop Cog 본문에서 분리하고, root `util/youtube_feed_fallback.py` 제거를 테스트로 고정 |
-| YouTube loop runner 분리 | `util/youtube_loop_runner.py` 94줄, `cogs/loop.py` 현재 309줄, runner 대상 테스트 2개 통과 | YouTube 후보 확인, pending check timestamp helper 호출, 커뮤니티 task orchestration을 loop Cog 본문에서 분리 |
+| YouTube loop runner 분리 | `util/youtube/loop_runner.py` 94줄, `cogs/loop.py` 현재 309줄, runner 대상 테스트 3개 통과 | YouTube 후보 확인, pending check timestamp helper 호출, 커뮤니티 task orchestration을 loop Cog 본문에서 분리하고, root `util/youtube_loop_runner.py` 제거를 테스트로 고정 |
 | YouTube video candidate runner 분리 | `util/youtube/video_candidate_runner.py` 132줄, `cogs/loop.py` 현재 309줄, video candidate 대상 테스트 4개 통과 | live/upcoming/upload/shorts candidate 상태 처리와 outcome 반환을 loop Cog 본문에서 분리하고, root `util/youtube_video_candidate_runner.py` 제거를 테스트로 고정 |
 | YouTube notification sender 분리 | `util/youtube/notification_sender.py` 92줄, `cogs/loop.py` 현재 309줄, sender 대상 테스트 5개 통과 | live/upload 알림 대상 채널 resolve와 메시지 전송을 loop Cog 본문에서 분리하고, root `util/youtube_notification_sender.py` 제거를 테스트로 고정 |
 | Daily refresh runner 분리 | `util/daily_refresh_runner.py` 106줄 추출, `cogs/loop.py` 현재 309줄, daily refresh 대상 테스트 2개 통과 | 기념일/DDAY/썬데이메이플/user message reset orchestration을 loop Cog 본문에서 분리 |

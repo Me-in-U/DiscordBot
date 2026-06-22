@@ -38,7 +38,7 @@ from util.youtube.notification_state import (
     remove_pending_youtube_video,
     should_check_pending_youtube_video,
 )
-from util.youtube_loop_runner import (
+from util.youtube.loop_runner import (
     run_youtube_community_posts,
     run_youtube_notification_candidates,
 )

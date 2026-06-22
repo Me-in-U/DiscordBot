@@ -1,12 +1,17 @@
 import unittest
 from dataclasses import replace
+from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
-from util.youtube_loop_runner import (
+from util.youtube.loop_runner import (
     run_youtube_community_posts,
     run_youtube_notification_candidates,
 )
 from util.youtube_subscriptions import YouTubeSubscription
+
+
+YOUTUBE_LOOP_RUNNER_PATH = Path("util/youtube/loop_runner.py")
+LEGACY_YOUTUBE_LOOP_RUNNER_PATH = Path("util/youtube_loop_runner.py")
 
 
 def _subscription(
@@ -85,6 +90,10 @@ class FakeCommunityOwner:
 
 
 class YouTubeLoopRunnerTests(unittest.IsolatedAsyncioTestCase):
+    def test_youtube_loop_runner_lives_under_youtube_package(self):
+        self.assertTrue(YOUTUBE_LOOP_RUNNER_PATH.exists())
+        self.assertFalse(LEGACY_YOUTUBE_LOOP_RUNNER_PATH.exists())
+
     async def test_notification_runner_processes_pending_candidates(self):
         owner = FakeNotificationOwner()
         subscription = _subscription(
@@ -107,19 +116,19 @@ class YouTubeLoopRunnerTests(unittest.IsolatedAsyncioTestCase):
         touch_pending = AsyncMock(side_effect=_touch_pending)
 
         with patch(
-            "util.youtube_loop_runner.list_all_youtube_subscriptions",
+            "util.youtube.loop_runner.list_all_youtube_subscriptions",
             new=AsyncMock(return_value=[subscription]),
         ):
             with patch(
-                "util.youtube_loop_runner.touch_pending_youtube_video_check",
+                "util.youtube.loop_runner.touch_pending_youtube_video_check",
                 touch_pending,
             ):
                 with patch(
-                    "util.youtube_loop_runner.get_youtube_subscription",
+                    "util.youtube.loop_runner.get_youtube_subscription",
                     new=AsyncMock(return_value=None),
                 ):
                     with patch(
-                        "util.youtube_loop_runner.aiohttp.ClientSession",
+                        "util.youtube.loop_runner.aiohttp.ClientSession",
                         FakeSessionFactory,
                     ):
                         await run_youtube_notification_candidates(owner)
@@ -150,7 +159,7 @@ class YouTubeLoopRunnerTests(unittest.IsolatedAsyncioTestCase):
         ]
 
         with patch(
-            "util.youtube_loop_runner.list_all_youtube_subscriptions",
+            "util.youtube.loop_runner.list_all_youtube_subscriptions",
             new=AsyncMock(return_value=subscriptions),
         ):
             await run_youtube_community_posts(owner)
