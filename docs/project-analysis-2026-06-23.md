@@ -14,8 +14,8 @@
 6. Top 5 리스크는 `music.py`, `youtube_summary.py`, `loop.py` 같은 대형 파일이 변경 위험을 키우는 점이다.
 7. 권장 처리 순서는 Jenkins 테스트 게이트, `on_ready` guard, YouTube temp workspace, 민감 로그 제거, 문서 최신화다.
 8. 현재 작업트리에서는 위 1-4번 리스크의 1차 보강과 대형 파일 일부 분리가 구현되었다.
-9. 현재 최신 검증은 `compileall` 통과, unittest 486개 통과다.
-10. 이번 패치로 MapleStory sender helper가 `util/maplestory/` 카테고리 패키지로 이동되었고, MapleStory util 카테고리 정리가 이어졌다.
+9. 현재 최신 검증은 `compileall` 통과, unittest 487개 통과다.
+10. 이번 패치로 MapleStory notice loop runner가 `util/maplestory/` 카테고리 패키지로 이동되었고, MapleStory util 카테고리 정리가 이어졌다.
 
 ## 기준선
 
@@ -31,7 +31,7 @@
 
 이 문서의 진단은 기준 커밋 `34aab00` 상태를 대상으로 한다. 이후 현재 작업트리에서는 아래 항목이 구현되었다.
 
-최신 검증 결과: `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` 486개 통과.
+최신 검증 결과: `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` 487개 통과.
 
 | 상태 | 항목 | 구현 근거 |
 | --- | --- | --- |
@@ -77,7 +77,8 @@
 | 완료 | YouTube Atom feed fallback helper 패키지 이동 | `util/youtube_feed_fallback.py`를 `util/youtube/feed_fallback.py`로 이동하고, `cogs.loop`/test import를 새 카테고리 패키지 경로로 통일했으며 root helper 제거를 경로 계약 테스트로 고정 |
 | 완료 | Weekly 1557 report runner 1차 분리 | `util/weekly_1557_reporter.py`로 주간 1557 리포트 생성/전송/초기화 orchestration 이동 |
 | 완료 | Presence status helper 1차 분리 | `util/presence_status.py`로 USER_MESSAGES 집계와 presence 문구 생성 이동 |
-| 완료 | MapleStory notice loop runner 1차 분리 | `util/maplestory_notice_loop_runner.py`로 공지 결과 집계/로그 orchestration 이동, 3분 polling loop는 `cogs/loop.py`에 유지 |
+| 완료 | MapleStory notice loop runner 1차 분리 | `util/maplestory/notice_loop_runner.py`로 공지 결과 집계/로그 orchestration 이동, 3분 polling loop는 `cogs/loop.py`에 유지 |
+| 완료 | MapleStory notice loop runner 패키지 이동 | `util/maplestory_notice_loop_runner.py`를 `util/maplestory/notice_loop_runner.py`로 이동하고, `cogs.loop`/test import를 새 카테고리 패키지 경로로 통일했으며 root helper 제거를 경로 계약 테스트로 고정 |
 | 완료 | 민감 로그 제거 | OpenAI response 객체 전체 출력 제거, 메시지 원문/sample 출력 제거 |
 | 완료 | Cog 로드 실패 격리 | 선택 Cog 실패는 로깅 후 계속 진행, 필수 Cog 실패는 `RequiredCogLoadError`로 startup 실패 |
 | 완료 | WebSub token 운영 필수화 | `.env.deploy` 또는 production 런타임에서 `YOUTUBE_WEBSUB_VERIFY_TOKEN` 누락 시 startup 실패 |
@@ -187,7 +188,7 @@
 | 완료 | YouTube notification state helper 패키지 이동 | `util/youtube_notification_state.py`를 `util/youtube/notification_state.py`로 이동하고, `cogs.loop`/YouTube runner/test import를 새 카테고리 패키지 경로로 통일했으며 root helper 제거를 경로 계약 테스트로 고정 |
 | 완료 | YouTube video status helper 패키지 이동 | `util/youtube_video_status.py`를 `util/youtube/video_status.py`로 이동하고, `cogs.loop`/WebSub surface/test import를 새 카테고리 패키지 경로로 통일했으며 root helper 제거를 경로 계약 테스트로 고정 |
 
-이번 패치로 MapleStory sender helper의 `util/maplestory/` 패키지 이동이 완료되었다. root `util/music*.py` helper와 root `util/youtube*.py` helper는 더 이상 남지 않았고, MapleStory root util helper의 카테고리 이동이 계속 진행 중이다.
+이번 패치로 MapleStory notice loop runner의 `util/maplestory/` 패키지 이동이 완료되었다. root `util/music*.py` helper와 root `util/youtube*.py` helper는 더 이상 남지 않았고, MapleStory root util helper의 카테고리 이동이 계속 진행 중이다.
 
 ## 현재 구조 요약
 
@@ -611,7 +612,7 @@
 | Docker Python | 기준 커밋 `Dockerfile.deps` -> `FROM python:3.12-slim`, 현재 작업트리 -> `FROM python:3.11-slim` | 로컬/운영 Python minor version 불일치가 해소됨 |
 | 테스트 기준선 | `python -m unittest discover -s test` -> 154개 통과 | 현재 회귀 테스트 기준 |
 | 컴파일 기준선 | `python -m compileall -q bot.py api cogs common func util test` 통과 | 문법/import 기본 검증 |
-| 작업트리 최신 검증 | `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` -> 486개 통과 | 구현 진행 후 회귀 확인 |
+| 작업트리 최신 검증 | `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` -> 487개 통과 | 구현 진행 후 회귀 확인 |
 | 파일 수 | PowerShell 파일 집계 -> Python 파일 96개 | 분석 규모 |
 | 대형 파일 기준선 | 기준 커밋 line count: `music.py` 2663, `youtube_summary.py` 1072, `loop.py` 954, `maplestory_events.py` 875 | 분리 우선 후보였던 초기 상태 |
 | 대형 파일 현재 | Python read line count: `music.py` 1706, `youtube_summary.py` 191, `loop.py` 309, `maplestory_events.py` 251 | 분리 진행 후에도 `music.py`는 command/action facade 축소 여지가 큼 |
@@ -665,7 +666,7 @@
 | WebSub renewal runner 분리 | `util/youtube/websub_renewal.py` 24줄, `cogs/loop.py` 현재 309줄, WebSub renewal 대상 테스트 3개 통과 | 주기적 WebSub 갱신 호출과 성공 로그를 loop Cog 본문에서 분리하고, root `util/youtube_websub_renewal.py` 제거를 테스트로 고정 |
 | Weekly 1557 report runner 분리 | `util/weekly_1557_reporter.py` 66줄 추출, `cogs/loop.py` 현재 309줄, weekly 1557 대상 테스트 3개 통과 | 주간 1557 리포트 생성, 전송, 카운트 초기화 orchestration을 loop Cog 본문에서 분리 |
 | Presence status helper 분리 | `util/presence_status.py` 20줄 추출, `cogs/loop.py` 현재 309줄, presence 대상 테스트 3개 통과 | USER_MESSAGES 캐시 집계와 Discord presence 문구 생성을 loop Cog 본문에서 분리 |
-| MapleStory notice loop runner 분리 | `util/maplestory_notice_loop_runner.py` 47줄 추출, `cogs/loop.py` 현재 309줄, MapleStory notice loop 대상 테스트 2개 통과 | 공지 refresh 결과 집계, 실패 로그, 전송 건수 로그를 loop Cog 본문에서 분리하고 3분 polling 위치는 유지 |
+| MapleStory notice loop runner 분리 | `util/maplestory/notice_loop_runner.py` 47줄, `cogs/loop.py` 현재 309줄, MapleStory notice loop 대상 테스트 3개 통과 | 공지 refresh 결과 집계, 실패 로그, 전송 건수 로그를 loop Cog 본문에서 분리하고 3분 polling 위치는 유지하며, root `util/maplestory_notice_loop_runner.py` 제거를 테스트로 고정 |
 | env 추적 상태 | `git check-ignore -v .env .env.deploy`; `git ls-files .env .env.deploy` empty | 비밀 파일은 ignore 상태 |
 | Jenkins 테스트 단계 | 기준 커밋 `Jenkinsfile`에는 checkout/validate/deploy만 있었고, 현재 작업트리에는 `Verify` stage 추가 | 배포 전 compile/unittest gate 부재가 해소됨 |
 | 설치 안내 불일치 | README는 `requirements.txt`, AGENTS는 `pip_install.txt` 안내 | 문서 정합성 개선 필요 |

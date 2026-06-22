@@ -1,10 +1,19 @@
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 
-from util.maplestory_notice_loop_runner import run_maplestory_notice_loop
+from util.maplestory.notice_loop_runner import run_maplestory_notice_loop
+
+
+MAPLESTORY_NOTICE_LOOP_RUNNER_PATH = Path("util/maplestory/notice_loop_runner.py")
+LEGACY_MAPLESTORY_NOTICE_LOOP_RUNNER_PATH = Path("util/maplestory_notice_loop_runner.py")
 
 
 class MapleStoryNoticeLoopRunnerTests(unittest.IsolatedAsyncioTestCase):
+    async def test_maplestory_notice_loop_runner_lives_under_maplestory_package(self):
+        self.assertTrue(MAPLESTORY_NOTICE_LOOP_RUNNER_PATH.exists())
+        self.assertFalse(LEGACY_MAPLESTORY_NOTICE_LOOP_RUNNER_PATH.exists())
+
     async def test_reports_sent_count_and_logs_non_skipped_failures(self):
         bot = object()
         calls: list[object] = []
