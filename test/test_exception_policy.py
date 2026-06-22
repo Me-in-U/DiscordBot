@@ -10,7 +10,7 @@ USER_ACTION_PATHS = (
     Path("cogs/questions/__init__.py"),
     Path("cogs/search/__init__.py"),
     Path("cogs/summarize.py"),
-    Path("cogs/translation.py"),
+    Path("cogs/translation/__init__.py"),
 )
 
 
