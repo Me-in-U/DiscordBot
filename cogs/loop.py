@@ -18,7 +18,7 @@ from util.maplestory_notice_loop_runner import run_maplestory_notice_loop
 from util.presence_status import build_presence_activity_name
 from util.weekly_1557_reporter import run_weekly_1557_report
 from util.youtube.community_polling import poll_youtube_community_posts
-from util.youtube_feed_fallback import (
+from util.youtube.feed_fallback import (
     YouTubeFeedFallbackState,
     poll_youtube_feed_fallback,
 )

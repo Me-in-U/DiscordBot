@@ -1,8 +1,9 @@
 import unittest
 from dataclasses import replace
 from datetime import datetime, timezone
+from pathlib import Path
 
-from util.youtube_feed_fallback import (
+from util.youtube.feed_fallback import (
     YouTubeFeedFallbackState,
     fetch_youtube_feed_entries,
     poll_youtube_feed_fallback,
@@ -11,6 +12,10 @@ from util.youtube_feed_fallback import (
 )
 from util.youtube_subscriptions import YouTubeSubscription
 from util.youtube_websub import YouTubeAtomEntry
+
+
+YOUTUBE_FEED_FALLBACK_PATH = Path("util/youtube/feed_fallback.py")
+LEGACY_YOUTUBE_FEED_FALLBACK_PATH = Path("util/youtube_feed_fallback.py")
 
 
 def _subscription(**overrides) -> YouTubeSubscription:
@@ -53,6 +58,10 @@ def _entry(
 
 
 class YouTubeFeedFallbackTests(unittest.IsolatedAsyncioTestCase):
+    def test_youtube_feed_fallback_lives_under_youtube_package(self):
+        self.assertTrue(YOUTUBE_FEED_FALLBACK_PATH.exists())
+        self.assertFalse(LEGACY_YOUTUBE_FEED_FALLBACK_PATH.exists())
+
     def test_should_poll_records_timestamp_and_throttles_recent_checks(self):
         state = YouTubeFeedFallbackState()
         first_check = datetime(2026, 6, 23, 1, 10, tzinfo=timezone.utc)
