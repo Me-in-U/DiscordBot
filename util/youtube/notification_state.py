@@ -11,7 +11,7 @@ from util.youtube_subscriptions import (
     update_youtube_subscription_state,
     update_youtube_upload_notification_state,
 )
-from util.youtube_websub import YouTubeVideoLiveStatus
+from util.youtube.websub import YouTubeVideoLiveStatus
 
 
 DEFAULT_PENDING_CHECK_INTERVAL_SECONDS = 300

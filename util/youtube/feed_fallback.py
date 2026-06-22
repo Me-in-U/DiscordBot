@@ -12,7 +12,7 @@ from util.youtube_subscriptions import (
     YouTubeSubscription,
     get_youtube_subscription,
 )
-from util.youtube_websub import (
+from util.youtube.websub import (
     YouTubeAtomEntry,
     build_youtube_feed_topic_url,
     parse_youtube_atom_entries,

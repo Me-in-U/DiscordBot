@@ -1,9 +1,9 @@
 import unittest
 from pathlib import Path
 
-import util.youtube_websub as youtube_websub
+import util.youtube.websub as youtube_websub
 
-from util.youtube_websub import (
+from util.youtube.websub import (
     YouTubeVideoStatus,
     build_youtube_websub_callback_url,
     build_youtube_websub_request_data,
@@ -38,12 +38,18 @@ SAMPLE_ATOM = """<?xml version="1.0" encoding="UTF-8"?>
 """
 
 LOOP_PATH = Path("cogs/loop.py")
+YOUTUBE_WEBSUB_PATH = Path("util/youtube/websub.py")
+LEGACY_YOUTUBE_WEBSUB_PATH = Path("util/youtube_websub.py")
 VIDEO_CANDIDATE_RUNNER_PATH = Path("util/youtube/video_candidate_runner.py")
 VIDEO_STATUS_PATH = Path("util/youtube/video_status.py")
 COMMUNITY_POLLING_PATH = Path("util/youtube/community_polling.py")
 
 
 class YouTubeWebSubTests(unittest.TestCase):
+    def test_youtube_websub_lives_under_youtube_package(self):
+        self.assertTrue(YOUTUBE_WEBSUB_PATH.exists())
+        self.assertFalse(LEGACY_YOUTUBE_WEBSUB_PATH.exists())
+
     def test_parses_youtube_atom_entry(self):
         entries = parse_youtube_atom_entries(SAMPLE_ATOM)
 

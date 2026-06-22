@@ -7,7 +7,7 @@ from util.youtube_subscriptions import (
     YouTubeSubscription,
     find_youtube_subscriptions_by_channel_id,
 )
-from util.youtube_websub import parse_youtube_atom_entries
+from util.youtube.websub import parse_youtube_atom_entries
 
 
 FindSubscriptions = Callable[[str], Awaitable[Sequence[YouTubeSubscription]]]

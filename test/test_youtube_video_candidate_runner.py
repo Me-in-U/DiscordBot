@@ -3,7 +3,7 @@ from pathlib import Path
 
 from util.youtube.video_candidate_runner import process_youtube_video_candidate
 from util.youtube_subscriptions import YouTubeSubscription
-from util.youtube_websub import YouTubeVideoLiveStatus, YouTubeVideoStatus
+from util.youtube.websub import YouTubeVideoLiveStatus, YouTubeVideoStatus
 
 
 YOUTUBE_VIDEO_CANDIDATE_RUNNER_PATH = Path(

@@ -6,7 +6,7 @@ import discord
 
 from util.channel_settings import get_channel
 from util.youtube_subscriptions import YouTubeSubscription
-from util.youtube_websub import (
+from util.youtube.websub import (
     YouTubeVideoLiveStatus,
     build_youtube_live_notification_message,
     build_youtube_upload_notification_message,

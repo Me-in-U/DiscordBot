@@ -13,7 +13,7 @@ from util.youtube.notification_state import (
     touch_pending_youtube_video_check,
 )
 from util.youtube_subscriptions import YouTubeSubscription
-from util.youtube_websub import YouTubeVideoLiveStatus, YouTubeVideoStatus
+from util.youtube.websub import YouTubeVideoLiveStatus, YouTubeVideoStatus
 
 
 YOUTUBE_NOTIFICATION_STATE_PATH = Path("util/youtube/notification_state.py")

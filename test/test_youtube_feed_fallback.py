@@ -11,7 +11,7 @@ from util.youtube.feed_fallback import (
     should_poll_youtube_feed,
 )
 from util.youtube_subscriptions import YouTubeSubscription
-from util.youtube_websub import YouTubeAtomEntry
+from util.youtube.websub import YouTubeAtomEntry
 
 
 YOUTUBE_FEED_FALLBACK_PATH = Path("util/youtube/feed_fallback.py")

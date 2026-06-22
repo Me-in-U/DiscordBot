@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from typing import Any, Protocol
 
-from util.youtube_websub import YouTubeVideoLiveStatus, classify_video_item
+from util.youtube.websub import YouTubeVideoLiveStatus, classify_video_item
 
 
 class YouTubeVideosListRequest(Protocol):

@@ -11,7 +11,7 @@ from util.youtube_subscriptions import (
     list_all_youtube_subscriptions,
     update_youtube_websub_state,
 )
-from util.youtube_websub import (
+from util.youtube.websub import (
     YOUTUBE_HUB_URL,
     build_youtube_websub_callback_url,
     build_youtube_websub_request_data,

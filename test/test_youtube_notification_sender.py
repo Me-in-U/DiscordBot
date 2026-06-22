@@ -7,7 +7,7 @@ from util.youtube.notification_sender import (
     send_youtube_upload_notification,
 )
 from util.youtube_subscriptions import YouTubeSubscription
-from util.youtube_websub import YouTubeVideoLiveStatus, YouTubeVideoStatus
+from util.youtube.websub import YouTubeVideoLiveStatus, YouTubeVideoStatus
 
 
 YOUTUBE_NOTIFICATION_SENDER_PATH = Path("util/youtube/notification_sender.py")

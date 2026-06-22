@@ -2,7 +2,7 @@ import unittest
 from pathlib import Path
 
 from util.youtube.video_status import fetch_youtube_video_status
-from util.youtube_websub import YouTubeVideoStatus
+from util.youtube.websub import YouTubeVideoStatus
 
 
 YOUTUBE_VIDEO_STATUS_PATH = Path("util/youtube/video_status.py")

@@ -4,7 +4,7 @@ import sys
 from dotenv import load_dotenv
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
-from util.youtube_websub import (
+from util.youtube.websub import (
     build_youtube_feed_topic_url,
     classify_video_item,
 )
