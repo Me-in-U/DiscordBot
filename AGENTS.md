@@ -6,12 +6,12 @@ This repository hosts a modular Discord bot built with `discord.py`. Follow thes
 
 - **Entry Point**: `bot.py` initializes `commands.Bot`, loads extensions dynamically from `cogs/`, and manages global state (`USER_MESSAGES`, `PARTY_LIST`).
 - **Cogs System**:
-  - **Standard Cogs**: Single `.py` files in `cogs/` (e.g., `music.py`, `summarize.py`).
-  - **Package Cogs**: Directories in `cogs/` with `__init__.py` (e.g., `cogs/gambling/`). The `__init__.py` must expose the main Cog class.
+  - **Standard Cogs**: Single `.py` files in `cogs/` (e.g., `summarize.py`).
+  - **Package Cogs**: Directories in `cogs/` with `__init__.py` (e.g., `cogs/music/`, `cogs/gambling/`). The `__init__.py` must expose the main Cog class.
 - **Voice & AI**:
   - **Voice Chat**: `cogs/voice_chat.py` handles voice processing using `discord.ext.voice_recv` (audio sink), `whisper` (STT), and `pyttsx3` (TTS).
   - **Spring AI**: `func/spring_ai.py` communicates with an external Spring backend for chat capabilities.
-  - **YouTube**: `func/youtube_summary.py` and `cogs/music.py` use `yt-dlp` for media handling.
+  - **YouTube**: `func/youtube_summary.py` and `cogs/music/__init__.py` use `yt-dlp` for media handling.
 
 ## Data & Configuration
 

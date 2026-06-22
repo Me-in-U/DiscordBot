@@ -213,6 +213,10 @@ class DbMigrationContractTests(unittest.IsolatedAsyncioTestCase):
 
 
 class CogLoadPolicyTests(unittest.IsolatedAsyncioTestCase):
+    def test_music_cog_uses_package_layout(self):
+        self.assertFalse(Path("cogs/music.py").exists())
+        self.assertTrue(Path("cogs/music/__init__.py").exists())
+
     async def test_optional_cog_failure_does_not_stop_remaining_loads(self):
         import bot
 

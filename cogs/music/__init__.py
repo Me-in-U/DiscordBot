@@ -1,4 +1,4 @@
-# cogs/music.py
+# cogs/music/__init__.py
 from __future__ import annotations
 
 import asyncio

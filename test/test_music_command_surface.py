@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 
 
-MUSIC_PATH = Path("cogs/music.py")
+MUSIC_PATH = Path("cogs/music/__init__.py")
 MUSIC_LOGGING_PATH = Path("util/music/logging.py")
 MUSIC_VIEWS_PATH = Path("util/music/views.py")
 MUSIC_STATE_PATH = Path("util/music/state.py")
