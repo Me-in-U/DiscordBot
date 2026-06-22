@@ -9,7 +9,7 @@ from util.youtube.websub_subscription import (
     request_youtube_websub_subscription,
     unsubscribe_youtube_websub_subscription,
 )
-from util.youtube_subscriptions import YouTubeSubscription
+from util.youtube.subscriptions import YouTubeSubscription
 
 
 YOUTUBE_WEBSUB_SUBSCRIPTION_PATH = Path("util/youtube/websub_subscription.py")

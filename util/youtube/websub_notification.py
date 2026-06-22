@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable, Sequence
 from typing import Any
 
-from util.youtube_subscriptions import (
+from util.youtube.subscriptions import (
     YouTubeSubscription,
     find_youtube_subscriptions_by_channel_id,
 )

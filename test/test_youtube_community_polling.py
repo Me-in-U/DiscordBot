@@ -5,7 +5,7 @@ import aiohttp
 
 from util.youtube.community import YouTubeCommunityPost
 from util.youtube.community_polling import poll_youtube_community_posts
-from util.youtube_subscriptions import YouTubeSubscription
+from util.youtube.subscriptions import YouTubeSubscription
 
 
 YOUTUBE_COMMUNITY_POLLING_PATH = Path("util/youtube/community_polling.py")

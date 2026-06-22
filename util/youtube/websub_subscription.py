@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 
 import aiohttp
 
-from util.youtube_subscriptions import (
+from util.youtube.subscriptions import (
     YouTubeSubscription,
     get_youtube_subscription,
     list_all_youtube_subscriptions,

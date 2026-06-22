@@ -2,7 +2,7 @@ import unittest
 from pathlib import Path
 
 from util.youtube.websub_notification import handle_youtube_websub_notification
-from util.youtube_subscriptions import YouTubeSubscription
+from util.youtube.subscriptions import YouTubeSubscription
 
 
 YOUTUBE_WEBSUB_NOTIFICATION_PATH = Path("util/youtube/websub_notification.py")

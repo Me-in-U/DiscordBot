@@ -5,7 +5,7 @@ from typing import Protocol
 import aiohttp
 
 from util.youtube.notification_state import touch_pending_youtube_video_check
-from util.youtube_subscriptions import (
+from util.youtube.subscriptions import (
     YouTubeSubscription,
     get_youtube_subscription,
     list_all_youtube_subscriptions,

@@ -14,7 +14,7 @@ from util.youtube.community import (
 from util.youtube.community_notification import (
     process_youtube_community_notifications,
 )
-from util.youtube_subscriptions import YouTubeSubscription
+from util.youtube.subscriptions import YouTubeSubscription
 
 
 LogWarning = Callable[..., None]

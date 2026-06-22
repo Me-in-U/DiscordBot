@@ -6,7 +6,7 @@ from util.youtube.notification_sender import (
     send_youtube_live_notification,
     send_youtube_upload_notification,
 )
-from util.youtube_subscriptions import YouTubeSubscription
+from util.youtube.subscriptions import YouTubeSubscription
 from util.youtube.websub import YouTubeVideoLiveStatus, YouTubeVideoStatus
 
 

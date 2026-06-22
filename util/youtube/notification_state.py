@@ -6,7 +6,7 @@ from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from util.youtube_subscriptions import (
+from util.youtube.subscriptions import (
     YouTubeSubscription,
     update_youtube_subscription_state,
     update_youtube_upload_notification_state,

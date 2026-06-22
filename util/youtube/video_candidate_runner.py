@@ -5,7 +5,7 @@ from typing import Protocol
 
 from googleapiclient.errors import HttpError
 
-from util.youtube_subscriptions import YouTubeSubscription
+from util.youtube.subscriptions import YouTubeSubscription
 from util.youtube.websub import (
     YouTubeVideoLiveStatus,
     YouTubeVideoStatus,

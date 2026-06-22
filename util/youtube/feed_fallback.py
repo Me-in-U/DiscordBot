@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 
 import aiohttp
 
-from util.youtube_subscriptions import (
+from util.youtube.subscriptions import (
     YouTubeSubscription,
     get_youtube_subscription,
 )

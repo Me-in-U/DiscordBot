@@ -2,10 +2,12 @@ import ast
 import unittest
 from pathlib import Path
 
-from util.youtube_subscriptions import YouTubeSubscription, row_to_subscription
+from util.youtube.subscriptions import YouTubeSubscription, row_to_subscription
 
 
 YOUTUBE_SUBSCRIPTION_COG_PATH = Path("cogs/youtube_subscriptions.py")
+YOUTUBE_SUBSCRIPTIONS_HELPER_PATH = Path("util/youtube/subscriptions.py")
+LEGACY_YOUTUBE_SUBSCRIPTIONS_HELPER_PATH = Path("util/youtube_subscriptions.py")
 LEGACY_YOUTUBE_CHECKER_COG_PATH = Path("cogs/YoutubeCheckerCog.py")
 CUSTOM_HELP_PATH = Path("cogs/custom_help.py")
 DB_PATH = Path("util/db.py")
@@ -26,6 +28,10 @@ def _is_ephemeral_true(keyword: ast.keyword) -> bool:
 
 
 class YouTubeSubscriptionTests(unittest.TestCase):
+    def test_youtube_subscriptions_helper_lives_under_youtube_package(self):
+        self.assertTrue(YOUTUBE_SUBSCRIPTIONS_HELPER_PATH.exists())
+        self.assertFalse(LEGACY_YOUTUBE_SUBSCRIPTIONS_HELPER_PATH.exists())
+
     def test_add_subscription_description_mentions_search_terms(self):
         tree = ast.parse(
             YOUTUBE_SUBSCRIPTION_COG_PATH.read_text(encoding="utf-8"),
@@ -192,7 +198,7 @@ class YouTubeSubscriptionTests(unittest.TestCase):
         self.assertIn("notified_community_post_ids", db_source)
 
     def test_alert_settings_can_leave_only_community_enabled(self):
-        source = Path("util/youtube_subscriptions.py").read_text(encoding="utf-8")
+        source = YOUTUBE_SUBSCRIPTIONS_HELPER_PATH.read_text(encoding="utf-8")
 
         self.assertIn("community_alert_enabled", source)
         self.assertIn(

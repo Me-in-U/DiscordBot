@@ -5,7 +5,7 @@ from collections.abc import Awaitable, Callable
 import discord
 
 from util.channel_settings import get_channel
-from util.youtube_subscriptions import YouTubeSubscription
+from util.youtube.subscriptions import YouTubeSubscription
 from util.youtube.websub import (
     YouTubeVideoLiveStatus,
     build_youtube_live_notification_message,

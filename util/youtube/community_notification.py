@@ -15,7 +15,7 @@ from util.youtube.notification_sender import (
     GetChannelSetting,
     resolve_youtube_notification_target,
 )
-from util.youtube_subscriptions import (
+from util.youtube.subscriptions import (
     YouTubeSubscription,
     update_youtube_community_notification_state,
 )

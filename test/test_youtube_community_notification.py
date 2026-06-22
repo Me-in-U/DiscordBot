@@ -7,7 +7,7 @@ from util.youtube.community_notification import (
     process_youtube_community_notifications,
     send_youtube_community_notification,
 )
-from util.youtube_subscriptions import YouTubeSubscription
+from util.youtube.subscriptions import YouTubeSubscription
 
 
 YOUTUBE_COMMUNITY_NOTIFICATION_PATH = Path("util/youtube/community_notification.py")

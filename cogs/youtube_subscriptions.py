@@ -8,7 +8,7 @@ from discord.ext import commands
 
 from util.channel_settings import get_channel
 from util.youtube.channel_resolver import resolve_youtube_channel_input
-from util.youtube_subscriptions import (
+from util.youtube.subscriptions import (
     YouTubeSubscription,
     create_youtube_subscription,
     delete_youtube_subscription,

@@ -26,7 +26,7 @@ from util.youtube.notification_sender import (
     send_youtube_live_notification,
     send_youtube_upload_notification,
 )
-from util.youtube_subscriptions import (
+from util.youtube.subscriptions import (
     YouTubeSubscription,
     delete_legacy_youtube_live_checker_setting,
 )

@@ -10,7 +10,7 @@ from util.youtube.feed_fallback import (
     remember_youtube_feed_entry_seen,
     should_poll_youtube_feed,
 )
-from util.youtube_subscriptions import YouTubeSubscription
+from util.youtube.subscriptions import YouTubeSubscription
 from util.youtube.websub import YouTubeAtomEntry
 
 

@@ -7,7 +7,7 @@ from util.youtube.loop_runner import (
     run_youtube_community_posts,
     run_youtube_notification_candidates,
 )
-from util.youtube_subscriptions import YouTubeSubscription
+from util.youtube.subscriptions import YouTubeSubscription
 
 
 YOUTUBE_LOOP_RUNNER_PATH = Path("util/youtube/loop_runner.py")

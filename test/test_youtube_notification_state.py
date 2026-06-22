@@ -12,7 +12,7 @@ from util.youtube.notification_state import (
     should_check_pending_youtube_video,
     touch_pending_youtube_video_check,
 )
-from util.youtube_subscriptions import YouTubeSubscription
+from util.youtube.subscriptions import YouTubeSubscription
 from util.youtube.websub import YouTubeVideoLiveStatus, YouTubeVideoStatus
 
 
