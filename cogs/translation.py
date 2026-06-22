@@ -7,7 +7,7 @@ from discord.ext import commands
 
 from api.chatGPT import custom_prompt_model
 from common.openai_prompt import build_prompt, build_single_image_content
-from util.message_context import (
+from util.message.context import (
     build_message_action_target,
     build_message_select_label,
     build_recent_message_option,

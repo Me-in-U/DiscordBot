@@ -1,16 +1,21 @@
 import os
 import unittest
+from pathlib import Path
 
 os.environ.setdefault("OPENAI_KEY", "test-key")
 os.environ.setdefault("GOOGLE_API_KEY", "test-key")
 
-from util.message_context import (
+from util.message.context import (
     build_surrounding_message_context,
     build_message_action_target,
     build_message_select_label,
     build_recent_message_option,
     extract_first_youtube_link,
 )
+
+
+MESSAGE_CONTEXT_PATH = Path("util/message/context.py")
+LEGACY_MESSAGE_CONTEXT_PATH = Path("util/message_context.py")
 
 
 class DummyAttachment:
@@ -76,6 +81,10 @@ class DummyChannel:
 
 
 class MessageContextActionTests(unittest.TestCase):
+    def test_message_context_lives_under_message_package(self):
+        self.assertTrue(MESSAGE_CONTEXT_PATH.exists())
+        self.assertFalse(LEGACY_MESSAGE_CONTEXT_PATH.exists())
+
     def test_builds_target_from_text_and_image_attachment(self):
         target = build_message_action_target(
             DummyMessage(

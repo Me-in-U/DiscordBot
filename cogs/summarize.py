@@ -18,7 +18,7 @@ from func.youtube_summary import (
 )
 from util.get_recent_messages import get_recent_messages
 from util.logging_utils import log_user_error
-from util.message_context import extract_first_youtube_link
+from util.message.context import extract_first_youtube_link
 
 
 DISCORD_SUMMARY_PROMPT_ID = "pmpt_68ac08b66784819785d89655eaaaa7470bc0cc5deddb37d9"
