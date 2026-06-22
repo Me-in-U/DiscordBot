@@ -1,11 +1,16 @@
 import unittest
+from pathlib import Path
 
-from util.youtube_channel_resolver import (
+from util.youtube.channel_resolver import (
     YouTubeChannelMetadata,
     extract_youtube_channel_handle,
     is_youtube_channel_id,
     resolve_youtube_channel_input,
 )
+
+
+YOUTUBE_CHANNEL_RESOLVER_PATH = Path("util/youtube/channel_resolver.py")
+LEGACY_YOUTUBE_CHANNEL_RESOLVER_PATH = Path("util/youtube_channel_resolver.py")
 
 
 class FakeYouTubeClient:
@@ -35,6 +40,10 @@ class FakeYouTubeClient:
 
 
 class YouTubeChannelResolverTests(unittest.IsolatedAsyncioTestCase):
+    def test_youtube_channel_resolver_lives_under_youtube_package(self):
+        self.assertTrue(YOUTUBE_CHANNEL_RESOLVER_PATH.exists())
+        self.assertFalse(LEGACY_YOUTUBE_CHANNEL_RESOLVER_PATH.exists())
+
     def test_detects_channel_id(self):
         self.assertTrue(is_youtube_channel_id("UC1234567890123456789012"))
         self.assertFalse(is_youtube_channel_id("@ChimChakMan_Data"))
