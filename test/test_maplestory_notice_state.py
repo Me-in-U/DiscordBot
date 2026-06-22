@@ -1,13 +1,22 @@
 import unittest
+from pathlib import Path
 
 from util.maplestory_events import MapleStoryNotice
-from util.maplestory_notice_state import (
+from util.maplestory.notice_state import (
     find_maplestory_notice_updates,
     maplestory_notice_state_from_notices,
 )
 
 
+MAPLESTORY_NOTICE_STATE_PATH = Path("util/maplestory/notice_state.py")
+LEGACY_MAPLESTORY_NOTICE_STATE_PATH = Path("util/maplestory_notice_state.py")
+
+
 class MapleStoryNoticeStateTests(unittest.TestCase):
+    def test_maplestory_notice_state_lives_under_maplestory_package(self):
+        self.assertTrue(MAPLESTORY_NOTICE_STATE_PATH.exists())
+        self.assertFalse(LEGACY_MAPLESTORY_NOTICE_STATE_PATH.exists())
+
     def test_notice_state_helpers_are_available_from_state_module(self):
         original = MapleStoryNotice(
             notice_id="149371",

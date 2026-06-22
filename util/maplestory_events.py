@@ -9,7 +9,7 @@ from typing import Any
 import aiohttp
 import discord
 
-from util.maplestory_notice_state import (
+from util.maplestory.notice_state import (
     MAPLESTORY_NOTICE_STATE_LIMIT,
     build_maplestory_notice_fingerprint,
     find_maplestory_notice_updates,
