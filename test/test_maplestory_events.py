@@ -23,6 +23,8 @@ from util.maplestory.events import (
 
 MAPLESTORY_EVENTS_PATH = Path("util/maplestory/events.py")
 LEGACY_MAPLESTORY_EVENTS_PATH = Path("util/maplestory_events.py")
+MAPLESTORY_COG_PATH = Path("cogs/maplestory/__init__.py")
+LEGACY_MAPLESTORY_COG_PATH = Path("cogs/maplestory.py")
 
 
 LIST_HTML = """
@@ -110,6 +112,10 @@ class MapleStoryEventTests(unittest.TestCase):
     def test_maplestory_events_lives_under_maplestory_package(self):
         self.assertTrue(MAPLESTORY_EVENTS_PATH.exists())
         self.assertFalse(LEGACY_MAPLESTORY_EVENTS_PATH.exists())
+
+    def test_maplestory_cog_uses_package_layout(self):
+        self.assertTrue(MAPLESTORY_COG_PATH.exists())
+        self.assertFalse(LEGACY_MAPLESTORY_COG_PATH.exists())
 
     def test_parses_sunday_maple_url_from_ongoing_event_list(self):
         event_url = parse_maplestory_ongoing_event_url(LIST_HTML)
@@ -243,7 +249,7 @@ class MapleStoryEventTests(unittest.TestCase):
         self.assertEqual(channel.sent_messages, [])
 
     def test_slash_command_and_help_mention_sunday_maple(self):
-        cog_source = Path("cogs/maplestory.py").read_text(encoding="utf-8")
+        cog_source = MAPLESTORY_COG_PATH.read_text(encoding="utf-8")
         help_source = Path("cogs/custom_help.py").read_text(encoding="utf-8")
 
         self.assertIn('name="썬데이메이플"', cog_source)
@@ -350,7 +356,7 @@ class MapleStoryEventTests(unittest.TestCase):
         self.assertEqual(embed.fields[0].value, "[공지]")
 
     def test_slash_command_help_and_loop_include_maplestory_notice_subscription(self):
-        cog_source = Path("cogs/maplestory.py").read_text(encoding="utf-8")
+        cog_source = MAPLESTORY_COG_PATH.read_text(encoding="utf-8")
         help_source = Path("cogs/custom_help.py").read_text(encoding="utf-8")
         loop_source = Path("cogs/loop.py").read_text(encoding="utf-8")
 
