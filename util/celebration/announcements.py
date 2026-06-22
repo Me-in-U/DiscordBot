@@ -7,7 +7,7 @@ from datetime import date, datetime, time, timedelta, timezone
 import discord
 import holidays
 
-from util.channel_settings import get_channel, get_channels_by_purpose
+from util.guild.channel_settings import get_channel, get_channels_by_purpose
 from util.db import execute_query, fetch_all, fetch_one
 
 SEOUL_TZ = timezone(timedelta(hours=9))

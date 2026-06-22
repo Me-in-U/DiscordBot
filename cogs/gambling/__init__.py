@@ -13,7 +13,7 @@ from .lottery import start_daily_lottery as run_lottery_event
 from .ranking import show_ranking as show_guild_ranking
 from .rps import run_rock_paper_scissors
 from .services import balance_service
-from util.channel_settings import get_channel
+from util.guild.channel_settings import get_channel
 from .sprinkle_command import run_sprinkle
 from .slot_machine import run_slot_machine
 from .blackjack import run_blackjack

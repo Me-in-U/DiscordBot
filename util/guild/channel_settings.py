@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import Dict, Optional
-from .db import execute_query, fetch_one, fetch_all
+from util.db import execute_query, fetch_all, fetch_one
 
 
 async def get_channel(guild_id: int, purpose: str) -> Optional[int]:

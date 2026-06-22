@@ -104,7 +104,7 @@ async def refresh_maplestory_notice_messages(
     *,
     fetch_notices: FetchNotices | None = None,
 ) -> list[MapleStoryNoticeUpdateResult]:
-    from util.channel_settings import get_channels_by_purpose
+    from util.guild.channel_settings import get_channels_by_purpose
 
     channels = await get_channels_by_purpose(MAPLESTORY_NOTICE_CHANNEL_TYPE)
     if not channels:

@@ -4,7 +4,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from util.channel_settings import get_settings_for_guild, set_channel
+from util.guild.channel_settings import get_settings_for_guild, set_channel
 
 PURPOSE_CHOICES = {
     "celebration": "기념일",

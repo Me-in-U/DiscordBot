@@ -4,7 +4,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from util.channel_settings import set_channel
+from util.guild.channel_settings import set_channel
 from util.maplestory.events import (
     MAPLESTORY_NOTICE_CHANNEL_TYPE,
     build_sunday_maple_event_embeds,

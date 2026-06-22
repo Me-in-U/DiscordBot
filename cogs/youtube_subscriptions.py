@@ -6,7 +6,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from util.channel_settings import get_channel
+from util.guild.channel_settings import get_channel
 from util.youtube.channel_resolver import resolve_youtube_channel_input
 from util.youtube.subscriptions import (
     YouTubeSubscription,

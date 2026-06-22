@@ -11,7 +11,7 @@ import discord
 from discord import Embed, Message, Object, TextChannel, app_commands
 from discord.ext import commands
 from discord.utils import utcnow
-from util.channel_settings import get_channel
+from util.guild.channel_settings import get_channel
 from util.music.logging import (
     build_music_play_command_debug_message,
     make_music_debug_logger,

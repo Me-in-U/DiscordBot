@@ -17,7 +17,7 @@ This repository hosts a modular Discord bot built with `discord.py`. Follow thes
 
 - **Guild Configuration** (`channel_settings` table):
   - Stores guild-specific channel IDs (e.g., gambling channel, celebration channel).
-  - Managed via `util/channel_settings.py`. Always use this utility to read/write channel settings.
+- Managed via `util/guild/channel_settings.py`. Always use this utility to read/write channel settings.
 - **Feature State** (`setting_data` table):
   - Stores persistent state for specific features like Riot API data (`dailySoloRank`) or YouTube checkers.
   - Access through DB helpers in `util/db.py`, not local JSON files.
