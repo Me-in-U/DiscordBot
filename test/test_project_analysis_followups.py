@@ -206,7 +206,7 @@ class DbMigrationContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_status_api_exposes_schema_version_in_health_payload(self):
-        source = Path("cogs/status_api.py").read_text(encoding="utf-8")
+        source = Path("cogs/status_api/__init__.py").read_text(encoding="utf-8")
 
         self.assertIn("DB_SCHEMA_VERSION", source)
         self.assertIn('"schema_version"', source)
