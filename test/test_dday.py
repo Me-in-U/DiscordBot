@@ -5,6 +5,8 @@ from pathlib import Path
 
 
 DDAY_COG_PATH = Path("cogs/dday.py")
+DDAY_UTIL_PATH = Path("util/celebration/dday.py")
+LEGACY_DDAY_UTIL_PATH = Path("util/dday.py")
 DB_PATH = Path("util/db.py")
 LOOP_PATH = Path("cogs/loop.py")
 
@@ -39,8 +41,12 @@ def _rename_mapping(decorator: ast.expr) -> dict[str, str]:
 
 
 class DdayUtilityTests(unittest.TestCase):
+    def test_dday_helper_lives_under_celebration_package(self):
+        self.assertTrue(DDAY_UTIL_PATH.exists())
+        self.assertFalse(LEGACY_DDAY_UTIL_PATH.exists())
+
     def test_parse_dday_date_accepts_supported_formats(self):
-        from util.dday import parse_dday_date
+        from util.celebration.dday import parse_dday_date
 
         self.assertEqual(parse_dday_date("2026-06-04"), date(2026, 6, 4))
         self.assertEqual(parse_dday_date("2026.06.04"), date(2026, 6, 4))
@@ -48,7 +54,7 @@ class DdayUtilityTests(unittest.TestCase):
         self.assertEqual(parse_dday_date("20260604"), date(2026, 6, 4))
 
     def test_parse_dday_date_rejects_invalid_dates(self):
-        from util.dday import parse_dday_date
+        from util.celebration.dday import parse_dday_date
 
         for value in ("2026-02-30", "26-06-04", "2026년6월4일", ""):
             with self.subTest(value=value):
@@ -56,7 +62,7 @@ class DdayUtilityTests(unittest.TestCase):
                     parse_dday_date(value)
 
     def test_calculate_dday_label_formats_today_future_and_past(self):
-        from util.dday import calculate_dday_label
+        from util.celebration.dday import calculate_dday_label
 
         today = date(2026, 6, 4)
 
@@ -65,7 +71,7 @@ class DdayUtilityTests(unittest.TestCase):
         self.assertEqual(calculate_dday_label(date(2026, 6, 1), today), "D+3")
 
     def test_filter_visible_dday_events_excludes_past_items_by_default(self):
-        from util.dday import DdayEvent, filter_visible_dday_events
+        from util.celebration.dday import DdayEvent, filter_visible_dday_events
 
         today = date(2026, 6, 4)
         events = [
@@ -82,7 +88,7 @@ class DdayUtilityTests(unittest.TestCase):
         self.assertEqual(visible_titles, ["오늘", "미래", "지난 유지"])
 
     def test_build_dday_list_embed_groups_events(self):
-        from util.dday import DdayEvent, build_dday_list_embed
+        from util.celebration.dday import DdayEvent, build_dday_list_embed
 
         today = date(2026, 6, 4)
         events = [
@@ -184,7 +190,7 @@ class DdaySchemaAndCommandTests(unittest.TestCase):
 class DdayDeleteViewTests(unittest.IsolatedAsyncioTestCase):
     async def test_delete_view_paginates_more_than_twenty_five_events(self):
         from cogs.dday import DdayDeleteView
-        from util.dday import DdayEvent
+        from util.celebration.dday import DdayEvent
 
         events = [
             DdayEvent(index, 10, f"이벤트 {index}", date(2026, 6, index), False, 100)
@@ -199,7 +205,7 @@ class DdayDeleteViewTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_delete_view_rejects_other_users(self):
         from cogs.dday import DdayDeleteView
-        from util.dday import DdayEvent
+        from util.celebration.dday import DdayEvent
 
         view = DdayDeleteView(
             requester_id=100,

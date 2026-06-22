@@ -14,8 +14,8 @@
 6. Top 5 리스크는 `music.py`, `youtube_summary.py`, `loop.py` 같은 대형 파일이 변경 위험을 키우는 점이다.
 7. 권장 처리 순서는 Jenkins 테스트 게이트, `on_ready` guard, YouTube temp workspace, 민감 로그 제거, 문서 최신화다.
 8. 현재 작업트리에서는 위 1-4번 리스크의 1차 보강과 대형 파일 일부 분리가 구현되었다.
-9. 현재 최신 검증은 `compileall` 통과, unittest 498개 통과다.
-10. 이번 패치로 celebration announcement helper가 `util/celebration/` 카테고리 패키지로 이동되었고, 기념일 util 카테고리 정리가 시작되었다.
+9. 현재 최신 검증은 `compileall` 통과, unittest 499개 통과다.
+10. 이번 패치로 DDAY helper가 `util/celebration/` 카테고리 패키지로 이동되었고, 기념일 util 카테고리 정리가 완료되었다.
 
 ## 기준선
 
@@ -31,7 +31,7 @@
 
 이 문서의 진단은 기준 커밋 `34aab00` 상태를 대상으로 한다. 이후 현재 작업트리에서는 아래 항목이 구현되었다.
 
-최신 검증 결과: `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` 498개 통과.
+최신 검증 결과: `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` 499개 통과.
 
 | 상태 | 항목 | 구현 근거 |
 | --- | --- | --- |
@@ -92,6 +92,7 @@
 | 완료 | Message context helper 패키지 이동 | `util/message_context.py`를 `util/message/context.py`로 이동하고, 해석/설명/번역/요약 Cog와 test import를 새 카테고리 패키지 경로로 통일했으며 root helper 제거를 경로 계약 테스트로 고정 |
 | 완료 | Recent messages helper 패키지 이동 | `util/get_recent_messages.py`를 `util/message/recent.py`로 이동하고, 질문/요약 Cog import를 새 카테고리 패키지 경로로 통일했으며 root helper 제거와 기본 포맷팅을 테스트로 고정 |
 | 완료 | Celebration announcement helper 패키지 이동 | `util/celebration.py`를 `util/celebration/announcements.py`로 이동하고, 수동 갱신/status API/DDAY/daily refresh/MapleStory import와 test patch 경로를 새 카테고리 패키지로 통일했으며 root helper 제거를 경로 계약 테스트로 고정 |
+| 완료 | DDAY helper 패키지 이동 | `util/dday.py`를 `util/celebration/dday.py`로 이동하고, DDAY Cog/daily refresh/test import를 새 카테고리 패키지 경로로 통일했으며 root helper 제거를 경로 계약 테스트로 고정 |
 | 완료 | 운영 리소스 문서화 | `docs/jenkins-deploy.md`에 `mem_limit: 500m`, YouTube 요약/STT 리소스 주의, health check 점검 절차 추가 |
 | 완료 | music queue helper 1차 분리 | `util/music/queue.py`로 queue 조작/preview/URL enqueue/search entry enqueue helper 이동, `test/test_music_queue_helpers.py`에서 music package import 경로 검증 |
 | 완료 | music queue display helper 분리 | `util/music/queue.py`로 대기열 embed title/description 조립 이동, `_track_title` import 회귀 테스트 추가 |
@@ -197,7 +198,7 @@
 | 완료 | YouTube notification state helper 패키지 이동 | `util/youtube_notification_state.py`를 `util/youtube/notification_state.py`로 이동하고, `cogs.loop`/YouTube runner/test import를 새 카테고리 패키지 경로로 통일했으며 root helper 제거를 경로 계약 테스트로 고정 |
 | 완료 | YouTube video status helper 패키지 이동 | `util/youtube_video_status.py`를 `util/youtube/video_status.py`로 이동하고, `cogs.loop`/WebSub surface/test import를 새 카테고리 패키지 경로로 통일했으며 root helper 제거를 경로 계약 테스트로 고정 |
 
-이번 패치로 celebration announcement helper의 `util/celebration/` 패키지 이동이 완료되었다. root `util/music*.py`, root `util/youtube*.py`, root `util/maplestory*.py`, root loop helper는 더 이상 남지 않았다.
+이번 패치로 DDAY helper의 `util/celebration/` 패키지 이동이 완료되었다. root `util/music*.py`, root `util/youtube*.py`, root `util/maplestory*.py`, root loop helper, root celebration helper는 더 이상 남지 않았다.
 
 ## 현재 구조 요약
 
@@ -621,7 +622,7 @@
 | Docker Python | 기준 커밋 `Dockerfile.deps` -> `FROM python:3.12-slim`, 현재 작업트리 -> `FROM python:3.11-slim` | 로컬/운영 Python minor version 불일치가 해소됨 |
 | 테스트 기준선 | `python -m unittest discover -s test` -> 154개 통과 | 현재 회귀 테스트 기준 |
 | 컴파일 기준선 | `python -m compileall -q bot.py api cogs common func util test` 통과 | 문법/import 기본 검증 |
-| 작업트리 최신 검증 | `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` -> 498개 통과 | 구현 진행 후 회귀 확인 |
+| 작업트리 최신 검증 | `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` -> 499개 통과 | 구현 진행 후 회귀 확인 |
 | 파일 수 | PowerShell 파일 집계 -> Python 파일 96개 | 분석 규모 |
 | 대형 파일 기준선 | 기준 커밋 line count: `music.py` 2663, `youtube_summary.py` 1072, `loop.py` 954, `maplestory_events.py` 875 | 분리 우선 후보였던 초기 상태 |
 | 대형 파일 현재 | Python read line count: `music.py` 1706, `youtube_summary.py` 191, `loop.py` 309, `util/maplestory/events.py` 251 | 분리 진행 후에도 `music.py`는 command/action facade 축소 여지가 큼 |
@@ -681,6 +682,7 @@
 | Message context helper 패키지 이동 | `util/message/context.py` 188줄, message context 대상 테스트 12개 통과 | 메시지 action target, 선택 label, 주변 메시지 context, YouTube 링크 추출 helper를 message 카테고리 패키지로 이동하고, root `util/message_context.py` 제거를 테스트로 고정 |
 | Recent messages helper 패키지 이동 | `util/message/recent.py` 76줄, recent messages 대상 테스트 2개 통과 | USER_MESSAGES 최근 대화 포맷팅 helper를 message 카테고리 패키지로 이동하고, root `util/get_recent_messages.py` 제거와 이미지 payload 포맷을 테스트로 고정 |
 | Celebration announcement helper 패키지 이동 | `util/celebration/announcements.py` 281줄, celebration helper 대상 테스트 2개 통과 | 기념일 메시지 생성, 대상 채널 조회, 기존 메시지 갱신/전송 orchestration을 celebration 카테고리 패키지로 이동하고, root `util/celebration.py` 제거를 테스트로 고정 |
+| DDAY helper 패키지 이동 | `util/celebration/dday.py` 353줄, DDAY 대상 테스트 12개 통과 | DDAY 날짜 parsing, 목록 embed, 삭제 UI, refresh orchestration을 celebration 카테고리 패키지로 이동하고, root `util/dday.py` 제거를 테스트로 고정 |
 | env 추적 상태 | `git check-ignore -v .env .env.deploy`; `git ls-files .env .env.deploy` empty | 비밀 파일은 ignore 상태 |
 | Jenkins 테스트 단계 | 기준 커밋 `Jenkinsfile`에는 checkout/validate/deploy만 있었고, 현재 작업트리에는 `Verify` stage 추가 | 배포 전 compile/unittest gate 부재가 해소됨 |
 | 설치 안내 불일치 | README는 `requirements.txt`, AGENTS는 `pip_install.txt` 안내 | 문서 정합성 개선 필요 |

@@ -6,7 +6,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from util.dday import (
+from util.celebration.dday import (
     DdayEvent,
     build_dday_list_embed,
     calculate_dday_label,
