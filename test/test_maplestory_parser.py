@@ -79,7 +79,7 @@ class MapleStoryParserModuleTests(unittest.TestCase):
     def test_legacy_maplestory_events_reexports_parser_entrypoints(self):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", DeprecationWarning)
-            import util.maplestory_events as maplestory_events
+            import util.maplestory.events as maplestory_events
         import util.maplestory.parser as maplestory_parser
 
         self.assertIs(maplestory_events.MapleStoryEvent, maplestory_parser.MapleStoryEvent)

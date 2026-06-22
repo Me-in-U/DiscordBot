@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable, Sequence
 from typing import Protocol
 
-from util.maplestory_events import refresh_maplestory_notice_messages
+from util.maplestory.events import refresh_maplestory_notice_messages
 
 
 class MapleStoryNoticeLoopResult(Protocol):

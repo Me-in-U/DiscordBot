@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from util.maplestory_events import (
+from util.maplestory.events import (
     MapleStoryEvent,
     MapleStoryNotice,
     SUNDAY_MAPLE_EVENT_TITLE,
@@ -19,6 +19,10 @@ from util.maplestory_events import (
     parse_maplestory_ongoing_event_url,
     refresh_sunday_maple_messages,
 )
+
+
+MAPLESTORY_EVENTS_PATH = Path("util/maplestory/events.py")
+LEGACY_MAPLESTORY_EVENTS_PATH = Path("util/maplestory_events.py")
 
 
 LIST_HTML = """
@@ -103,6 +107,10 @@ NOTICE_DETAIL_HTML = """
 
 
 class MapleStoryEventTests(unittest.TestCase):
+    def test_maplestory_events_lives_under_maplestory_package(self):
+        self.assertTrue(MAPLESTORY_EVENTS_PATH.exists())
+        self.assertFalse(LEGACY_MAPLESTORY_EVENTS_PATH.exists())
+
     def test_parses_sunday_maple_url_from_ongoing_event_list(self):
         event_url = parse_maplestory_ongoing_event_url(LIST_HTML)
 

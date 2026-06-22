@@ -14,8 +14,8 @@
 6. Top 5 리스크는 `music.py`, `youtube_summary.py`, `loop.py` 같은 대형 파일이 변경 위험을 키우는 점이다.
 7. 권장 처리 순서는 Jenkins 테스트 게이트, `on_ready` guard, YouTube temp workspace, 민감 로그 제거, 문서 최신화다.
 8. 현재 작업트리에서는 위 1-4번 리스크의 1차 보강과 대형 파일 일부 분리가 구현되었다.
-9. 현재 최신 검증은 `compileall` 통과, unittest 487개 통과다.
-10. 이번 패치로 MapleStory notice loop runner가 `util/maplestory/` 카테고리 패키지로 이동되었고, MapleStory util 카테고리 정리가 이어졌다.
+9. 현재 최신 검증은 `compileall` 통과, unittest 488개 통과다.
+10. 이번 패치로 MapleStory events orchestration이 `util/maplestory/` 카테고리 패키지로 이동되었고, root MapleStory util 정리가 완료되었다.
 
 ## 기준선
 
@@ -31,7 +31,7 @@
 
 이 문서의 진단은 기준 커밋 `34aab00` 상태를 대상으로 한다. 이후 현재 작업트리에서는 아래 항목이 구현되었다.
 
-최신 검증 결과: `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` 487개 통과.
+최신 검증 결과: `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` 488개 통과.
 
 | 상태 | 항목 | 구현 근거 |
 | --- | --- | --- |
@@ -176,19 +176,20 @@
 | 완료 | music search/meta extraction helper 분리 | `util/music/extractor.py`로 keyword search 결과 URL 결정과 yt-dlp entries selection 이동 |
 | 완료 | music source facade 분리 | `util/music/source.py`로 `YTDLSource`, yt-dlp fallback, FFmpeg 옵션 조립, HTML stream fallback 호출 이동 |
 | 완료 | lint/type checker 배치 결정 | 이번 보강 배치에서는 새 의존성 없이 `compileall`/unittest/`git diff --check`/AST 정책 테스트를 gate로 유지, `ruff`/type checker는 별도 후속 작업으로 분리 |
-| 완료 | MapleStory notice state 1차 분리 | `util/maplestory/notice_state.py`로 공지 fingerprint/state/update 계산 이동, 기존 `util.maplestory_events` 공개 import 호환 유지 |
-| 완료 | MapleStory notice state helper 패키지 이동 | `util/maplestory_notice_state.py`를 `util/maplestory/notice_state.py`로 이동하고, `util.maplestory_events`/test import를 새 카테고리 패키지 경로로 통일했으며 root helper 제거를 경로 계약 테스트로 고정 |
-| 완료 | MapleStory parser 1차 분리 | `util/maplestory/parser.py`로 이벤트/공지 HTML parser와 dataclass 이동, 기존 `util.maplestory_events` 공개 import 호환 유지 |
+| 완료 | MapleStory notice state 1차 분리 | `util/maplestory/notice_state.py`로 공지 fingerprint/state/update 계산 이동, `util.maplestory.events` facade 공개 import 유지 |
+| 완료 | MapleStory notice state helper 패키지 이동 | `util/maplestory_notice_state.py`를 `util/maplestory/notice_state.py`로 이동하고, `util.maplestory.events`/test import를 새 카테고리 패키지 경로로 통일했으며 root helper 제거를 경로 계약 테스트로 고정 |
+| 완료 | MapleStory parser 1차 분리 | `util/maplestory/parser.py`로 이벤트/공지 HTML parser와 dataclass 이동, `util.maplestory.events` facade 공개 import 유지 |
 | 완료 | MapleStory parser helper 패키지 이동 | `util/maplestory_parser.py`를 `util/maplestory/parser.py`로 이동하고, MapleStory fetcher/sender/events/test import를 새 카테고리 패키지 경로로 통일했으며 root helper 제거를 경로 계약 테스트로 고정 |
-| 완료 | MapleStory fetcher 1차 분리 | `util/maplestory/fetcher.py`로 이벤트/공지 HTML fetch와 상세 hydrate 이동, 기존 `util.maplestory_events` 공개 import 호환 유지 |
-| 완료 | MapleStory fetcher helper 패키지 이동 | `util/maplestory_fetcher.py`를 `util/maplestory/fetcher.py`로 이동하고, `util.maplestory_events`/test import와 logger 검증을 새 카테고리 패키지 경로로 통일했으며 root helper 제거를 경로 계약 테스트로 고정 |
-| 완료 | MapleStory sender 1차 분리 | `util/maplestory/sender.py`로 embed/message build, 채널 resolve, Discord send helper 이동, 기존 `util.maplestory_events` 공개 import 호환 유지 |
-| 완료 | MapleStory sender helper 패키지 이동 | `util/maplestory_sender.py`를 `util/maplestory/sender.py`로 이동하고, `util.maplestory_events`/test import를 새 카테고리 패키지 경로로 통일했으며 root helper 제거를 경로 계약 테스트로 고정 |
+| 완료 | MapleStory fetcher 1차 분리 | `util/maplestory/fetcher.py`로 이벤트/공지 HTML fetch와 상세 hydrate 이동, `util.maplestory.events` facade 공개 import 유지 |
+| 완료 | MapleStory fetcher helper 패키지 이동 | `util/maplestory_fetcher.py`를 `util/maplestory/fetcher.py`로 이동하고, `util.maplestory.events`/test import와 logger 검증을 새 카테고리 패키지 경로로 통일했으며 root helper 제거를 경로 계약 테스트로 고정 |
+| 완료 | MapleStory sender 1차 분리 | `util/maplestory/sender.py`로 embed/message build, 채널 resolve, Discord send helper 이동, `util.maplestory.events` facade 공개 import 유지 |
+| 완료 | MapleStory sender helper 패키지 이동 | `util/maplestory_sender.py`를 `util/maplestory/sender.py`로 이동하고, `util.maplestory.events`/test import를 새 카테고리 패키지 경로로 통일했으며 root helper 제거를 경로 계약 테스트로 고정 |
+| 완료 | MapleStory events orchestration 패키지 이동 | `util/maplestory_events.py`를 `util/maplestory/events.py`로 이동하고, `cogs.maplestory`/daily refresh/notice loop/test import를 새 카테고리 패키지 경로로 통일했으며 root helper 제거를 경로 계약 테스트로 고정 |
 | 완료 | YouTube notification state 1차 분리 | `util/youtube/notification_state.py`로 notified ID 정규화, YouTube datetime 파싱, pending live 재검사 판단 이동 |
 | 완료 | YouTube notification state helper 패키지 이동 | `util/youtube_notification_state.py`를 `util/youtube/notification_state.py`로 이동하고, `cogs.loop`/YouTube runner/test import를 새 카테고리 패키지 경로로 통일했으며 root helper 제거를 경로 계약 테스트로 고정 |
 | 완료 | YouTube video status helper 패키지 이동 | `util/youtube_video_status.py`를 `util/youtube/video_status.py`로 이동하고, `cogs.loop`/WebSub surface/test import를 새 카테고리 패키지 경로로 통일했으며 root helper 제거를 경로 계약 테스트로 고정 |
 
-이번 패치로 MapleStory notice loop runner의 `util/maplestory/` 패키지 이동이 완료되었다. root `util/music*.py` helper와 root `util/youtube*.py` helper는 더 이상 남지 않았고, MapleStory root util helper의 카테고리 이동이 계속 진행 중이다.
+이번 패치로 MapleStory events orchestration의 `util/maplestory/` 패키지 이동이 완료되었다. root `util/music*.py`, root `util/youtube*.py`, root `util/maplestory*.py` helper는 더 이상 남지 않았다.
 
 ## 현재 구조 요약
 
@@ -612,10 +613,10 @@
 | Docker Python | 기준 커밋 `Dockerfile.deps` -> `FROM python:3.12-slim`, 현재 작업트리 -> `FROM python:3.11-slim` | 로컬/운영 Python minor version 불일치가 해소됨 |
 | 테스트 기준선 | `python -m unittest discover -s test` -> 154개 통과 | 현재 회귀 테스트 기준 |
 | 컴파일 기준선 | `python -m compileall -q bot.py api cogs common func util test` 통과 | 문법/import 기본 검증 |
-| 작업트리 최신 검증 | `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` -> 487개 통과 | 구현 진행 후 회귀 확인 |
+| 작업트리 최신 검증 | `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` -> 488개 통과 | 구현 진행 후 회귀 확인 |
 | 파일 수 | PowerShell 파일 집계 -> Python 파일 96개 | 분석 규모 |
 | 대형 파일 기준선 | 기준 커밋 line count: `music.py` 2663, `youtube_summary.py` 1072, `loop.py` 954, `maplestory_events.py` 875 | 분리 우선 후보였던 초기 상태 |
-| 대형 파일 현재 | Python read line count: `music.py` 1706, `youtube_summary.py` 191, `loop.py` 309, `maplestory_events.py` 251 | 분리 진행 후에도 `music.py`는 command/action facade 축소 여지가 큼 |
+| 대형 파일 현재 | Python read line count: `music.py` 1706, `youtube_summary.py` 191, `loop.py` 309, `util/maplestory/events.py` 251 | 분리 진행 후에도 `music.py`는 command/action facade 축소 여지가 큼 |
 | 대형 파일 1차 분리 | `util/music/queue.py` 추출, `test/test_music_queue_helpers.py` 19개 통과 | `music.py` queue 책임 일부 축소 |
 | music queue display/enqueue/action/metadata/metadata-extraction/metadata-runner helper 분리 | `util/music/queue.py` 213줄, `util/music/queue_actions.py` 83줄, `cogs/music.py` 현재 1706줄, queue helper/action 대상 테스트 28개 통과, command surface 대상 테스트 50개 통과, `test_music*.py` 222개 통과 | 대기열 표시 title/description 조립, `_play` active-voice URL enqueue, `_play_from_search_pick` 검색 선택 URL 보정과 active-voice queue enqueue, yt-dlp metadata dict의 QueuedTrack 반영, metadata 추출 예외 회수/dict 결과 필터링, executor scheduling과 QueuedTrack 반영 sequence, 삭제/비우기/이동/셔플 사용자 응답 문구를 command handler에서 분리하고 `_track_title` import 누락과 queue action/metadata 계약을 테스트로 고정했으며, root `util/music_queue.py`와 `util/music_queue_actions.py` 제거를 테스트로 고정 |
 | music playback/skip/seek/URL action helper 분리 | `util/music/playback_actions.py` 125줄, `cogs/music.py` 현재 1706줄, playback action 대상 테스트 18개 통과, `test_music*.py` 220개 통과 | 일시정지/다시재생/정지/반복/스킵/구간 이동에 더해 URL 재생의 active voice 대기열 추가/즉시 준비 판단, play_url_now replacement 상태 전이, queue track 반환, 사용자 응답 문구를 command handler에서 분리하고, root `util/music_playback_actions.py` 제거를 테스트로 고정 |
@@ -646,7 +647,8 @@
 | MapleStory 상태 분리 | `util/maplestory/notice_state.py` 103줄, state 대상 테스트 2개 통과 | 공지 상태 계산을 parser/fetch/send orchestration에서 분리하고, root `util/maplestory_notice_state.py` 제거를 테스트로 고정 |
 | MapleStory parser 분리 | `util/maplestory/parser.py` 394줄, parser 대상 테스트 3개 및 기존 MapleStory events 테스트 15개 통과 | 이벤트/공지 HTML parser와 dataclass를 fetch/send orchestration에서 분리하고, root `util/maplestory_parser.py` 제거를 테스트로 고정 |
 | MapleStory fetcher 분리 | `util/maplestory/fetcher.py` 91줄, fetcher 대상 테스트 5개 통과 | 이벤트/공지 HTML fetch와 상세 hydrate를 send orchestration에서 분리하고, root `util/maplestory_fetcher.py` 제거를 테스트로 고정 |
-| MapleStory sender 분리 | `util/maplestory/sender.py` 336줄, `util/maplestory_events.py` 현재 251줄, sender 대상 테스트 6개 통과 | embed/message build, 채널 resolve, Discord send helper를 refresh/state orchestration에서 분리하고, root `util/maplestory_sender.py` 제거를 테스트로 고정 |
+| MapleStory sender 분리 | `util/maplestory/sender.py` 336줄, `util/maplestory/events.py` 현재 251줄, sender 대상 테스트 6개 통과 | embed/message build, 채널 resolve, Discord send helper를 refresh/state orchestration에서 분리하고, root `util/maplestory_sender.py` 제거를 테스트로 고정 |
+| MapleStory events orchestration 패키지 이동 | `util/maplestory/events.py` 251줄, MapleStory events 대상 테스트 16개 및 MapleStory 전체 대상 테스트 35개 통과 | refresh/state orchestration facade를 MapleStory 카테고리 패키지로 이동하고, root `util/maplestory_events.py` 제거를 테스트로 고정 |
 | YouTube notification 상태 분리 | `util/youtube/notification_state.py` 168줄, YouTube notification state 대상 테스트 10개 통과 | pending live 재검사, notified ID 계산, live/upload/pending 상태 저장, pending check timestamp 갱신을 loop orchestration에서 분리하고, root `util/youtube_notification_state.py` 제거를 테스트로 고정 |
 | Loop task lifecycle 분리 | `util/loop_task_lifecycle.py` 31줄 추출, lifecycle 대상 테스트 3개 통과 | 반복 task start/cancel 정책을 Cog 본문에서 분리하고 unload cleanup 추가 |
 | YouTube subscriptions helper 패키지 이동 | `util/youtube/subscriptions.py` 403줄, subscription 대상 테스트 11개 통과 | YouTube subscription row mapping, list/find/create/delete/update, alert state persistence, legacy live checker setting cleanup helper를 YouTube 카테고리 패키지로 이동하고, root `util/youtube_subscriptions.py` 제거를 테스트로 고정 |

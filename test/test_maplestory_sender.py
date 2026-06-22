@@ -146,7 +146,7 @@ class MapleStorySenderCompatibilityTests(unittest.TestCase):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", DeprecationWarning)
             import util.maplestory.sender as maplestory_sender
-            import util.maplestory_events as maplestory_events
+            import util.maplestory.events as maplestory_events
 
         self.assertIs(
             maplestory_events.SundayMapleUpdateResult,

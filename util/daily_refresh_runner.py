@@ -7,7 +7,7 @@ from typing import Any, Protocol
 
 from util.celebration import refresh_celebration_messages
 from util.dday import refresh_dday_messages
-from util.maplestory_events import refresh_sunday_maple_messages
+from util.maplestory.events import refresh_sunday_maple_messages
 
 
 class RefreshResult(Protocol):

@@ -113,7 +113,7 @@ class MapleStoryFetcherCompatibilityTests(unittest.TestCase):
         import util.maplestory.fetcher as maplestory_fetcher
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", DeprecationWarning)
-            import util.maplestory_events as maplestory_events
+            import util.maplestory.events as maplestory_events
 
         self.assertIs(
             maplestory_events.fetch_sunday_maple_event,

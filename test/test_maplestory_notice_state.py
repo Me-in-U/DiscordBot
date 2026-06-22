@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 
-from util.maplestory_events import MapleStoryNotice
+from util.maplestory.events import MapleStoryNotice
 from util.maplestory.notice_state import (
     find_maplestory_notice_updates,
     maplestory_notice_state_from_notices,
