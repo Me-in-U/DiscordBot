@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import random
 from typing import List, Tuple
 
@@ -8,6 +9,9 @@ import discord
 
 from .constants import BET_AMOUNT_REQUIRED, SEOUL_TZ
 from .services import BalanceService
+
+
+logger = logging.getLogger(__name__)
 
 
 async def run_ladder_game(
@@ -174,8 +178,8 @@ class LadderView(discord.ui.View):
             self.finished = True
             try:
                 await interaction.response.edit_message(embed=embed, view=self)
-            except Exception:
-                pass
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                logger.debug("사다리 결과 메시지 수정 실패", exc_info=True)
 
     async def on_timeout(self) -> None:
         for child in self.children:

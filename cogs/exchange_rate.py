@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from io import BytesIO
 from typing import Final
 
@@ -17,6 +18,10 @@ from api.exchange_rate import (
     SUPPORTED_CURRENCIES,
     get_exchange_quote,
 )
+from util.logging_utils import user_error_message
+
+
+logger = logging.getLogger(__name__)
 
 matplotlib.use("Agg")
 
@@ -287,9 +292,10 @@ class ExchangeRateCommands(commands.Cog):
         except ExchangeRateError as exc:
             await interaction.followup.send(f"❌ {exc}", ephemeral=True)
             return
-        except Exception as exc:
+        except Exception:
+            logger.exception("환율 정보 조회 실패")
             await interaction.followup.send(
-                f"⚠️ 환율 정보를 가져오는 중 오류가 발생했습니다: {exc}",
+                user_error_message("환율 정보 조회"),
                 ephemeral=True,
             )
             return

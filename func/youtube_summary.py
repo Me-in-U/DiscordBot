@@ -2,6 +2,7 @@
 import asyncio
 import glob
 import json
+import logging
 import os
 import re
 from dataclasses import dataclass, field
@@ -13,8 +14,10 @@ import subprocess
 from dotenv import load_dotenv
 from faster_whisper import WhisperModel
 from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 from pytube.exceptions import VideoUnavailable
 from yt_dlp import YoutubeDL
+from yt_dlp.utils import DownloadError
 from util.env_utils import getenv_clean, sanitize_environment
 
 # request_gpt.py 에 정의된 함수들 임포트
@@ -24,6 +27,7 @@ from common.openai_prompt import build_prompt
 load_dotenv()
 sanitize_environment()
 GOOGLE_API_KEY = getenv_clean("GOOGLE_API_KEY")
+logger = logging.getLogger(__name__)
 
 if not GOOGLE_API_KEY:
     raise EnvironmentError("GOOGLE_API_KEY 환경 변수가 설정되지 않았습니다.")
@@ -423,8 +427,8 @@ async def get_youtube_link_title(url: str, link_kind: str) -> str:
         video_id = extract_video_id(url)
         title = await asyncio.to_thread(_fetch_youtube_video_title, video_id)
         return title or _build_youtube_link_title_fallback(url, link_kind)
-    except Exception as e:
-        print(f"YouTube 제목 조회 실패: {url} ({e})")
+    except (aiohttp.ClientError, asyncio.TimeoutError, HttpError, ValueError):
+        logger.warning("YouTube 제목 조회 실패: url=%s", url, exc_info=True)
         return _build_youtube_link_title_fallback(url, link_kind)
 
 
@@ -513,8 +517,8 @@ def fetch_youtube_comments(video_id: str, max_comments: int = 10) -> list:
         for item in response.get("items", []):
             comment = item["snippet"]["topLevelComment"]["snippet"]["textDisplay"]
             comments.append(comment)
-    except Exception as e:
-        print(f"댓글 가져오기 오류: {e}")
+    except (HttpError, KeyError, TypeError, ValueError):
+        logger.warning("YouTube 댓글 가져오기 오류: video_id=%s", video_id, exc_info=True)
     return comments
 
 
@@ -566,13 +570,15 @@ class YouTubeSummaryView(discord.ui.View):
                 view=None,
             )
 
-        except Exception as e:
+        except Exception:
+            logger.exception("YouTube 요약 처리 실패: url=%s", self.youtube_url)
             # 에러 시 메시지 갱신
             button.disabled = True
             button.label = "오류!"
             button.style = discord.ButtonStyle.danger
             await self.original_message.edit(
-                content=f"오류가 발생했습니다: {e}", view=self
+                content="⚠️ 유튜브 요약 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
+                view=self,
             )
 
         self.stop()
@@ -592,9 +598,9 @@ class YouTubeSummaryView(discord.ui.View):
             await asyncio.sleep(60)
             try:
                 await self.original_message.delete()
-            except discord.NotFound:
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
                 # 이미 다른 곳에서 삭제되었을 수도 있으므로 무시
-                pass
+                logger.debug("유튜브 요약 안내 메시지 삭제 실패", exc_info=True)
 
 
 async def check_youtube_link(message):
@@ -688,8 +694,8 @@ def download_youtube_subtitles(
                 try:
                     os.remove(fp)
                     print(f"기존 파일 삭제: {fp}")
-                except Exception:
-                    pass
+                except OSError:
+                    logger.debug("기존 자막 파일 삭제 실패: path=%s", fp, exc_info=True)
 
     def download_subtitles(lang: str, auto: bool = False) -> str:
         """지정된 언어로 자막 다운로드"""
@@ -732,8 +738,13 @@ def download_youtube_subtitles(
                     f"{lang} {'자동생성 ' if auto else ''}자막 파일이 생성되지 않았습니다."
                 )
 
-        except Exception as e:
-            print(f"{lang} {'자동생성 ' if auto else ''}자막 다운로드 중 오류: {e}")
+        except (DownloadError, OSError, ValueError):
+            logger.warning(
+                "%s %s자막 다운로드 중 오류",
+                lang,
+                "자동생성 " if auto else "",
+                exc_info=True,
+            )
         return ""
 
     # 한글 자막 우선 다운로드 시도
@@ -781,8 +792,8 @@ def read_subtitles_file(file_path: str) -> str:
 
         clean_text = remove_unnecessary_line_breaks("\n".join(clean_lines))
         return clean_text
-    except Exception as e:
-        print(f"자막 파일 읽기 중 오류가 발생했습니다: {e}")
+    except OSError:
+        logger.warning("자막 파일 읽기 중 오류가 발생했습니다: path=%s", file_path, exc_info=True)
         return ""
 
 
@@ -842,9 +853,9 @@ async def youtube_to_mp3(url: str) -> None:
             raise FileNotFoundError("youtube_audio.mp3 파일이 생성되지 않았습니다.")
 
     except VideoUnavailable:
-        print("해당 유튜브 영상을 다운로드할 수 없습니다.")
-    except Exception as e:
-        print(f"yt-dlp 다운로드/변환 실패, ffmpeg 직접 추출 시도: {e}")
+        logger.warning("해당 유튜브 영상을 다운로드할 수 없습니다: url=%s", url, exc_info=True)
+    except (DownloadError, OSError, ValueError):
+        logger.warning("yt-dlp 다운로드/변환 실패, ffmpeg 직접 추출 시도: url=%s", url, exc_info=True)
         try:
             # HTML 파싱으로 오디오 스트림 URL 얻기
             page_url = normalize_youtube_link(url)
@@ -882,8 +893,15 @@ async def youtube_to_mp3(url: str) -> None:
                 raise FileNotFoundError(
                     "youtube_audio.mp3 파일이 생성되지 않았습니다.(ffmpeg)"
                 )
-        except Exception as e2:
-            print(f"ffmpeg 직접 추출도 실패: {e2}")
+        except (
+            aiohttp.ClientError,
+            asyncio.TimeoutError,
+            OSError,
+            RuntimeError,
+            subprocess.SubprocessError,
+            ValueError,
+        ):
+            logger.exception("ffmpeg 직접 추출도 실패: url=%s", url)
             raise
 
 
@@ -1038,8 +1056,11 @@ async def process_youtube_video_link(url: str) -> str:
     finally:
         # MP3 파일 정리
         if os.path.exists(mp3_path):
-            os.remove(mp3_path)
-            print("MP3 파일 삭제 완료.")
+            try:
+                os.remove(mp3_path)
+                print("MP3 파일 삭제 완료.")
+            except OSError:
+                logger.warning("MP3 파일 삭제 실패: path=%s", mp3_path, exc_info=True)
 
     return summary_text.strip()
 

@@ -165,6 +165,23 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         self.assertIn("IDLE_DISCONNECT_SECONDS = 300", text)
         self.assertIn("idle_disconnect_task: Optional[asyncio.Task] = None", text)
 
+    def test_background_task_spawn_logs_task_exceptions(self):
+        tree = ast.parse(MUSIC_PATH.read_text(encoding="utf-8"))
+        spawn_node = next(
+            (
+                node
+                for node in ast.walk(tree)
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+                and node.name == "_spawn_bg"
+            ),
+            None,
+        )
+        self.assertIsNotNone(spawn_node, "_spawn_bg function not found")
+        source = ast.get_source_segment(MUSIC_PATH.read_text(encoding="utf-8"), spawn_node)
+
+        self.assertIn("task.exception()", source)
+        self.assertIn("logger.exception", source)
+
     def test_music_favorites_are_backed_by_dedicated_table(self):
         db_source = DB_PATH.read_text(encoding="utf-8")
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import logging
 import re
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
@@ -13,6 +14,9 @@ from urllib.parse import urljoin
 
 import aiohttp
 import discord
+
+
+logger = logging.getLogger(__name__)
 
 
 MAPLESTORY_BASE_URL = "https://maplestory.nexon.com"
@@ -168,8 +172,12 @@ async def fetch_latest_maplestory_notices(
                     notice,
                 )
             )
-        except Exception as exc:
-            print(f"메이플스토리 공지 상세 조회 실패: notice={notice.notice_id} error={exc}")
+        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError):
+            logger.warning(
+                "메이플스토리 공지 상세 조회 실패: notice=%s",
+                notice.notice_id,
+                exc_info=True,
+            )
             hydrated.append(notice)
     return hydrated
 
@@ -250,7 +258,8 @@ async def refresh_sunday_maple_messages(
     fetch = fetch_event or fetch_sunday_maple_event
     try:
         event = await fetch()
-    except Exception as exc:
+    except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as exc:
+        logger.warning("썬데이메이플 이벤트 조회 실패", exc_info=True)
         return [
             SundayMapleUpdateResult(
                 guild_id=current_guild_id,
@@ -297,7 +306,13 @@ async def refresh_sunday_maple_messages(
                     action="sent",
                 )
             )
-        except Exception as exc:
+        except (discord.Forbidden, discord.HTTPException) as exc:
+            logger.warning(
+                "썬데이메이플 공지 전송 실패: guild=%s channel=%s",
+                current_guild_id,
+                getattr(channel, "id", None),
+                exc_info=True,
+            )
             results.append(
                 SundayMapleUpdateResult(
                     guild_id=current_guild_id,
@@ -324,7 +339,8 @@ async def refresh_maplestory_notice_messages(
     fetch = fetch_notices or fetch_latest_maplestory_notices
     try:
         notices = await fetch()
-    except Exception as exc:
+    except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as exc:
+        logger.warning("메이플스토리 공지 목록 조회 실패", exc_info=True)
         return [
             MapleStoryNoticeUpdateResult(
                 guild_id=guild_id,
@@ -390,7 +406,14 @@ async def refresh_maplestory_notice_messages(
         for notice in reversed(updates):
             try:
                 await target.send(build_maplestory_notice_message(notice))
-            except Exception as exc:
+            except (discord.Forbidden, discord.HTTPException) as exc:
+                logger.warning(
+                    "메이플스토리 공지 전송 실패: guild=%s channel=%s notice=%s",
+                    guild_id,
+                    channel_id,
+                    notice.notice_id,
+                    exc_info=True,
+                )
                 results.append(
                     MapleStoryNoticeUpdateResult(
                         guild_id=guild_id,

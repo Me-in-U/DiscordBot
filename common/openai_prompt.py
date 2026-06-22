@@ -1,8 +1,17 @@
+from __future__ import annotations
+
+from typing import Any, TypeAlias
+
+
+PromptPayload: TypeAlias = dict[str, Any]
+OpenAIInputContent: TypeAlias = list[dict[str, Any]]
+
+
 def build_prompt(
     prompt_id: str,
     prompt_version: str,
-    variables: dict | None = None,
-) -> dict:
+    variables: dict[str, Any] | None = None,
+) -> PromptPayload:
     prompt = {
         "id": prompt_id,
         "version": prompt_version,
@@ -12,7 +21,7 @@ def build_prompt(
     return prompt
 
 
-def build_single_image_content(image_url: str | None):
+def build_single_image_content(image_url: str | None) -> OpenAIInputContent | None:
     if not image_url:
         return None
 

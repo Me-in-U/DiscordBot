@@ -136,6 +136,20 @@ class ExplanationTargetTests(unittest.IsolatedAsyncioTestCase):
             "**요약**\n설정 혼선입니다.\n\n**설명**\nDB_HOST 값이 맞지 않습니다.",
         )
 
+    async def test_explain_target_returns_safe_message_on_model_failure(self):
+        def fake_custom_prompt_model(**kwargs):
+            raise RuntimeError("secret-token")
+
+        with patch("cogs.explanation.custom_prompt_model", fake_custom_prompt_model):
+            with self.assertLogs("cogs.explanation", level="ERROR") as captured:
+                result = await explain_target("DB_HOST가 docker로 잡혀야 한다", None)
+
+        self.assertIn("설명", result)
+        self.assertIn("오류가 발생했습니다", result)
+        self.assertNotIn("secret-token", result)
+        self.assertNotIn("Error:", result)
+        self.assertIn("secret-token", "\n".join(captured.output))
+
 
 if __name__ == "__main__":
     unittest.main()

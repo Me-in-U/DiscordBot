@@ -1,8 +1,13 @@
+import logging
+import asyncio
+
 import discord
 from discord import app_commands
 from discord.ext import commands
 from discord.ui import View, button
-import asyncio
+
+
+logger = logging.getLogger(__name__)
 
 
 class JoinView(View):
@@ -250,19 +255,20 @@ class Party(commands.Cog):
 
         try:
             await interaction.user.send(f"'{category.name}' 파티를 해제합니다...")
-        except Exception:
-            pass
+        except (discord.Forbidden, discord.HTTPException):
+            logger.debug("파티 해제 DM 전송 실패", exc_info=True)
 
         for channel in category.channels:
             try:
                 await channel.delete()
-            except Exception as e:
-                print(f"채널 {channel.name} 삭제 중 오류: {e}")
+            except (discord.Forbidden, discord.HTTPException):
+                logger.warning("파티 채널 삭제 실패: channel=%s", channel.name, exc_info=True)
         try:
             await category.delete()
-        except Exception as e:
+        except (discord.Forbidden, discord.HTTPException):
+            logger.exception("파티 카테고리 삭제 실패: category=%s", category.name)
             await interaction.response.send_message(
-                f"카테고리 삭제 중 오류가 발생했습니다: {e}"
+                "⚠️ 파티 카테고리 삭제 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
             )
             return
 
@@ -275,8 +281,8 @@ class Party(commands.Cog):
 
         try:
             await interaction.user.send("파티가 성공적으로 해제되었습니다.")
-        except Exception:
-            pass
+        except (discord.Forbidden, discord.HTTPException):
+            logger.debug("파티 해제 완료 DM 전송 실패", exc_info=True)
 
     @app_commands.command(name="파티참가", description="파티에 참가합니다.")
     @app_commands.describe(파티명="참가할 파티 이름을 입력하세요.")
@@ -382,9 +388,11 @@ class Party(commands.Cog):
             await category.set_permissions(interaction.user, overwrite=None)
             for ch in category.channels:
                 await ch.set_permissions(interaction.user, overwrite=None)
-        except Exception as e:
+        except (discord.Forbidden, discord.HTTPException):
+            logger.exception("파티 권한 해제 실패: category=%s", category.name)
             return await interaction.response.send_message(
-                f"권한 해제 중 오류가 발생했습니다: {e}", ephemeral=True
+                "⚠️ 파티 권한 해제 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
+                ephemeral=True,
             )
 
         # 3) 성공 안내

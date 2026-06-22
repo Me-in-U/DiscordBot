@@ -1,4 +1,10 @@
 from dataclasses import dataclass
+import logging
+
+import discord
+
+
+logger = logging.getLogger(__name__)
 
 
 IMAGE_EXTENSIONS = {
@@ -166,7 +172,8 @@ async def build_surrounding_message_context(
             following_messages.append(context_message)
             if len(following_messages) >= limit:
                 break
-    except Exception:
+    except (discord.Forbidden, discord.HTTPException):
+        logger.debug("주변 메시지 컨텍스트 조회 실패", exc_info=True)
         return SurroundingMessageContext()
 
     return SurroundingMessageContext(

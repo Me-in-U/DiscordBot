@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from dataclasses import replace
 from datetime import datetime, timedelta, time, timezone
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
@@ -9,7 +10,6 @@ from discord.ext import commands, tasks
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-from api.riot import get_rank_data
 from bot import (
     SONPANNO_GUILD_ID,
     SEOUL_TZ,
@@ -62,6 +62,7 @@ YOUTUBE_PENDING_EARLY_WINDOW = timedelta(minutes=15)
 YOUTUBE_PENDING_EXPIRE_WINDOW = timedelta(hours=24)
 YOUTUBE_FEED_FALLBACK_INTERVAL_SECONDS = 300
 YOUTUBE_FEED_FALLBACK_MAX_ENTRIES = 5
+logger = logging.getLogger(__name__)
 
 
 class LoopTasks(commands.Cog):
@@ -185,8 +186,8 @@ class LoopTasks(commands.Cog):
             query = "SELECT user_id, count FROM counter_1557"
             rows = await fetch_all(query)
             data = {row["user_id"]: row["count"] for row in rows}
-        except Exception as e:
-            print(f"1557Counter DB 로드 중 오류 발생: {e}")
+        except Exception:
+            logger.exception("1557Counter DB 로드 중 오류 발생")
             data = {}
 
         if not data:
@@ -419,10 +420,11 @@ class LoopTasks(commands.Cog):
 
         try:
             entries = await self._fetch_youtube_feed_entries(session, subscription)
-        except Exception as e:
-            print(
-                "YouTube Atom feed 처리 오류: "
-                f"channel={subscription.channel_id} error={e}"
+        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError):
+            logger.warning(
+                "YouTube Atom feed 처리 오류: channel=%s",
+                subscription.channel_id,
+                exc_info=True,
             )
             return subscription
 
@@ -648,8 +650,8 @@ class LoopTasks(commands.Cog):
     ) -> str:
         try:
             status = await self._fetch_youtube_video_status(video_id)
-        except HttpError as e:
-            print(f"YouTube videos.list 에러: {e}")
+        except HttpError:
+            logger.exception("YouTube videos.list 에러: video_id=%s", video_id)
             return "error"
 
         if status is None:
@@ -718,10 +720,11 @@ class LoopTasks(commands.Cog):
                 subscription.channel_id,
                 limit=10,
             )
-        except Exception as e:
-            print(
-                "YouTube 커뮤니티 게시물 조회 실패: "
-                f"channel={subscription.channel_id} error={e}"
+        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError):
+            logger.warning(
+                "YouTube 커뮤니티 게시물 조회 실패: channel=%s",
+                subscription.channel_id,
+                exc_info=True,
             )
             return subscription
 
@@ -870,8 +873,8 @@ class LoopTasks(commands.Cog):
                             break
                         subscription = refreshed
                         pending = dict(subscription.pending_videos)
-        except Exception as e:
-            print(f"YouTube 알림 후보 확인 오류: {e}")
+        except Exception:
+            logger.exception("YouTube 알림 후보 확인 오류")
 
     @tasks.loop(minutes=10)
     async def youtube_community_check(self):
@@ -882,8 +885,8 @@ class LoopTasks(commands.Cog):
                 if not subscription.community_alert_enabled:
                     continue
                 await self._poll_youtube_community_posts(subscription)
-        except Exception as e:
-            print(f"YouTube 커뮤니티 알림 확인 오류: {e}")
+        except Exception:
+            logger.exception("YouTube 커뮤니티 알림 확인 오류")
 
     @tasks.loop(minutes=3)
     async def maplestory_notice_check(self):
@@ -904,8 +907,8 @@ class LoopTasks(commands.Cog):
                 )
             if sent_count:
                 print(f"메이플스토리 공지 알림 {sent_count}건 전송 완료")
-        except Exception as e:
-            print(f"메이플스토리 공지 확인 오류: {e}")
+        except Exception:
+            logger.exception("메이플스토리 공지 확인 오류")
 
     @tasks.loop(hours=12)
     async def youtube_websub_renewal(self):
@@ -914,8 +917,8 @@ class LoopTasks(commands.Cog):
             subscribed = await self.ensure_youtube_websub_subscription()
             if subscribed:
                 print("YouTube WebSub 구독 갱신 요청 완료")
-        except Exception as e:
-            print(f"YouTube WebSub 구독 갱신 오류: {e}")
+        except Exception:
+            logger.exception("YouTube WebSub 구독 갱신 오류")
 
     @youtube_notification_check.before_loop
     async def before_youtube_notification_check(self):

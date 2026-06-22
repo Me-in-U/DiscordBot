@@ -1,6 +1,10 @@
+from __future__ import annotations
+
 import asyncio
+import logging
 import os
 from datetime import datetime, timedelta, timezone
+from typing import Any
 
 import discord
 from discord.ext import commands
@@ -11,8 +15,16 @@ from func.youtube_summary import check_youtube_link
 from util.get_recent_messages import get_recent_messages
 from util.db import create_tables, upsert_guild, upsert_user
 from util.env_utils import getenv_clean, sanitize_environment
+from util.logging_utils import configure_logging
+
+configure_logging()
+logger = logging.getLogger(__name__)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MessagePart = dict[str, str | None]
+StoredMessage = dict[str, Any]
+UserMessages = dict[int, dict[str, list[StoredMessage]]]
+PartyList = dict[int, list[discord.CategoryChannel]]
 
 # Client 설정, 변수
 intents = discord.Intents.default()
@@ -21,8 +33,8 @@ intents.members = True
 intents.voice_states = True
 DISCORD_CLIENT = commands.Bot(command_prefix="/", intents=intents)
 DISCORD_CLIENT.remove_command("help")
-DISCORD_CLIENT.USER_MESSAGES = {}  # 길드별 -> 유저별 -> 메시지 리스트
-DISCORD_CLIENT.PARTY_LIST = {}
+DISCORD_CLIENT.USER_MESSAGES: UserMessages = {}  # 길드별 -> 유저별 -> 메시지 리스트
+DISCORD_CLIENT.PARTY_LIST: PartyList = {}
 
 # 환경 변수를 .env 파일에서 로딩
 load_dotenv()
@@ -36,7 +48,7 @@ SEOUL_TZ = timezone(timedelta(hours=9))  # 서울 시간대 설정 (UTC+9)
 
 
 # Cog 로드
-async def load_cogs():
+async def load_cogs() -> None:
     """Cog를 로드하고 초기 설정값을 전달합니다."""
     print("-------------------Cog 로드 시작-------------------")
     cogs_path = os.path.join(BASE_DIR, "cogs")
@@ -66,7 +78,7 @@ async def load_cogs():
     print("-------------------Cog 로드 완료-------------------\n")
 
 
-async def load_party_list():
+async def load_party_list() -> None:
     """
     모든 길드의 카테고리 중 이름이 '-파티'로 끝나는 카테고리들을 DISCORD_CLIENT.PARTY_LIST에 저장합니다.
     """
@@ -85,7 +97,7 @@ async def load_party_list():
     print("---------------------------------------------------\n")
 
 
-async def load_variable():
+async def load_variable() -> None:
     await asyncio.sleep(1)
     print()
     await load_recent_messages()
@@ -93,7 +105,7 @@ async def load_variable():
     print("[최근 메시지, 파티] 로드 완료\n")
 
 
-async def update_db_info():
+async def update_db_info() -> None:
     """Update guild and user info in DB on startup."""
     print("---------------- DB 정보 업데이트 시작 ----------------")
     try:
@@ -114,13 +126,13 @@ async def update_db_info():
                 await upsert_user(member.id, name)
 
         print("---------------- DB 정보 업데이트 완료 ----------------\n")
-    except Exception as e:
-        print(f"[DB 업데이트 오류] {e}")
+    except Exception:
+        logger.exception("[DB 업데이트 오류]")
 
 
 #! client.event
 @DISCORD_CLIENT.event
-async def on_ready():
+async def on_ready() -> None:
     """
     봇 실행 준비.
     """
@@ -140,8 +152,8 @@ async def on_ready():
         # 글로벌 동기화
         synced_global = await DISCORD_CLIENT.tree.sync()
         print(f"[GLOBAL SYNC] {len(synced_global)}개 명령어 동기화")
-    except Exception as e:
-        print(f"슬래시 커맨드 동기화 실패: {e}")
+    except Exception:
+        logger.exception("슬래시 커맨드 동기화 실패")
 
     # 로그인 완료 로그
     print(f"Logged on as {DISCORD_CLIENT.user}!")
@@ -152,30 +164,30 @@ async def on_ready():
 
 
 @DISCORD_CLIENT.event
-async def on_member_join(member):
+async def on_member_join(member: discord.Member) -> None:
     """
     새로운 멤버 입장 시 DB 업데이트
     """
     try:
         await upsert_user(member.id, member.display_name)
-    except Exception as e:
-        print(f"[on_member_join 오류] {e}")
+    except Exception:
+        logger.exception("[on_member_join 오류]")
 
 
 @DISCORD_CLIENT.event
-async def on_member_update(before, after):
+async def on_member_update(before: discord.Member, after: discord.Member) -> None:
     """
     멤버 정보 변경 시(닉네임 등) DB 업데이트
     """
     try:
         if before.display_name != after.display_name:
             await upsert_user(after.id, after.display_name)
-    except Exception as e:
-        print(f"[on_member_update 오류] {e}")
+    except Exception:
+        logger.exception("[on_member_update 오류]")
 
 
 @DISCORD_CLIENT.event
-async def on_message(message):
+async def on_message(message: discord.Message) -> None:
     """
     일반 메시지 처리
     """
@@ -272,9 +284,9 @@ async def on_message(message):
             and message.channel.id == SONPANNO_GUILD_ID
         ):
             await find1557(message)
-    except Exception as e:
+    except Exception:
         # 1557 처리 중 예외는 전체 흐름을 막지 않도록 로깅만 수행
-        print(f"[1557 처리 오류] {e}")
+        logger.exception("1557 처리 오류")
 
 
 #! client.command
@@ -282,7 +294,7 @@ async def on_message(message):
     aliases=["채팅"],
     help="입력된 채팅 내용을 봇이 대신 전송하고 원본 메시지를 삭제합니다.",
 )
-async def echo(ctx, *, text: str = None):
+async def echo(ctx: commands.Context, *, text: str | None = None) -> None:
     """
     채팅 내용 그대로 보내기 (사용자 메시지는 삭제)
     """
@@ -302,11 +314,11 @@ async def echo(ctx, *, text: str = None):
     aliases=["핑"],
     help="봇 레이턴시 측정",
 )
-async def ping(ctx):
+async def ping(ctx: commands.Context) -> None:
     await ctx.respond(f"퐁! Latency is {DISCORD_CLIENT.latency}")
 
 
-async def load_recent_messages(guild_id: int | None = None):
+async def load_recent_messages(guild_id: int | None = None) -> None:
     print("------------------- 메시지 로드 -------------------")
     today = datetime.now(SEOUL_TZ).date()
 
@@ -342,19 +354,19 @@ async def load_recent_messages(guild_id: int | None = None):
                         guild_map[author_key] = []
 
                     # content 파츠 구성
-                    parts = []
+                    parts: list[MessagePart] = []
                     text = (message.content or "").strip()
                     if text:
                         parts.append({"type": "input_text", "text": text})
 
-                    def _is_image(att):
+                    def _is_image(att: discord.Attachment) -> bool:
                         try:
                             if getattr(att, "content_type", None):
                                 return (
                                     str(att.content_type).lower().startswith("image/")
                                 )
                         except Exception:
-                            pass
+                            logger.debug("attachment content_type check failed", exc_info=True)
                         name = (getattr(att, "filename", "") or "").lower()
                         return name.endswith(
                             (".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp")
@@ -383,6 +395,12 @@ async def load_recent_messages(guild_id: int | None = None):
                     )
             except Exception:
                 # 채널 접근 권한 없음 등은 무시
+                logger.debug(
+                    "recent message load skipped channel: guild=%s channel=%s",
+                    guild.id,
+                    getattr(channel, "id", None),
+                    exc_info=True,
+                )
                 continue
 
         # 작성자별 오래된→최신 정렬
@@ -398,7 +416,7 @@ async def load_recent_messages(guild_id: int | None = None):
     print("---------------------------------------------------\n")
 
 
-async def main():
+async def main() -> None:
     async with DISCORD_CLIENT:
         await load_cogs()
         await DISCORD_CLIENT.start(DISCORD_TOKEN)

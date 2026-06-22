@@ -1,6 +1,10 @@
+from __future__ import annotations
+
 import os
+from collections.abc import Sequence
+from typing import Any, TypeAlias
+
 import aiomysql
-import asyncio
 from dotenv import load_dotenv
 from util.env_utils import getenv_clean, sanitize_environment
 
@@ -19,10 +23,12 @@ DB_USER = getenv_clean("DB_USERNAME")
 DB_PASSWORD = getenv_clean("DB_PASSWORD")
 DB_NAME = getenv_clean("DB_DATABASE")
 
-pool = None
+QueryArgs: TypeAlias = Sequence[Any] | dict[str, Any] | None
+DbRow: TypeAlias = dict[str, Any]
+pool: aiomysql.Pool | None = None
 
 
-async def get_db_pool():
+async def get_db_pool() -> aiomysql.Pool:
     global pool
     if pool is None:
         pool = await aiomysql.create_pool(
@@ -37,7 +43,7 @@ async def get_db_pool():
     return pool
 
 
-async def close_db_pool():
+async def close_db_pool() -> None:
     global pool
     if pool:
         pool.close()
@@ -45,7 +51,7 @@ async def close_db_pool():
         pool = None
 
 
-async def execute_query(query, args=None):
+async def execute_query(query: str, args: QueryArgs = None) -> int:
     """Executes a query (INSERT, UPDATE, DELETE) and returns lastrowid."""
     pool = await get_db_pool()
     async with pool.acquire() as conn:
@@ -54,7 +60,7 @@ async def execute_query(query, args=None):
             return cur.lastrowid
 
 
-async def fetch_one(query, args=None):
+async def fetch_one(query: str, args: QueryArgs = None) -> DbRow | None:
     """Fetches a single row."""
     pool = await get_db_pool()
     async with pool.acquire() as conn:
@@ -63,7 +69,7 @@ async def fetch_one(query, args=None):
             return await cur.fetchone()
 
 
-async def fetch_all(query, args=None):
+async def fetch_all(query: str, args: QueryArgs = None) -> list[DbRow]:
     """Fetches all rows."""
     pool = await get_db_pool()
     async with pool.acquire() as conn:
@@ -72,7 +78,7 @@ async def fetch_all(query, args=None):
             return await cur.fetchall()
 
 
-async def create_tables():
+async def create_tables() -> None:
     """Creates necessary tables if they do not exist."""
     queries = [
         """
@@ -290,7 +296,7 @@ async def create_tables():
             )
 
 
-async def upsert_guild(guild_id, guild_name):
+async def upsert_guild(guild_id: int, guild_name: str) -> None:
     query = """
     INSERT INTO guild (guild_id, guild_name)
     VALUES (%s, %s)
@@ -300,7 +306,7 @@ async def upsert_guild(guild_id, guild_name):
     await execute_query(query, (int(guild_id), guild_name))
 
 
-async def upsert_user(user_id, username):
+async def upsert_user(user_id: int, username: str) -> None:
     query = """
     INSERT INTO discord_user (user_id, username)
     VALUES (%s, %s)

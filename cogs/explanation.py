@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import re
 
 import discord
@@ -13,10 +14,12 @@ from util.message_context import (
     build_recent_message_option,
     build_surrounding_message_context,
 )
+from util.logging_utils import log_user_error
 
 
 EXPLANATION_PROMPT_ID = "pmpt_69fabdb4fa308190867e700bb0a2de160eaa5a328b9e0f83"
 EXPLANATION_PROMPT_VERSION = "5"
+logger = logging.getLogger(__name__)
 _EXPLANATION_RESPONSE_LABEL_PATTERN = re.compile(
     r"(?i)\b(Summary|Details|Explanation|Context|Unclear|요약|설명|주요 내용|맥락|추가 맥락|불확실한 부분)\s*:"
 )
@@ -57,7 +60,7 @@ def build_explanation_prompt(
 
 def format_explanation_response_for_discord(response: str) -> str:
     stripped_response = response.strip()
-    if not stripped_response or stripped_response.startswith("Error:"):
+    if not stripped_response:
         return response
     if (
         "**요약**" in stripped_response
@@ -129,8 +132,8 @@ async def explain_target(
             previous_messages,
             following_messages,
         )
-    except Exception as e:
-        return f"Error: {e}"
+    except Exception as exc:
+        return log_user_error(logger, "설명", exc)
 
 
 @app_commands.context_menu(name="메시지 설명")
@@ -235,8 +238,8 @@ class ExplanationSelectView(discord.ui.View):
         if isinstance(self.original_message, discord.Message):
             try:
                 await self.original_message.edit(content=result_message, view=None)
-            except Exception:
-                pass
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                logger.debug("설명 결과 메시지 수정 실패", exc_info=True)
 
         self.stop()
 
@@ -247,14 +250,14 @@ class ExplanationSelectView(discord.ui.View):
                     content="1분 이내에 설명할 메시지를 선택하지 않아 작업이 취소되었습니다.",
                     view=None,
                 )
-            except Exception:
-                pass
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                logger.debug("설명 선택 만료 메시지 수정 실패", exc_info=True)
 
             await asyncio.sleep(30)
             try:
                 await self.original_message.delete()
-            except discord.NotFound:
-                pass
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                logger.debug("설명 선택 만료 메시지 삭제 실패", exc_info=True)
 
 
 class ExplanationCommands(commands.Cog):

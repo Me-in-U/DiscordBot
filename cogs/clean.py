@@ -1,10 +1,16 @@
 from __future__ import annotations
 
+import logging
 from datetime import timedelta
 
 import discord
 from discord import app_commands
 from discord.ext import commands
+
+from util.logging_utils import user_error_message
+
+
+logger = logging.getLogger(__name__)
 
 
 class Clean(commands.Cog):
@@ -99,9 +105,11 @@ class Clean(commands.Cog):
             await interaction.followup.send(
                 "권한이 부족하여 일부 또는 전부 삭제하지 못했습니다.", ephemeral=True
             )
-        except discord.HTTPException as e:
+        except discord.HTTPException:
+            logger.exception("메시지 삭제 중 Discord HTTP 오류")
             await interaction.followup.send(
-                f"삭제 중 오류가 발생했습니다: {e}", ephemeral=True
+                user_error_message("메시지 삭제"),
+                ephemeral=True,
             )
 
 

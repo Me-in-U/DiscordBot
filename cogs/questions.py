@@ -1,4 +1,5 @@
 import asyncio
+import logging
 
 import discord
 from discord import app_commands
@@ -7,12 +8,14 @@ from discord.ext import commands
 from api.chatGPT import custom_prompt_model
 from common.openai_prompt import build_prompt, build_single_image_content
 from util.get_recent_messages import get_recent_messages
+from util.logging_utils import log_user_error
 
 
 GENERAL_PROMPT_ID = "pmpt_68ac254fa8008190861e8f3f686556d50c6160cd272b9aca"
 GENERAL_PROMPT_VERSION = "4"
 GOD_QUESTION_PROMPT_ID = "pmpt_68acfa93ac6481959537fcb1853c883307d25e6bf62ef36c"
 GOD_QUESTION_PROMPT_VERSION = "5"
+logger = logging.getLogger(__name__)
 
 
 class QuestionCommands(commands.Cog):
@@ -65,10 +68,13 @@ class QuestionCommands(commands.Cog):
                     },
                 ),
             )
-        except Exception as e:
-            response = f"Error: {e}"
+        except Exception as exc:
+            response = log_user_error(logger, "질문", exc)
 
-        await interaction.followup.send(f"{response}")
+        try:
+            await interaction.followup.send(f"{response}")
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            logger.debug("질문 응답 전송 실패", exc_info=True)
 
     @app_commands.command(
         name="신이시여",
@@ -112,10 +118,13 @@ class QuestionCommands(commands.Cog):
                     },
                 ),
             )
-        except Exception as e:
-            response = f"Error: {e}"
+        except Exception as exc:
+            response = log_user_error(logger, "신이시여 질문", exc)
 
-        await interaction.followup.send(f"{response}")
+        try:
+            await interaction.followup.send(f"{response}")
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            logger.debug("신이시여 응답 전송 실패", exc_info=True)
 
 
 async def setup(bot):

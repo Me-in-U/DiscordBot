@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 import asyncio
+import logging
 import os
 import tempfile
 import wave
 import discord
-import traceback
 import time
 import numpy as np
 from collections import deque
@@ -11,6 +13,8 @@ from discord.ext import commands
 from discord import app_commands
 from faster_whisper import WhisperModel
 import pyttsx3
+
+logger = logging.getLogger(__name__)
 
 # Try to import voice_recv, if not available, we can't do voice receive
 try:
@@ -20,7 +24,7 @@ except ImportError:
 
 
 class StreamingSink(voice_recv.AudioSink if voice_recv else object):
-    def __init__(self, cog, command_user, vc):
+    def __init__(self, cog, command_user, vc) -> None:
         self.cog = cog
         self.command_user = command_user
         self.vc = vc
@@ -36,10 +40,10 @@ class StreamingSink(voice_recv.AudioSink if voice_recv else object):
         self.PRE_SPEECH_BUFFER_DURATION = 0.2  # 0.2초 프리롤
         self.POST_SPEECH_BUFFER_DURATION = 0.2  # 0.2초 포스트롤
 
-    def wants_opus(self):
+    def wants_opus(self) -> bool:
         return False
 
-    def write(self, user, data):
+    def write(self, user, data) -> None:
         # Calculate RMS
         pcm_data = np.frombuffer(data.pcm, dtype=np.int16).astype(np.float32)
         rms = np.sqrt(np.mean(pcm_data**2))
@@ -90,7 +94,7 @@ class StreamingSink(voice_recv.AudioSink if voice_recv else object):
                 # Add to pre-speech ring buffer (frame)
                 self.user_pre_speech_buffer[user].append(data.pcm)
 
-    def flush_user(self, user):
+    def flush_user(self, user) -> None:
         buffer = self.user_buffers[user]
         duration = len(buffer) / (48000 * 2 * 2)  # 48k, stereo, 16bit
 
@@ -118,19 +122,19 @@ class StreamingSink(voice_recv.AudioSink if voice_recv else object):
         self.user_speaking[user] = False
         self.user_pre_speech_buffer[user].clear()
 
-    def cleanup(self):
+    def cleanup(self) -> None:
         pass
 
 
 class VoiceChat(commands.Cog):
-    def __init__(self, bot):
+    def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
         self.model = None
         self.chat_data = {}  # guild_id -> {queue, message, task}
         self.active_chats = {}  # user_id -> task
         self.transcribe_lock = asyncio.Lock()
 
-    async def load_model(self):
+    async def load_model(self) -> None:
         # Ensure ffmpeg is in PATH
         ffmpeg_path = os.path.abspath(
             os.path.join(os.path.dirname(__file__), "..", "bin")
@@ -154,16 +158,16 @@ class VoiceChat(commands.Cog):
                                 print(f"[DEBUG] Added NVIDIA library path: {bin_path}")
             except ImportError:
                 print("[DEBUG] NVIDIA libraries not found in python environment.")
-            except Exception as e:
-                print(f"[DEBUG] Error adding NVIDIA paths: {e}")
+            except Exception:
+                logger.exception("[DEBUG] Error adding NVIDIA paths")
 
         # Check if ffmpeg is actually callable
         import shutil
 
         if shutil.which("ffmpeg") is None:
-            print(f"Warning: ffmpeg not found in PATH. Added path: {ffmpeg_path}")
+            logger.warning("ffmpeg not found in PATH. Added path: %s", ffmpeg_path)
             if not os.path.exists(os.path.join(ffmpeg_path, "ffmpeg.exe")):
-                print(f"Error: ffmpeg.exe not found in {ffmpeg_path}")
+                logger.error("ffmpeg.exe not found in %s", ffmpeg_path)
 
         if self.model is None:
             print("Loading Whisper model...")
@@ -177,8 +181,11 @@ class VoiceChat(commands.Cog):
                         device="cuda",
                         compute_type="float16",
                     )
-                except Exception as e:
-                    print(f"GPU load failed: {e}. Falling back to CPU (tiny model)...")
+                except Exception:
+                    logger.warning(
+                        "GPU load failed. Falling back to CPU (tiny model).",
+                        exc_info=True,
+                    )
                     return WhisperModel(
                         "tiny",
                         device="cpu",
@@ -192,7 +199,7 @@ class VoiceChat(commands.Cog):
         name="대화",
         description="음성 채널에 봇을 초대하여 실시간 대화를 시작합니다.",
     )
-    async def start_chat(self, interaction: discord.Interaction):
+    async def start_chat(self, interaction: discord.Interaction) -> None:
         if voice_recv is None:
             await interaction.response.send_message(
                 "discord-ext-voice-recv 모듈이 설치되지 않았습니다.", ephemeral=True
@@ -238,7 +245,7 @@ class VoiceChat(commands.Cog):
     @app_commands.command(
         name="대화종료", description="실시간 대화를 종료하고 봇을 퇴장시킵니다."
     )
-    async def stop_chat(self, interaction: discord.Interaction):
+    async def stop_chat(self, interaction: discord.Interaction) -> None:
         if interaction.user.id in self.active_chats:
             self.active_chats[interaction.user.id].cancel()
             del self.active_chats[interaction.user.id]
@@ -260,7 +267,7 @@ class VoiceChat(commands.Cog):
                 "봇이 음성 채널에 없습니다.", ephemeral=True
             )
 
-    async def chat_loop(self, command_user, vc):
+    async def chat_loop(self, command_user, vc) -> None:
         await self.load_model()
         print(f"[DEBUG] chat_loop started for {command_user.name}")
 
@@ -280,13 +287,12 @@ class VoiceChat(commands.Cog):
             print("[DEBUG] chat_loop cancelled")
             if vc.is_listening():
                 vc.stop_listening()
-        except Exception as e:
-            print(f"[DEBUG] Chat loop error: {e}")
-            traceback.print_exc()
+        except Exception:
+            logger.exception("[DEBUG] Chat loop error")
             if vc.is_listening():
                 vc.stop_listening()
 
-    async def process_audio(self, filepath, speaker, recipient, vc):
+    async def process_audio(self, filepath: str, speaker, recipient, vc) -> None:
         print(
             f"[DEBUG] process_audio started. File: {filepath}, Speaker: {speaker.name}"
         )
@@ -340,17 +346,16 @@ class VoiceChat(commands.Cog):
                 # TTS Playback (Commented out)
                 # ...
 
-        except Exception as e:
-            print(f"Processing Error: {e}")
-            traceback.print_exc()
+        except Exception:
+            logger.exception("Processing Error")
         finally:
             if os.path.exists(filepath):
                 try:
                     os.remove(filepath)
-                except:
-                    pass
+                except OSError:
+                    logger.warning("failed to remove temporary voice file: %s", filepath, exc_info=True)
 
-    async def transcribe(self, filepath):
+    async def transcribe(self, filepath: str) -> str:
         loop = asyncio.get_event_loop()
 
         def _transcribe():
@@ -391,7 +396,7 @@ class VoiceChat(commands.Cog):
             text = await loop.run_in_executor(None, _transcribe)
         return text
 
-    async def display_loop(self, guild_id):
+    async def display_loop(self, guild_id: int) -> None:
         """Updates the status message every 3 seconds with the latest STT queue."""
         print(f"[DEBUG] display_loop started for guild {guild_id}")
         last_content = ""
@@ -410,17 +415,16 @@ class VoiceChat(commands.Cog):
                         except discord.NotFound:
                             print("[DEBUG] Status message deleted, stopping loop")
                             break
-                        except Exception as e:
-                            print(f"[DEBUG] Error editing message: {e}")
+                        except Exception:
+                            logger.warning("[DEBUG] Error editing message", exc_info=True)
 
                 await asyncio.sleep(3)
         except asyncio.CancelledError:
             print(f"[DEBUG] display_loop cancelled for guild {guild_id}")
-        except Exception as e:
-            print(f"[DEBUG] display_loop error: {e}")
-            traceback.print_exc()
+        except Exception:
+            logger.exception("[DEBUG] display_loop error")
 
-    async def generate_tts(self, text):
+    async def generate_tts(self, text: str) -> str:
         loop = asyncio.get_event_loop()
 
         def _create_tts():
@@ -434,13 +438,13 @@ class VoiceChat(commands.Cog):
 
         return await loop.run_in_executor(None, _create_tts)
 
-    def cleanup_tts(self, filepath):
+    def cleanup_tts(self, filepath: str) -> None:
         if os.path.exists(filepath):
             try:
                 os.remove(filepath)
-            except Exception as e:
-                print(f"Error cleaning up TTS file: {e}")
+            except OSError:
+                logger.warning("Error cleaning up TTS file: %s", filepath, exc_info=True)
 
 
-async def setup(bot):
+async def setup(bot: commands.Bot) -> None:
     await bot.add_cog(VoiceChat(bot))

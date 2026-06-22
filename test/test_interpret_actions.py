@@ -104,6 +104,20 @@ class InterpretTargetTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(variables["following_messages"], "Bob: 뭔 뜻임?")
         self.assertNotIn("Discord Markdown", target_question)
 
+    async def test_interpret_target_returns_safe_message_on_model_failure(self):
+        def fake_custom_prompt_model(**kwargs):
+            raise RuntimeError("secret-token")
+
+        with patch("cogs.interpret.custom_prompt_model", fake_custom_prompt_model):
+            with self.assertLogs("cogs.interpret", level="ERROR") as captured:
+                result = await interpret_target("요즘 일찍 들어오네?", None)
+
+        self.assertIn("해석", result)
+        self.assertIn("오류가 발생했습니다", result)
+        self.assertNotIn("secret-token", result)
+        self.assertNotIn("Error:", result)
+        self.assertIn("secret-token", "\n".join(captured.output))
+
 
 if __name__ == "__main__":
     unittest.main()

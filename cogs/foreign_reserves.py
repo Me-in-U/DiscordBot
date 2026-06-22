@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from decimal import Decimal, ROUND_HALF_UP
 from io import BytesIO
+import logging
 
 import discord
 import matplotlib
@@ -18,6 +19,10 @@ from api.foreign_reserves import (
     format_foreign_reserves_cycle,
     get_foreign_reserves,
 )
+from util.logging_utils import user_error_message
+
+
+logger = logging.getLogger(__name__)
 
 matplotlib.use("Agg")
 
@@ -202,9 +207,10 @@ class ForeignReservesCommands(commands.Cog):
         except ForeignReservesError as exc:
             await interaction.followup.send(f"❌ {exc}", ephemeral=True)
             return
-        except Exception as exc:
+        except Exception:
+            logger.exception("외환보유액 조회 실패")
             await interaction.followup.send(
-                f"⚠️ 외환보유액을 가져오는 중 오류가 발생했습니다: {exc}",
+                user_error_message("외환보유액 조회"),
                 ephemeral=True,
             )
             return

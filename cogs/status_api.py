@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import time
 from datetime import datetime, timezone
@@ -9,6 +10,9 @@ from discord.ext import commands
 
 from util.celebration import refresh_celebration_messages
 from util.env_utils import getenv_clean
+
+
+logger = logging.getLogger(__name__)
 
 
 class StatusApi(commands.Cog):
@@ -197,8 +201,8 @@ class StatusApi(commands.Cog):
             result = await loop_cog.handle_youtube_websub_notification(raw_body)
         except ElementTree.ParseError:
             return web.json_response({"error": "Invalid Atom XML."}, status=400)
-        except Exception as e:
-            print(f"YouTube WebSub 처리 오류: {e}")
+        except Exception:
+            logger.exception("YouTube WebSub 처리 오류")
             return web.json_response({"error": "WebSub notification failed."}, status=500)
 
         return web.json_response(result, status=202)

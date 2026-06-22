@@ -1,4 +1,8 @@
+import logging
 from datetime import datetime
+
+
+logger = logging.getLogger(__name__)
 
 
 def get_recent_messages(client, guild_id: int, limit: int = 20):
@@ -35,17 +39,17 @@ def get_recent_messages(client, guild_id: int, limit: int = 20):
         t = m.get("time", "")
         try:
             return datetime.strptime(t, "%Y-%m-%d %H:%M:%S")
-        except Exception:
+        except (TypeError, ValueError):
             return datetime(1970, 1, 1)
 
     # 길드별 저장 구조: USER_MESSAGES[guild_id][author] = [msg,...]
     root = getattr(client, "USER_MESSAGES", {})
     if not isinstance(root, dict):
-        print("get_recent_messages: USER_MESSAGES 타입 오류 ->", type(root))
+        logger.warning("get_recent_messages: USER_MESSAGES 타입 오류 -> %s", type(root))
         return ""
     guild_map = root.get(guild_id) or {}
     if not isinstance(guild_map, dict):
-        print("get_recent_messages: 길드 맵이 dict가 아님 ->", type(guild_map))
+        logger.warning("get_recent_messages: 길드 맵이 dict가 아님 -> %s", type(guild_map))
         return ""
 
     # 길드 내 모든 유저 메시지 평탄화(+ author 주입)
@@ -55,7 +59,7 @@ def get_recent_messages(client, guild_id: int, limit: int = 20):
             for m in msgs:
                 all_msgs.append({**m, "author": author})
 
-    print(f"get_recent_messages[guild={guild_id}]: 집계된 메시지 수 = {len(all_msgs)}")
+    logger.debug("get_recent_messages[guild=%s]: 집계된 메시지 수 = %s", guild_id, len(all_msgs))
 
     if not all_msgs:
         return ""
@@ -72,5 +76,5 @@ def get_recent_messages(client, guild_id: int, limit: int = 20):
         t = m.get("time", "")
         lines.append(f"[{t}] {author}({role}): {content}")
 
-    print(f"\n최근 메시지 데이터 요청됨 (guild={guild_id})", lines)
+    logger.debug("최근 메시지 데이터 요청됨 (guild=%s): %s", guild_id, lines)
     return "\n".join(lines)

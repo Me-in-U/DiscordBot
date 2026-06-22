@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import logging
 import random
 
 import discord
 
 from .services import BalanceService
 from .sprinkle import SprinkleView, build_sprinkle_embed
+
+
+logger = logging.getLogger(__name__)
 
 
 async def run_sprinkle(
@@ -58,8 +62,8 @@ async def run_sprinkle(
     try:
         sent = await interaction.original_response()
         view.original_message = sent
-    except Exception:
-        pass
+    except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+        logger.debug("뿌리기 원본 메시지 조회 실패", exc_info=True)
 
 
 def _split_amount_randomly(total_amount: int, people: int) -> list[int]:

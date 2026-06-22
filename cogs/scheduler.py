@@ -1,3 +1,8 @@
+from __future__ import annotations
+
+import logging
+from typing import Any, TypedDict
+
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
@@ -6,46 +11,93 @@ from datetime import datetime, timedelta
 from bot import SEOUL_TZ
 from util.db import execute_query, fetch_all
 
+logger = logging.getLogger(__name__)
+
+
+class ScheduledMessageRow(TypedDict, total=False):
+    id: str
+    guild_id: int
+    channel_id: int
+    user_id: int
+    trigger_time: datetime
+    message: str
+    type: str
+    repeat_type: str | None
+    repeat_value: str | None
+    is_recurring: bool
+
+
+def calculate_recurring_trigger_time(
+    now: datetime,
+    repeat_type: str,
+    value: str,
+) -> datetime:
+    if repeat_type == "hourly":
+        try:
+            interval = int(value)
+        except ValueError as exc:
+            raise ValueError("hourly 반복 값은 양의 정수여야 합니다.") from exc
+        if interval <= 0:
+            raise ValueError("hourly 반복 값은 양의 정수여야 합니다.")
+        return now + timedelta(hours=interval)
+
+    if repeat_type == "daily":
+        trigger_time_value = datetime.strptime(value, "%H:%M").time()
+        trigger_time = now.replace(
+            hour=trigger_time_value.hour,
+            minute=trigger_time_value.minute,
+            second=0,
+            microsecond=0,
+        )
+        if trigger_time <= now:
+            trigger_time += timedelta(days=1)
+        return trigger_time
+
+    if repeat_type == "weekly":
+        return now + timedelta(weeks=1)
+
+    if repeat_type == "monthly":
+        year = now.year
+        month = now.month + 1
+        if month > 12:
+            year += 1
+            month = 1
+        try:
+            return now.replace(year=year, month=month)
+        except ValueError:
+            if month == 12:
+                return now.replace(year=year + 1, month=1, day=1)
+            return now.replace(year=year, month=month + 1, day=1)
+
+    raise ValueError(f"지원하지 않는 반복 유형입니다: {repeat_type}")
+
 
 class SchedulerCog(commands.Cog):
-    def __init__(self, bot):
+    def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
         self.check_schedule_task.start()
         print("SchedulerCog : init 완료!")
 
-    def cog_unload(self):
+    def cog_unload(self) -> None:
         self.check_schedule_task.cancel()
 
-    def calculate_next_run(self, item, current_trigger):
+    def calculate_next_run(
+        self,
+        item: ScheduledMessageRow | dict[str, Any],
+        current_trigger: datetime,
+    ) -> datetime | None:
         # item is dict from row
         repeat_type = item.get("repeat_type")
         value = item.get("repeat_value")
 
+        if not repeat_type or value is None:
+            return None
         try:
-            if repeat_type == "hourly":
-                interval = int(value)
-                return current_trigger + timedelta(hours=interval)
-            elif repeat_type == "daily":
+            if repeat_type == "daily":
                 return current_trigger + timedelta(days=1)
-            elif repeat_type == "weekly":
-                return current_trigger + timedelta(weeks=1)
-            elif repeat_type == "monthly":
-                year = current_trigger.year
-                month = current_trigger.month
-                if month == 12:
-                    year += 1
-                    month = 1
-                else:
-                    month += 1
-                try:
-                    return current_trigger.replace(year=year, month=month)
-                except ValueError:
-                    if month == 12:
-                        return current_trigger.replace(year=year + 1, month=1, day=1)
-                    else:
-                        return current_trigger.replace(month=month + 1, day=1)
-        except Exception as e:
-            print(f"Next run calc error: {e}")
+            return calculate_recurring_trigger_time(current_trigger, repeat_type, str(value))
+        except ValueError:
+            logger.warning("Next run calc error: item=%s", item, exc_info=True)
             return None
         return None
 
@@ -61,7 +113,7 @@ class SchedulerCog(commands.Cog):
     )
     async def add_one_time(
         self, interaction: discord.Interaction, date: str, time_str: str, message: str
-    ):
+    ) -> None:
         current_year = datetime.now(SEOUL_TZ).year
         if len(date.split("-")) == 2:
             date = f"{current_year}-{date}"
@@ -116,24 +168,13 @@ class SchedulerCog(commands.Cog):
         repeat_type: str,
         value: str,
         message: str,
-    ):
+    ) -> None:
         now = datetime.now(SEOUL_TZ)
-        trigger_time = now  # Logic omitted for brevity, usually current time + interval or next occurrence
-        # Simplified trigger time logic mostly for demo
-        # Real implementation should parse 'value' to find next occurrence
-        # For 'hourly' -> now + int(value) hours
         try:
-            val = value
-            if repeat_type == "hourly":
-                trigger_time = now + timedelta(hours=int(val))
-            elif repeat_type == "daily":
-                t = datetime.strptime(val, "%H:%M").time()
-                trigger_time = now.replace(hour=t.hour, minute=t.minute, second=0)
-                if trigger_time <= now:
-                    trigger_time += timedelta(days=1)
-            # ... and so on. For simplicity, just insert.
-        except:
-            pass
+            trigger_time = calculate_recurring_trigger_time(now, repeat_type, value)
+        except ValueError as exc:
+            await interaction.response.send_message(f"❌ 반복 예약 값이 올바르지 않습니다. {exc}", ephemeral=True)
+            return
 
         uid = str(uuid.uuid4())
         query = """INSERT INTO scheduled_messages (id, guild_id, channel_id, user_id, trigger_time, message, created_at, type, repeat_type, repeat_value, is_recurring) 
@@ -155,7 +196,7 @@ class SchedulerCog(commands.Cog):
         await interaction.response.send_message("✅ 반복 예약 완료", ephemeral=True)
 
     @schedule_group.command(name="리스트", description="현재 등록된 예약 목록")
-    async def list_reservations(self, interaction: discord.Interaction):
+    async def list_reservations(self, interaction: discord.Interaction) -> None:
         query = "SELECT * FROM scheduled_messages WHERE guild_id = %s AND user_id = %s ORDER BY trigger_time"
         rows = await fetch_all(
             query, (int(interaction.guild_id), int(interaction.user.id))
@@ -174,7 +215,7 @@ class SchedulerCog(commands.Cog):
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @tasks.loop(seconds=30)
-    async def check_schedule_task(self):
+    async def check_schedule_task(self) -> None:
         now = datetime.now(SEOUL_TZ)
         query = "SELECT * FROM scheduled_messages WHERE trigger_time <= %s"
         rows = await fetch_all(query, (now,))
@@ -190,8 +231,8 @@ class SchedulerCog(commands.Cog):
                     await channel.send(
                         f"{prefix} 예약 메시지 (<@{row['user_id']}>):\n{row['message']}"
                     )
-            except Exception as e:
-                print(f"Message send error: {e}")
+            except Exception:
+                logger.exception("Message send error: row=%s", row)
 
             if row["is_recurring"]:
                 next_run = self.calculate_next_run(row, row["trigger_time"])
@@ -210,9 +251,9 @@ class SchedulerCog(commands.Cog):
                 )
 
     @check_schedule_task.before_loop
-    async def before_check_schedule_task(self):
+    async def before_check_schedule_task(self) -> None:
         await self.bot.wait_until_ready()
 
 
-async def setup(bot):
+async def setup(bot: commands.Bot) -> None:
     await bot.add_cog(SchedulerCog(bot))

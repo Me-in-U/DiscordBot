@@ -1,4 +1,5 @@
 import asyncio
+import logging
 
 import discord
 from discord import app_commands
@@ -6,10 +7,12 @@ from discord.ext import commands
 
 from api.chatGPT import custom_prompt_model
 from common.openai_prompt import build_prompt
+from util.logging_utils import log_user_error
 
 
 SEARCH_PROMPT_ID = "pmpt_68b25c89c1a48193a60de5a3cb23a1eb0c25a13613efd1bf"
 SEARCH_PROMPT_VERSION = "5"
+logger = logging.getLogger(__name__)
 
 
 class SearchCommands(commands.Cog):
@@ -40,10 +43,13 @@ class SearchCommands(commands.Cog):
                     {"user_input": 내용},
                 ),
             )
-        except Exception as e:
-            response = f"Error: {e}"
+        except Exception as exc:
+            response = log_user_error(logger, "검색", exc)
 
-        await interaction.followup.send(response)
+        try:
+            await interaction.followup.send(response)
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            logger.debug("검색 결과 전송 실패", exc_info=True)
 
 
 async def setup(bot):

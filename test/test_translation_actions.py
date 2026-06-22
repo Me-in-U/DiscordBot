@@ -34,6 +34,20 @@ class TranslationTargetTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(TRANSLATION_PROMPT_VERSION, "6")
         self.assertIsNone(captured_kwargs["image_content"])
 
+    async def test_translate_target_returns_safe_message_on_model_failure(self):
+        def fake_custom_prompt_model(**kwargs):
+            raise RuntimeError("secret-token")
+
+        with patch("cogs.translation.custom_prompt_model", fake_custom_prompt_model):
+            with self.assertLogs("cogs.translation", level="ERROR") as captured:
+                result = await translate_target(" example target_message ", None)
+
+        self.assertIn("번역", result)
+        self.assertIn("오류가 발생했습니다", result)
+        self.assertNotIn("secret-token", result)
+        self.assertNotIn("Error:", result)
+        self.assertIn("secret-token", "\n".join(captured.output))
+
 
 if __name__ == "__main__":
     unittest.main()

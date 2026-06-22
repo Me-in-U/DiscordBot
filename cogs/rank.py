@@ -1,37 +1,42 @@
-import asyncio
+from __future__ import annotations
+
+import logging
 from datetime import time
 import json
+from typing import Any, Mapping
 
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
-from api.riot import get_rank_data
+from api.riot import RiotRankData, RiotRankLookupError, get_rank_data
 from bot import SONPANNO_GUILD_ID, SEOUL_TZ
 
 
 from util.db import fetch_one, execute_query
 
+logger = logging.getLogger(__name__)
+
 
 class RankCommands(commands.Cog):
-    def __init__(self, bot):
+    def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
-        self.game_name = None  # 게임 닉네임
-        self.tag_line = None  # 게임 태그
+        self.game_name: str | None = None  # 게임 닉네임
+        self.tag_line: str | None = None  # 게임 태그
         self.daily_rank_loop_enabled = False  # 일일 랭크 루프 상태
         # self.load_settings() calls inside cog_load
         self.update_rank_data.start()
         print("Rank Cog : init 로드 완료!")
 
-    async def cog_load(self):
+    async def cog_load(self) -> None:
         await self.load_settings()
 
     @commands.Cog.listener()
-    async def on_ready(self):
+    async def on_ready(self) -> None:
         """봇이 준비되었을 때 호출됩니다."""
         print("DISCORD_CLIENT -> RankCommands Cog : on ready!")
 
-    async def _get_full_settings(self):
+    async def _get_full_settings(self) -> dict[str, Any]:
         query = (
             "SELECT setting_value FROM setting_data WHERE setting_key = 'dailySoloRank'"
         )
@@ -41,7 +46,7 @@ class RankCommands(commands.Cog):
             return json.loads(val) if isinstance(val, str) else val
         return {}
 
-    async def load_settings(self):
+    async def load_settings(self) -> None:
         """DB에서 초기 설정을 로드합니다."""
         data = await self._get_full_settings()
         if data:
@@ -49,7 +54,7 @@ class RankCommands(commands.Cog):
             self.tag_line = data.get("userData", {}).get("tag_line", "")
             self.daily_rank_loop_enabled = data.get("loop", False)
 
-    async def save_settings(self):
+    async def save_settings(self) -> None:
         """현재 설정을 DB에 저장합니다."""
         data = await self._get_full_settings()
         if "userData" not in data:
@@ -63,7 +68,7 @@ class RankCommands(commands.Cog):
         await execute_query(query, ("dailySoloRank", json_str, json_str))
 
     @tasks.loop(time=time(hour=0, minute=0, tzinfo=SEOUL_TZ))  # 매일 자정
-    async def update_rank_data(self):
+    async def update_rank_data(self) -> None:
         """매일 자정에 랭킹 정보를 업데이트합니다."""
         target_channel = self.bot.get_channel(SONPANNO_GUILD_ID)
         if not target_channel:
@@ -71,13 +76,14 @@ class RankCommands(commands.Cog):
             return
 
         if self.daily_rank_loop_enabled:
+            if not self.game_name or not self.tag_line:
+                await target_channel.send("❌ 설정된 일일 랭크 정보가 없습니다.")
+                return
             try:
                 await target_channel.send(
                     "📢 새로운 하루가 시작됩니다. 일일 솔랭 정보 출력"
                 )
-                today_rank_data = await asyncio.to_thread(
-                    get_rank_data, self.game_name, self.tag_line, "solo"
-                )
+                today_rank_data = await get_rank_data(self.game_name, self.tag_line, "solo")
 
                 settings = await self._get_full_settings()
                 yesterday_data = settings.get("yesterdayData", {})
@@ -103,10 +109,13 @@ class RankCommands(commands.Cog):
                 json_str = json.dumps(settings, ensure_ascii=False)
                 await execute_query(query, ("dailySoloRank", json_str, json_str))
 
-            except Exception as e:
+            except RiotRankLookupError as e:
                 await target_channel.send(
-                    f"❌ 랭킹 정보를 업데이트하는 중 오류가 발생했습니다: {e}"
+                    f"❌ 랭킹 정보를 가져오지 못했습니다. 닉네임#태그를 확인해주세요.\n{e}"
                 )
+            except Exception:
+                logger.exception("일일 랭크 업데이트 중 예외 발생")
+                await target_channel.send("❌ 랭킹 정보를 업데이트하는 중 오류가 발생했습니다.")
 
     @app_commands.command(
         name="솔랭",
@@ -118,16 +127,14 @@ class RankCommands(commands.Cog):
     @app_commands.rename(game_name="닉네임", tag_line="태그")
     async def print_solo_rank(
         self, interaction: discord.Interaction, game_name: str, tag_line: str
-    ):
+    ) -> None:
         """솔로 랭크 정보를 출력합니다."""
         try:
-            rank_data = await asyncio.to_thread(
-                get_rank_data, game_name, tag_line, "solo"
-            )
+            rank_data = await get_rank_data(game_name, tag_line, "solo")
             await interaction.response.send_message(self.print_rank_data(rank_data))
-        except ValueError:
+        except RiotRankLookupError as exc:
             await interaction.response.send_message(
-                "올바른 형식으로 입력해주세요. 예: !솔랭 닉네임#태그"
+                f"❌ 랭크 정보를 가져오지 못했습니다. 닉네임#태그를 확인해주세요.\n{exc}"
             )
 
     @app_commands.command(
@@ -140,22 +147,20 @@ class RankCommands(commands.Cog):
     @app_commands.rename(game_name="닉네임", tag_line="태그")
     async def print_flex_rank(
         self, interaction: discord.Interaction, game_name: str, tag_line: str
-    ):
+    ) -> None:
         """자유 랭크 정보를 출력합니다."""
         try:
-            rank_data = await asyncio.to_thread(
-                get_rank_data, game_name, tag_line, "flex"
-            )
+            rank_data = await get_rank_data(game_name, tag_line, "flex")
             await interaction.response.send_message(self.print_rank_data(rank_data))
-        except ValueError:
+        except RiotRankLookupError as exc:
             await interaction.response.send_message(
-                "올바른 형식으로 입력해주세요. 예: !자랭 닉네임#태그"
+                f"❌ 랭크 정보를 가져오지 못했습니다. 닉네임#태그를 확인해주세요.\n{exc}"
             )
 
     @app_commands.command(
         name="일일랭크", description="현재 설정된 자정 솔랭 정보를 출력합니다."
     )
-    async def daily_rank(self, interaction: discord.Interaction):
+    async def daily_rank(self, interaction: discord.Interaction) -> None:
         """현재 설정된 자정 솔랭 정보를 출력합니다."""
         if self.game_name and self.tag_line:
             await interaction.response.send_message(
@@ -173,13 +178,13 @@ class RankCommands(commands.Cog):
         text="닉네임#태그 형식으로 입력해주세요. 예: 라이엇유저#1234"
     )
     @app_commands.rename(text="닉네임태그")
-    async def update_daily_rank(self, interaction: discord.Interaction, text: str):
+    async def update_daily_rank(self, interaction: discord.Interaction, text: str) -> None:
         """자정 솔랭 닉네임#태그를 업데이트합니다."""
         try:
             game_name, tag_line = text.strip().split("#")
             self.game_name = game_name
             self.tag_line = tag_line
-            self.save_settings()
+            await self.save_settings()
             await interaction.response.send_message(
                 f"✅ **성공적으로 업데이트되었습니다.**\n새 값:\n- 닉네임: {self.game_name}\n- 태그: {self.tag_line}"
             )
@@ -188,6 +193,7 @@ class RankCommands(commands.Cog):
                 "올바른 형식으로 입력해주세요. 예: !일일랭크변경 닉네임#태그"
             )
         except Exception as e:
+            logger.exception("일일 랭크 설정 업데이트 중 예외 발생")
             await interaction.response.send_message(
                 f"⚠️ **업데이트 중 오류가 발생했습니다.**\n{str(e)}"
             )
@@ -198,7 +204,7 @@ class RankCommands(commands.Cog):
     )
     @app_commands.describe(status="true 또는 false로 입력하세요.")
     @app_commands.rename(status="상태")
-    async def toggle_daily_loop(self, interaction: discord.Interaction, status: str):
+    async def toggle_daily_loop(self, interaction: discord.Interaction, status: str) -> None:
         """자정 루프 상태를 변경합니다."""
         try:
             if status.lower() not in ["true", "false"]:
@@ -213,11 +219,16 @@ class RankCommands(commands.Cog):
                 "올바른 형식으로 입력해주세요. 예: !일일랭크루프 true/false"
             )
         except Exception as e:
+            logger.exception("일일 랭크 루프 상태 변경 중 예외 발생")
             await interaction.response.send_message(
                 f"⚠️ **루프 상태 변경 중 오류가 발생했습니다.**\n{str(e)}"
             )
 
-    def print_rank_data(self, data, yesterday_data=None):
+    def print_rank_data(
+        self,
+        data: Mapping[str, Any] | RiotRankData,
+        yesterday_data: Mapping[str, Any] | None = None,
+    ) -> str:
         """랭킹 데이터를 출력합니다."""
         message = f'## "{data["game_name"]}#{data["tag_line"]}" {data["rank_type_kor"]} 정보\n'
         message += (
@@ -246,7 +257,7 @@ class RankCommands(commands.Cog):
         return message
 
 
-async def setup(bot):
+async def setup(bot: commands.Bot) -> None:
     """Cog를 봇에 추가합니다."""
     await bot.add_cog(RankCommands(bot))
     print("Rank Cog : setup 완료!")

@@ -1,4 +1,4 @@
-import traceback
+import logging
 
 import discord
 from discord import app_commands
@@ -11,6 +11,9 @@ from util.maplestory_events import (
     fetch_sunday_maple_event,
     seed_maplestory_notice_state_for_guild,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 class MapleStoryCommands(commands.Cog):
@@ -53,7 +56,7 @@ class MapleStoryCommands(commands.Cog):
         try:
             event = await fetch_sunday_maple_event()
         except Exception:
-            traceback.print_exc()
+            logger.exception("썬데이메이플 이벤트 조회 실패")
             await interaction.followup.send(
                 "⚠️ 메이플스토리 이벤트 정보를 가져오는 중 오류가 발생했습니다.",
                 ephemeral=True,
@@ -114,7 +117,7 @@ class MapleStoryCommands(commands.Cog):
         try:
             seeded_count = await seed_maplestory_notice_state_for_guild(guild_id)
         except Exception:
-            traceback.print_exc()
+            logger.exception("메이플스토리 공지 초기 상태 저장 실패: guild_id=%s", guild_id)
             await interaction.followup.send(
                 "메이플스토리 공지 구독을 설정했습니다.\n"
                 "다만 최신 공지 초기 상태 저장에 실패해 다음 확인 때 초기화됩니다.",

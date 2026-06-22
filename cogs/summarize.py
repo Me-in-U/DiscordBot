@@ -1,4 +1,5 @@
 import asyncio
+import logging
 
 import discord
 from discord import app_commands
@@ -16,11 +17,13 @@ from func.youtube_summary import (
     process_youtube_link,
 )
 from util.get_recent_messages import get_recent_messages
+from util.logging_utils import log_user_error
 from util.message_context import extract_first_youtube_link
 
 
 DISCORD_SUMMARY_PROMPT_ID = "pmpt_68ac08b66784819785d89655eaaaa7470bc0cc5deddb37d9"
 DISCORD_SUMMARY_PROMPT_VERSION = "5"
+logger = logging.getLogger(__name__)
 
 
 def _truncate_select_text(text: str, max_length: int = 100) -> str:
@@ -87,9 +90,9 @@ class YouTubeSummarySelect(discord.ui.Select):
 
         try:
             summary_result = await process_youtube_link(selected_candidate.url)
-        except Exception as e:
+        except Exception as exc:
             await self.view.original_message.edit(
-                content=f"오류가 발생했습니다: {e}",
+                content=log_user_error(logger, "유튜브 요약", exc),
                 view=None,
             )
             self.view.stop()
@@ -135,8 +138,8 @@ class YouTubeSummarySelectionView(discord.ui.View):
                 ),
                 view=self,
             )
-        except discord.NotFound:
-            pass
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            logger.debug("유튜브 요약 선택 만료 메시지 수정 실패", exc_info=True)
 
 
 @app_commands.context_menu(name="유튜브 요약")
@@ -156,8 +159,10 @@ async def summarize_youtube_message_context_menu(
     link_kind = get_youtube_link_kind(youtube_url) or YOUTUBE_VIDEO_KIND
     try:
         summary_result = await process_youtube_link(youtube_url)
-    except Exception as e:
-        await interaction.edit_original_response(content=f"오류가 발생했습니다: {e}")
+    except Exception as exc:
+        await interaction.edit_original_response(
+            content=log_user_error(logger, "유튜브 요약", exc)
+        )
         return
 
     await interaction.edit_original_response(
@@ -212,8 +217,8 @@ class SummarizeCommands(commands.Cog):
                     },
                 ),
             )
-        except Exception as e:
-            response = f"Error: {e}"
+        except Exception as exc:
+            response = log_user_error(logger, "대화 요약", exc)
 
         # 응답 출력
         sent_msg = await interaction.original_response()

@@ -1,4 +1,5 @@
 import asyncio
+import logging
 
 import discord
 from discord import app_commands
@@ -11,10 +12,12 @@ from util.message_context import (
     build_message_select_label,
     build_recent_message_option,
 )
+from util.logging_utils import log_user_error
 
 
 TRANSLATION_PROMPT_ID = "pmpt_68ac23cf2e6c81969b355cc2d2ab11600ddeea74b62910b3"
 TRANSLATION_PROMPT_VERSION = "6"
+logger = logging.getLogger(__name__)
 
 
 async def translate_target(
@@ -36,8 +39,8 @@ async def translate_target(
                 {"target_message": normalized_message},
             ),
         )
-    except Exception as e:
-        return f"Error: {e}"
+    except Exception as exc:
+        return log_user_error(logger, "번역", exc)
 
 
 @app_commands.context_menu(name="메시지 번역")
@@ -132,8 +135,8 @@ class TranslationSelectView(discord.ui.View):
         if isinstance(self.original_message, discord.Message):
             try:
                 await self.original_message.edit(content=result_message, view=None)
-            except Exception:
-                pass
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                logger.debug("번역 결과 메시지 수정 실패", exc_info=True)
 
         self.stop()
 
@@ -150,15 +153,15 @@ class TranslationSelectView(discord.ui.View):
                     content="1분 이내에 번역하지 않으셔서 작업이 취소되었습니다.",
                     view=None,
                 )
-            except Exception:
-                pass
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                logger.debug("번역 선택 만료 메시지 수정 실패", exc_info=True)
 
             await asyncio.sleep(30)
             # original_message가 discord.Message인지 확인 후 삭제
             try:
                 await self.original_message.delete()
-            except discord.NotFound:
-                pass
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                logger.debug("번역 선택 만료 메시지 삭제 실패", exc_info=True)
 
 
 class TranslationCommands(commands.Cog):

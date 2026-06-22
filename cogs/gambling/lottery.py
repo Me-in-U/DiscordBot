@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import random
 from datetime import datetime
 from typing import Dict, List, Tuple
@@ -9,6 +10,9 @@ import discord
 
 from .constants import SEOUL_TZ
 from .services import BalanceService
+
+
+logger = logging.getLogger(__name__)
 
 
 class WeeklyLotteryView(discord.ui.View):
@@ -136,8 +140,8 @@ class WeeklyLotteryView(discord.ui.View):
         if self.original_message:
             try:
                 await self.original_message.edit(embed=embed, view=self)
-            except Exception:
-                pass
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                logger.debug("복주머니 메시지 수정 실패", exc_info=True)
         else:
             await interaction.response.edit_message(embed=embed, view=self)
 
@@ -147,7 +151,7 @@ class WeeklyLotteryView(discord.ui.View):
                 child.disabled = True
                 try:
                     index = int(child.custom_id.split("_")[1])
-                except Exception:
+                except (TypeError, ValueError, IndexError):
                     index = None
                 if index is not None and self.btn_states[index]["prize"] > 0:
                     child.label = "기간만료"
@@ -155,8 +159,8 @@ class WeeklyLotteryView(discord.ui.View):
         if self.original_message:
             try:
                 await self.original_message.edit(view=self)
-            except Exception:
-                pass
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                logger.debug("복주머니 만료 메시지 수정 실패", exc_info=True)
 
 
 def create_lottery_embed() -> discord.Embed:

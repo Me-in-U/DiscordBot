@@ -1,7 +1,10 @@
 # cogs/music.py
+from __future__ import annotations
+
 import asyncio
 import collections
 import json
+import logging
 import os
 import random
 import re
@@ -33,6 +36,7 @@ from util.music_favorites import (
 from dotenv import load_dotenv
 
 load_dotenv()
+logger = logging.getLogger(__name__)
 H_BAR = "\u2015"
 # 공통 상수
 PANEL_TITLE = "🎵 신창섭의 다해줬잖아"
@@ -53,8 +57,8 @@ def dbg(msg: str):
     try:
         now = datetime.now().strftime("%H:%M:%S")
         print(f"[MUSIC {now}] {msg}", flush=True)
-    except Exception:
-        pass
+    except (OSError, RuntimeError):
+        logger.debug("music debug 출력 실패", exc_info=True)
 
 
 # yt-dlp가 콘솔에 ERROR/경고를 직접 찍지 않도록 무음 로거 정의
@@ -546,8 +550,8 @@ class YTDLSource:
                 dbg(
                     f"YTDLSource.from_url: best abr={best.get('abr')} tbr={best.get('tbr')} acodec={best.get('acodec')} vcodec={best.get('vcodec')}"
                 )
-            except Exception:
-                pass
+            except (AttributeError, TypeError):
+                logger.debug("yt-dlp best format debug 출력 실패", exc_info=True)
 
         # yt-dlp가 고른 직접 URL (format 지정 결과) fallback
         audio_url = None
@@ -1005,8 +1009,8 @@ class MusicCog(commands.Cog):
             for r in rows:
                 res[str(r["guild_id"])] = int(r["message_id"])
             return res
-        except Exception as e:
-            print(f"[WARN] 패널 ID DB 로드 실패: {e}")
+        except Exception:
+            logger.warning("패널 ID DB 로드 실패", exc_info=True)
             return {}
 
     async def _set_panel_id(self, guild_id, message_id):
@@ -1023,7 +1027,20 @@ class MusicCog(commands.Cog):
         """백그라운드 태스크를 등록하고 레퍼런스를 보관한다."""
         task = asyncio.create_task(coro)
         self._bg_tasks.add(task)
-        task.add_done_callback(self._bg_tasks.discard)
+
+        def _log_and_discard(done_task: asyncio.Task) -> None:
+            self._bg_tasks.discard(done_task)
+            try:
+                exception = done_task.exception()
+            except asyncio.CancelledError:
+                return
+            if exception is not None:
+                logger.exception(
+                    "music background task failed",
+                    exc_info=(type(exception), exception, exception.__traceback__),
+                )
+
+        task.add_done_callback(_log_and_discard)
         return task
 
     async def _load_music_favorites(
@@ -1083,6 +1100,7 @@ class MusicCog(commands.Cog):
                 try:
                     return info_ytdl.extract_info(track.url, download=False)
                 except Exception:
+                    logger.debug("대기열 메타데이터 추출 실패: url=%s", track.url, exc_info=True)
                     return None
 
             info = await loop.run_in_executor(YTDL_EXECUTOR, _extract)
@@ -1432,7 +1450,7 @@ class MusicCog(commands.Cog):
                     gid = str(state.control_channel.guild.id)
                     await self._set_panel_id(gid, state.control_msg.id)
             else:
-                print(f"[WARN] 패널 업데이트 실패: {e}")
+                logger.warning("패널 업데이트 실패", exc_info=True)
 
     # ?완
     # ! 노래 재생 상황 업데이트 루프
@@ -1480,12 +1498,10 @@ class MusicCog(commands.Cog):
     def _schedule_idle_disconnect(self, guild_id: int) -> None:
         state = self._get_state(guild_id)
         self._cancel_idle_disconnect(state)
-        task = asyncio.create_task(self._idle_disconnect_after_timeout(guild_id))
+        task = self._spawn_bg(self._idle_disconnect_after_timeout(guild_id))
         state.idle_disconnect_task = task
-        self._bg_tasks.add(task)
 
         def _clear_task(done_task: asyncio.Task) -> None:
-            self._bg_tasks.discard(done_task)
             if state.idle_disconnect_task is done_task:
                 state.idle_disconnect_task = None
 
@@ -1593,11 +1609,8 @@ class MusicCog(commands.Cog):
                 icon_url=self.bot.user.avatar.url,  # 봇 프로필 아이콘
             )
             return embed
-        except Exception as e:
-            print("!! make_empty_embed 예외 발생:", e, flush=True)
-            import traceback
-
-            traceback.print_exc()
+        except Exception:
+            logger.exception("기본 음악 패널 임베드 생성 실패")
             raise
 
     # ! 노래 재생시 임베드
@@ -1632,11 +1645,8 @@ class MusicCog(commands.Cog):
                 icon_url=requester_icon,
             )
             return embed
-        except Exception as e:
-            print("!! _make_playing_embed 예외 발생:", e, flush=True)
-            import traceback
-
-            traceback.print_exc()
+        except Exception:
+            logger.exception("음악 재생 임베드 생성 실패")
             raise
 
     # ?완
@@ -1687,8 +1697,8 @@ class MusicCog(commands.Cog):
                         state.control_msg = control_msg
                         await self._edit_msg(state, embed, state.control_view)
                         fetched = True
-            except Exception as e:
-                print(f"[INFO] 저장된 패널 ID fetch 실패 -> fallback: {e}")
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                logger.info("저장된 패널 ID fetch 실패 -> fallback", exc_info=True)
                 # 실패 시 dict에서 제거
                 await self._del_panel_id(gid_key)
 
@@ -2016,11 +2026,11 @@ class MusicCog(commands.Cog):
         # !재생중 아님
         if not voice_client or not voice_client.is_playing():
             msg = await interaction.followup.send(MSG_NO_PLAYING, ephemeral=True)
-            _ = asyncio.create_task(self._auto_delete(msg, 5.0))
+            self._spawn_bg(self._auto_delete(msg, 5.0))
             return
         if error := self._same_voice_channel_error(interaction, voice_client):
             msg = await interaction.followup.send(error, ephemeral=True)
-            _ = asyncio.create_task(self._auto_delete(msg, 5.0))
+            self._spawn_bg(self._auto_delete(msg, 5.0))
             return
         print("[일시정지]")
         voice_client.pause()
@@ -2033,7 +2043,7 @@ class MusicCog(commands.Cog):
         state.control_view = await self._build_control_view(guild_id, state)
         await self._edit_msg(state, embed, state.control_view)
         # !메시지
-        _ = asyncio.create_task(
+        self._spawn_bg(
             self._auto_delete(
                 await interaction.followup.send("⏸️ 일시정지했습니다.", ephemeral=True),
                 5.0,
@@ -2052,11 +2062,11 @@ class MusicCog(commands.Cog):
                 msg = await interaction.followup.send(
                     "❌ 일시정지된 음악이 없습니다.", ephemeral=True
                 )
-                _ = asyncio.create_task(self._auto_delete(msg, 5.0))
+                self._spawn_bg(self._auto_delete(msg, 5.0))
                 return
             if error := self._same_voice_channel_error(interaction, voice_client):
                 msg = await interaction.followup.send(error, ephemeral=True)
-                _ = asyncio.create_task(self._auto_delete(msg, 5.0))
+                self._spawn_bg(self._auto_delete(msg, 5.0))
                 return
             print("[다시재생]")
             voice_client.resume()
@@ -2072,7 +2082,7 @@ class MusicCog(commands.Cog):
             state.control_view = await self._build_control_view(guild_id, state)
             await self._edit_msg(state, embed, state.control_view)
             # !메시지
-            _ = asyncio.create_task(
+            self._spawn_bg(
                 self._auto_delete(
                     await interaction.followup.send(
                         "▶️ 다시 재생합니다.", ephemeral=True
@@ -2085,7 +2095,7 @@ class MusicCog(commands.Cog):
             msg = await interaction.followup.send(
                 "❌ 다시 재생 중 오류가 발생했습니다.", ephemeral=True
             )
-            _ = asyncio.create_task(self._auto_delete(msg, 5.0))
+            self._spawn_bg(self._auto_delete(msg, 5.0))
 
     async def _skip(self, interaction: discord.Interaction):
         print("[스킵]")
@@ -2096,11 +2106,11 @@ class MusicCog(commands.Cog):
         voice_client = interaction.guild.voice_client
         if not voice_client or not voice_client.is_playing():
             msg = await interaction.followup.send(MSG_NO_PLAYING, ephemeral=True)
-            _ = asyncio.create_task(self._auto_delete(msg, 5.0))
+            self._spawn_bg(self._auto_delete(msg, 5.0))
             return
         if error := self._same_voice_channel_error(interaction, voice_client):
             msg = await interaction.followup.send(error, ephemeral=True)
-            _ = asyncio.create_task(self._auto_delete(msg, 5.0))
+            self._spawn_bg(self._auto_delete(msg, 5.0))
             return
 
         if state.is_loop:
@@ -2116,7 +2126,7 @@ class MusicCog(commands.Cog):
 
         # !메시지
         msg = await interaction.followup.send(msg_text, ephemeral=True)
-        _ = asyncio.create_task(self._auto_delete(msg, 5.0))
+        self._spawn_bg(self._auto_delete(msg, 5.0))
 
     async def _stop(self, interaction: discord.Interaction):
         print("[정지]")
@@ -2127,11 +2137,11 @@ class MusicCog(commands.Cog):
             msg = await interaction.followup.send(
                 "❌ 봇이 음성채널에 없습니다.", ephemeral=True
             )
-            _ = asyncio.create_task(self._auto_delete(msg, 5.0))
+            self._spawn_bg(self._auto_delete(msg, 5.0))
             return
         if error := self._same_voice_channel_error(interaction, voice_client):
             msg = await interaction.followup.send(error, ephemeral=True)
-            _ = asyncio.create_task(self._auto_delete(msg, 5.0))
+            self._spawn_bg(self._auto_delete(msg, 5.0))
             return
         # 정지 상태 진입
         state.is_stopping = True
@@ -2152,7 +2162,7 @@ class MusicCog(commands.Cog):
             state.updater_task = None
 
         # ! 메시지
-        _ = asyncio.create_task(
+        self._spawn_bg(
             self._auto_delete(
                 await interaction.followup.send(
                     "⏹️ 정지하고 나갑니다.", ephemeral=True
@@ -2169,7 +2179,7 @@ class MusicCog(commands.Cog):
             msg = await interaction.followup.send(
                 "❌ 대기열이 비어있습니다.", ephemeral=True
             )
-            _ = asyncio.create_task(self._auto_delete(msg, 5.0))
+            self._spawn_bg(self._auto_delete(msg, 5.0))
             return
 
         n = len(state.queue)
@@ -2212,7 +2222,7 @@ class MusicCog(commands.Cog):
         )
 
         msg = await interaction.followup.send(embed=embed, ephemeral=True)
-        _ = asyncio.create_task(self._auto_delete(msg, 20.0))
+        self._spawn_bg(self._auto_delete(msg, 20.0))
 
     async def _remove_from_queue(
         self, interaction: discord.Interaction, position: int
@@ -2307,7 +2317,7 @@ class MusicCog(commands.Cog):
 
         # ! task 재등록
         dbg("_restart_updater: creating new updater task")
-        state.updater_task = asyncio.create_task(self._updater_loop(guild_id))
+        state.updater_task = self._spawn_bg(self._updater_loop(guild_id))
         await asyncio.sleep(1)
 
     async def _seek(self, interaction: discord.Interaction, seconds: int):
@@ -2320,11 +2330,11 @@ class MusicCog(commands.Cog):
         if not voice_client or not state.player:
             # ! 메시지
             msg = await interaction.followup.send(MSG_NO_PLAYING, ephemeral=True)
-            _ = asyncio.create_task(self._auto_delete(msg, 5.0))
+            self._spawn_bg(self._auto_delete(msg, 5.0))
             return
         if error := self._same_voice_channel_error(interaction, voice_client):
             msg = await interaction.followup.send(error, ephemeral=True)
-            _ = asyncio.create_task(self._auto_delete(msg, 5.0))
+            self._spawn_bg(self._auto_delete(msg, 5.0))
             return
         try:
             total = int(state.player.data.get("duration", 0) or 0)
@@ -2333,7 +2343,7 @@ class MusicCog(commands.Cog):
                     f"❌ 이동할 시간은 곡 길이({total}초)보다 작아야 합니다.",
                     ephemeral=True,
                 )
-                _ = asyncio.create_task(self._auto_delete(msg, 6.0))
+                self._spawn_bg(self._auto_delete(msg, 6.0))
                 return
             # ! 새로운 player 생성 (start_time 포함)
             player = await YTDLSource.from_url(
@@ -2361,12 +2371,12 @@ class MusicCog(commands.Cog):
             msg = await interaction.followup.send(
                 f"⏩ {seconds}초 지점으로 이동했습니다.", ephemeral=True
             )
-            _ = asyncio.create_task(self._auto_delete(msg, 5.0))
+            self._spawn_bg(self._auto_delete(msg, 5.0))
         except FileNotFoundError:
             msg = await interaction.followup.send(
                 "❌ FFmpeg 실행 파일을 찾을 수 없습니다.", ephemeral=True
             )
-            _ = asyncio.create_task(self._auto_delete(msg, 8.0))
+            self._spawn_bg(self._auto_delete(msg, 8.0))
             state.is_seeking = False
         except Exception as e:
             dbg(f"_seek: failed: {type(e)} {e}")
@@ -2375,7 +2385,7 @@ class MusicCog(commands.Cog):
             msg = await interaction.followup.send(
                 "❌ 구간 이동 중 오류가 발생했습니다.", ephemeral=True
             )
-            _ = asyncio.create_task(self._auto_delete(msg, 6.0))
+            self._spawn_bg(self._auto_delete(msg, 6.0))
 
     # ?완료
     async def _toggle_loop(self, interaction: discord.Interaction):
@@ -2386,14 +2396,14 @@ class MusicCog(commands.Cog):
         voice_client = interaction.guild.voice_client
         if voice_client and (error := self._same_voice_channel_error(interaction, voice_client)):
             msg = await interaction.followup.send(error, ephemeral=True)
-            _ = asyncio.create_task(self._auto_delete(msg, 5.0))
+            self._spawn_bg(self._auto_delete(msg, 5.0))
             return
         state.is_loop = not state.is_loop
         # ! 메시지
         msg = await interaction.followup.send(
             f"🔁 반복 모드 {'켜짐' if state.is_loop else '꺼짐'}", ephemeral=True
         )
-        _ = asyncio.create_task(self._auto_delete(msg, 5.0))
+        self._spawn_bg(self._auto_delete(msg, 5.0))
 
     # ?완료
     def _vc_play(
@@ -2405,7 +2415,11 @@ class MusicCog(commands.Cog):
                 dbg(f"_after_play: error={error}")
             else:
                 dbg("_after_play: finished")
-            self.bot.loop.create_task(self._on_song_end(guild_id))
+
+            def _schedule_song_end() -> None:
+                self._spawn_bg(self._on_song_end(guild_id))
+
+            self.bot.loop.call_soon_threadsafe(_schedule_song_end)
 
         # ! voice_client 가져오기
         if guild_id:
@@ -2596,8 +2610,8 @@ class MusicCog(commands.Cog):
                 await self._get_or_create_panel(guild)
                 # 패널 확보 후 불필요 메세지 정리
                 await self._purge_music_channel_extras(guild)
-            except Exception as e:
-                print(f"[on_ready] 길드 {guild.id} 패널 생성 실패: {e}")
+            except Exception:
+                logger.exception("[on_ready] 길드 %s 패널 생성 실패", guild.id)
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
@@ -2632,14 +2646,14 @@ class MusicCog(commands.Cog):
             )
             # 5초 후 자동 삭제
             self._spawn_bg(self._auto_delete(warn_msg, 5.0))
-        except Exception:
-            pass
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            logger.debug("음악 전용 채널 경고 메시지 전송 실패", exc_info=True)
 
     @commands.Cog.listener()
     async def on_command_error(self, ctx, error):
         if isinstance(error, discord.errors.ClientException):
             return
-        print(f"[on_command_error] {type(error)} {error}")
+        logger.exception("music command error", exc_info=(type(error), error, error.__traceback__))
 
 
 async def setup(bot: commands.Bot):

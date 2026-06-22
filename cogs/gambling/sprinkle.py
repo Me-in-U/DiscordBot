@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from typing import List
 
 import discord
@@ -9,6 +10,9 @@ from datetime import datetime
 
 from .constants import SEOUL_TZ
 from .services import BalanceService
+
+
+logger = logging.getLogger(__name__)
 
 
 class SprinkleView(discord.ui.View):
@@ -77,8 +81,8 @@ class SprinkleView(discord.ui.View):
                 try:
                     if self.original_message:
                         await self.original_message.edit(view=self)
-                except Exception:
-                    pass
+                except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                    logger.debug("뿌리기 종료 메시지 수정 실패", exc_info=True)
                 self.stop()
 
     async def on_timeout(self) -> None:
@@ -96,8 +100,8 @@ class SprinkleView(discord.ui.View):
         if self.original_message:
             try:
                 await self.original_message.edit(view=self)
-            except Exception:
-                pass
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                logger.debug("뿌리기 만료 메시지 수정 실패", exc_info=True)
 
 
 def build_sprinkle_embed(

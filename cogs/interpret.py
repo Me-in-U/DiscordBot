@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import re
 
 import discord
@@ -13,9 +14,11 @@ from util.message_context import (
     build_recent_message_option,
     build_surrounding_message_context,
 )
+from util.logging_utils import log_user_error
 
 INTERPRET_PROMPT_ID = "pmpt_68abf98a25b481938994e409ffd1ecf20db1ff235be9e7ab"
 INTERPRET_PROMPT_VERSION = "12"
+logger = logging.getLogger(__name__)
 _INTERPRET_RESPONSE_LABEL_PATTERN = re.compile(
     r"(?i)\b(Reasoning|Conclusion|Hidden meaning)\s*:"
 )
@@ -23,7 +26,7 @@ _INTERPRET_RESPONSE_LABEL_PATTERN = re.compile(
 
 def format_interpret_response_for_discord(response: str) -> str:
     stripped_response = response.strip()
-    if not stripped_response or stripped_response.startswith("Error:"):
+    if not stripped_response:
         return response
     if (
         "**의미 분석**" in stripped_response
@@ -80,8 +83,8 @@ async def interpret_target(
             ),
         )
         return format_interpret_response_for_discord(response)
-    except Exception as e:
-        return f"Error: {e}"
+    except Exception as exc:
+        return log_user_error(logger, "해석", exc)
 
 
 @app_commands.context_menu(name="메시지 해석")
@@ -195,8 +198,8 @@ class InterpretSelectView(discord.ui.View):
         if isinstance(self.original_message, discord.Message):
             try:
                 await self.original_message.edit(content=result_message, view=None)
-            except Exception:
-                pass
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                logger.debug("해석 결과 메시지 수정 실패", exc_info=True)
 
         self.stop()
 
@@ -213,16 +216,16 @@ class InterpretSelectView(discord.ui.View):
                     content="1분 이내에 해석하지 않으셔서 작업이 취소되었습니다.",
                     view=None,
                 )
-            except Exception:
-                pass
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                logger.debug("해석 선택 만료 메시지 수정 실패", exc_info=True)
 
             await asyncio.sleep(30)
             # original_message가 discord.Message인지 확인 후 삭제
             if isinstance(self.original_message, discord.Message):
                 try:
                     await self.original_message.delete()
-                except discord.NotFound:
-                    pass
+                except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                    logger.debug("해석 선택 만료 메시지 삭제 실패", exc_info=True)
 
 
 class InterpretCommands(commands.Cog):
@@ -256,8 +259,8 @@ class InterpretCommands(commands.Cog):
             )
             try:
                 await interaction.followup.send(interpreted)
-            except Exception:
-                pass
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                logger.debug("해석 결과 전송 실패", exc_info=True)
         else:
             messages_options = []
             async for message in interaction.channel.history(limit=20):
@@ -278,8 +281,8 @@ class InterpretCommands(commands.Cog):
                     await interaction.response.send_message(
                         "**해석할 메시지를 찾지 못했습니다.**"
                     )
-                except Exception:
-                    pass
+                except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                    logger.debug("해석 대상 없음 응답 전송 실패", exc_info=True)
                 return
             view = InterpretSelectView(messages_options)
             # 슬래시 상호작용에 대한 첫 번째 응답
@@ -288,7 +291,8 @@ class InterpretCommands(commands.Cog):
                     content="아래 선택 메뉴에서 해석할 메시지를 선택하면 자동으로 해석이 진행됩니다.",
                     view=view,
                 )
-            except Exception:
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                logger.debug("해석 선택 메뉴 전송 실패", exc_info=True)
                 return
             # 실제로 채널에 올라간 discord.Message 객체를 가져와서 original_message에 저장
             sent_msg = await interaction.original_response()
