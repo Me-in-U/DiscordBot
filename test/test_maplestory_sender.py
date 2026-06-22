@@ -1,7 +1,12 @@
 import unittest
 import warnings
+from pathlib import Path
 
 from util.maplestory.parser import MapleStoryEvent, MapleStoryNotice
+
+
+MAPLESTORY_SENDER_PATH = Path("util/maplestory/sender.py")
+LEGACY_MAPLESTORY_SENDER_PATH = Path("util/maplestory_sender.py")
 
 
 class FakeSentMessage:
@@ -19,10 +24,14 @@ class FakeTextChannel:
 
 
 class MapleStorySenderTests(unittest.IsolatedAsyncioTestCase):
+    async def test_maplestory_sender_lives_under_maplestory_package(self):
+        self.assertTrue(MAPLESTORY_SENDER_PATH.exists())
+        self.assertFalse(LEGACY_MAPLESTORY_SENDER_PATH.exists())
+
     async def test_send_sunday_maple_event_to_channels_sends_embeds(self):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", DeprecationWarning)
-            from util.maplestory_sender import send_sunday_maple_event_to_channels
+            from util.maplestory.sender import send_sunday_maple_event_to_channels
 
         event = MapleStoryEvent(
             title="스페셜 썬데이 메이플",
@@ -43,7 +52,7 @@ class MapleStorySenderTests(unittest.IsolatedAsyncioTestCase):
     async def test_send_sunday_maple_event_to_channels_skips_missing_images(self):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", DeprecationWarning)
-            from util.maplestory_sender import send_sunday_maple_event_to_channels
+            from util.maplestory.sender import send_sunday_maple_event_to_channels
 
         channel = FakeTextChannel(channel_id=1234)
         results = await send_sunday_maple_event_to_channels(
@@ -61,7 +70,7 @@ class MapleStorySenderTests(unittest.IsolatedAsyncioTestCase):
     async def test_send_maplestory_notice_to_channel_sends_three_line_embed(self):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", DeprecationWarning)
-            from util.maplestory_sender import send_maplestory_notice_to_channel
+            from util.maplestory.sender import send_maplestory_notice_to_channel
 
         channel = FakeTextChannel(channel_id=1234)
         notice = MapleStoryNotice(
@@ -103,7 +112,7 @@ class MapleStorySenderTests(unittest.IsolatedAsyncioTestCase):
     async def test_openai_notice_summary_is_coerced_to_three_compact_lines(self):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", DeprecationWarning)
-            from util.maplestory_sender import summarize_maplestory_notice_with_openai
+            from util.maplestory.sender import summarize_maplestory_notice_with_openai
 
         notice = MapleStoryNotice(
             notice_id="149372",
@@ -136,7 +145,7 @@ class MapleStorySenderCompatibilityTests(unittest.TestCase):
     def test_legacy_maplestory_events_reexports_sender_entrypoints(self):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", DeprecationWarning)
-            import util.maplestory_sender as maplestory_sender
+            import util.maplestory.sender as maplestory_sender
             import util.maplestory_events as maplestory_events
 
         self.assertIs(

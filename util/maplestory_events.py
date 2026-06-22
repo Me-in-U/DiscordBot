@@ -35,7 +35,7 @@ from util.maplestory.parser import (
     parse_maplestory_notice_list,
     parse_maplestory_ongoing_event_url,
 )
-from util.maplestory_sender import (
+from util.maplestory.sender import (
     MapleStoryNoticeUpdateResult,
     SundayMapleUpdateResult,
     build_maplestory_notice_embed,
