@@ -11,7 +11,7 @@ from util.youtube_community import (
     YouTubeCommunityPost,
     fetch_latest_youtube_community_posts,
 )
-from util.youtube_community_notification import (
+from util.youtube.community_notification import (
     process_youtube_community_notifications,
 )
 from util.youtube_subscriptions import YouTubeSubscription

@@ -248,7 +248,7 @@ class YouTubeWebSubTests(unittest.TestCase):
         source = LOOP_PATH.read_text(encoding="utf-8")
         community_polling_source = COMMUNITY_POLLING_PATH.read_text(encoding="utf-8")
         community_notification_source = Path(
-            "util/youtube_community_notification.py"
+            "util/youtube/community_notification.py"
         ).read_text(encoding="utf-8")
 
         self.assertIn("@tasks.loop(minutes=10)", source)

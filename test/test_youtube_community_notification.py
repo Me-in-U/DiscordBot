@@ -1,12 +1,19 @@
 import unittest
+from pathlib import Path
 
 from util.youtube_community import YouTubeCommunityPost
-from util.youtube_community_notification import (
+from util.youtube.community_notification import (
     mark_youtube_community_post_notified,
     process_youtube_community_notifications,
     send_youtube_community_notification,
 )
 from util.youtube_subscriptions import YouTubeSubscription
+
+
+YOUTUBE_COMMUNITY_NOTIFICATION_PATH = Path("util/youtube/community_notification.py")
+LEGACY_YOUTUBE_COMMUNITY_NOTIFICATION_PATH = Path(
+    "util/youtube_community_notification.py"
+)
 
 
 def _subscription(**overrides) -> YouTubeSubscription:
@@ -44,6 +51,10 @@ def _post(post_id: str, *, text: str = "본문") -> YouTubeCommunityPost:
 
 
 class YouTubeCommunityNotificationTests(unittest.IsolatedAsyncioTestCase):
+    def test_youtube_community_notification_lives_under_youtube_package(self):
+        self.assertTrue(YOUTUBE_COMMUNITY_NOTIFICATION_PATH.exists())
+        self.assertFalse(LEGACY_YOUTUBE_COMMUNITY_NOTIFICATION_PATH.exists())
+
     async def test_mark_community_post_notified_trims_ids_and_persists_state(self):
         recorder = _Recorder()
         subscription = _subscription(
