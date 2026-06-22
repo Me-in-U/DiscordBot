@@ -14,8 +14,8 @@
 6. Top 5 리스크는 `music.py`, `youtube_summary.py`, `loop.py` 같은 대형 파일이 변경 위험을 키우는 점이다.
 7. 권장 처리 순서는 Jenkins 테스트 게이트, `on_ready` guard, YouTube temp workspace, 민감 로그 제거, 문서 최신화다.
 8. 현재 작업트리에서는 위 1-4번 리스크의 1차 보강과 대형 파일 일부 분리가 구현되었다.
-9. 현재 최신 검증은 `compileall` 통과, unittest 554개 통과다.
-10. 이번 패치로 `cogs/music/`, `cogs/youtube_subscriptions/`, `cogs/maplestory/`, `cogs/lol_scrim/`, `cogs/dday/`, `cogs/channel_settings/`, `cogs/party/`, `cogs/loop/`, `cogs/voice_chat/`, `cogs/search/`, `cogs/questions/`, `cogs/explanation/`, `cogs/interpret/`, `cogs/translation/`, `cogs/summarize/`, `cogs/rank/`, `cogs/scheduler/`, `cogs/status_api/`, `cogs/celebration_update/`, `cogs/exchange_rate/`, `cogs/foreign_reserves/`, `cogs/clean/`, `cogs/custom_help/`, `cogs/emoji_enlarge/`, `cogs/ping/` package cog 전환과 guild channel settings helper의 `util/guild/` 이동이 반영되었고, root util은 공통 infra 중심으로 축소되었다.
+9. 현재 최신 검증은 `compileall` 통과, unittest 556개 통과다.
+10. 이번 패치로 모든 root Cog 파일이 package cog로 전환되었고, guild channel settings helper의 `util/guild/` 이동도 반영되어 root util은 공통 infra 중심으로 축소되었다.
 
 ## 기준선
 
@@ -31,7 +31,7 @@
 
 이 문서의 진단은 기준 커밋 `34aab00` 상태를 대상으로 한다. 이후 현재 작업트리에서는 아래 항목이 구현되었다.
 
-최신 검증 결과: `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` 554개 통과.
+최신 검증 결과: `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` 556개 통과.
 
 | 상태 | 항목 | 구현 근거 |
 | --- | --- | --- |
@@ -74,6 +74,7 @@
 | 완료 | Custom help Cog package 이동 | `cogs/custom_help.py`를 `cogs/custom_help/__init__.py` package cog로 이동하고, `cogs.custom_help` 공개 import와 bot extension 이름은 유지하면서 물리 배치를 custom help 카테고리 폴더로 통일 |
 | 완료 | Emoji enlarge Cog package 이동 | `cogs/emoji_enlarge.py`를 `cogs/emoji_enlarge/__init__.py` package cog로 이동하고, `cogs.emoji_enlarge` 공개 import와 bot extension 이름은 유지하면서 물리 배치를 emoji enlarge 카테고리 폴더로 통일 |
 | 완료 | Ping Cog package 이동 | `cogs/ping.py`를 `cogs/ping/__init__.py` package cog로 이동하고, `cogs.ping` 공개 import와 bot extension 이름은 유지하면서 물리 배치를 ping 카테고리 폴더로 통일 |
+| 완료 | Vote Cog package 이동 | `cogs/vote.py`를 `cogs/vote/__init__.py` package cog로 이동하고, `cogs.vote` 공개 import와 bot extension 이름은 유지하면서 물리 배치를 vote 카테고리 폴더로 통일 |
 | 완료 | WebSub subscription helper 1차 분리 | `util/youtube/websub_subscription.py`로 callback URL 구성, subscribe/unsubscribe 요청, live/upload 구독 대상 필터링, WebSub 상태 저장 이동 |
 | 완료 | WebSub subscription helper 패키지 이동 | `util/youtube_websub_subscription.py`를 `util/youtube/websub_subscription.py`로 이동하고, `cogs.loop`/test import를 새 카테고리 패키지 경로로 통일했으며 root helper 제거를 경로 계약 테스트로 고정 |
 | 완료 | WebSub notification handler 1차 분리 | `util/youtube/websub_notification.py`로 Atom notification 파싱, 구독 조회, 후보 처리 결과 집계 이동 |
@@ -224,14 +225,14 @@
 | 완료 | YouTube notification state helper 패키지 이동 | `util/youtube_notification_state.py`를 `util/youtube/notification_state.py`로 이동하고, `cogs.loop`/YouTube runner/test import를 새 카테고리 패키지 경로로 통일했으며 root helper 제거를 경로 계약 테스트로 고정 |
 | 완료 | YouTube video status helper 패키지 이동 | `util/youtube_video_status.py`를 `util/youtube/video_status.py`로 이동하고, `cogs.loop`/WebSub surface/test import를 새 카테고리 패키지 경로로 통일했으며 root helper 제거를 경로 계약 테스트로 고정 |
 
-현재까지 guild channel settings helper의 `util/guild/` 패키지 이동과 Music/YouTube subscriptions/MapleStory/LoL scrim/DDAY/Channel settings/Party/Loop/Voice chat/Search/Questions/Explanation/Interpret/Translation/Summarize/Rank/Scheduler/Status API/Celebration update/Exchange rate/Foreign reserves/Clean/Custom help/Emoji enlarge/Ping Cog package 이동이 완료되었다. root `util/music*.py`, root `util/youtube*.py`, root `util/maplestory*.py`, root loop helper, root celebration helper는 더 이상 남지 않았다.
+현재까지 guild channel settings helper의 `util/guild/` 패키지 이동과 모든 Cog package 이동이 완료되었다. root `cogs/*.py`, root `util/music*.py`, root `util/youtube*.py`, root `util/maplestory*.py`, root loop helper, root celebration helper는 더 이상 남지 않았다.
 
 ## 현재 구조 요약
 
 - `bot.py`: Discord 클라이언트 초기화, Cog 동적 로드, 메시지 캐시(`USER_MESSAGES`), 파티 상태(`PARTY_LIST`), DB 초기화
 - `cogs/`: Discord 명령과 백그라운드 태스크 구현
   - 대형 Cog: `cogs/music/`, `cogs/loop/`, `cogs/voice_chat/`, `cogs/youtube_subscriptions/`
-  - 패키지 Cog: `cogs/celebration_update/`, `cogs/channel_settings/`, `cogs/clean/`, `cogs/custom_help/`, `cogs/dday/`, `cogs/emoji_enlarge/`, `cogs/exchange_rate/`, `cogs/explanation/`, `cogs/foreign_reserves/`, `cogs/gambling/`, `cogs/interpret/`, `cogs/lol_scrim/`, `cogs/loop/`, `cogs/maplestory/`, `cogs/music/`, `cogs/party/`, `cogs/ping/`, `cogs/questions/`, `cogs/rank/`, `cogs/scheduler/`, `cogs/search/`, `cogs/status_api/`, `cogs/summarize/`, `cogs/translation/`, `cogs/voice_chat/`, `cogs/youtube_subscriptions/`
+  - 패키지 Cog: `cogs/celebration_update/`, `cogs/channel_settings/`, `cogs/clean/`, `cogs/custom_help/`, `cogs/dday/`, `cogs/emoji_enlarge/`, `cogs/exchange_rate/`, `cogs/explanation/`, `cogs/foreign_reserves/`, `cogs/gambling/`, `cogs/interpret/`, `cogs/lol_scrim/`, `cogs/loop/`, `cogs/maplestory/`, `cogs/music/`, `cogs/party/`, `cogs/ping/`, `cogs/questions/`, `cogs/rank/`, `cogs/scheduler/`, `cogs/search/`, `cogs/status_api/`, `cogs/summarize/`, `cogs/translation/`, `cogs/voice_chat/`, `cogs/vote/`, `cogs/youtube_subscriptions/`
 - `api/`: OpenAI, Riot, ECOS 환율/외환보유액 API 래퍼
 - `func/`: YouTube 요약, 1557 감지 등 기능성 helper
 - `util/`: DB, 채널 설정, YouTube 구독, MapleStory, D-day, 로깅 등 공유 유틸
@@ -649,7 +650,7 @@
 | Docker Python | 기준 커밋 `Dockerfile.deps` -> `FROM python:3.12-slim`, 현재 작업트리 -> `FROM python:3.11-slim` | 로컬/운영 Python minor version 불일치가 해소됨 |
 | 테스트 기준선 | `python -m unittest discover -s test` -> 154개 통과 | 현재 회귀 테스트 기준 |
 | 컴파일 기준선 | `python -m compileall -q bot.py api cogs common func util test` 통과 | 문법/import 기본 검증 |
-| 작업트리 최신 검증 | `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` -> 554개 통과 | 구현 진행 후 회귀 확인 |
+| 작업트리 최신 검증 | `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` -> 556개 통과 | 구현 진행 후 회귀 확인 |
 | 파일 수 | PowerShell 파일 집계 -> Python 파일 96개 | 분석 규모 |
 | 대형 파일 기준선 | 기준 커밋 line count: `music.py` 2663, `youtube_summary.py` 1072, `loop.py` 954, `maplestory_events.py` 875 | 분리 우선 후보였던 초기 상태 |
 | 대형 파일 현재 | Python read line count: `cogs/music/__init__.py` 1706, `cogs/youtube_subscriptions/__init__.py` 566, `cogs/voice_chat/__init__.py` 380, `youtube_summary.py` 191, `cogs/loop/__init__.py` 269, `util/maplestory/events.py` 251 | 분리 진행 후에도 Music/YouTube subscription/Voice chat Cog entrypoint는 command/action facade 축소 여지가 큼 |
@@ -735,6 +736,7 @@
 | Custom help Cog package 이동 | `cogs/custom_help/__init__.py` 213줄, custom help layout 대상 테스트 2개 통과 | 도움말/기가채드 명령 표면을 package cog로 이동하고, `cogs.custom_help` extension/import 호환과 root `cogs/custom_help.py` 제거를 테스트로 고정 |
 | Emoji enlarge Cog package 이동 | `cogs/emoji_enlarge/__init__.py` 41줄, emoji enlarge layout 대상 테스트 2개 통과 | 단일 커스텀 이모지 확대 listener 표면을 package cog로 이동하고, `cogs.emoji_enlarge` extension/import 호환과 root `cogs/emoji_enlarge.py` 제거를 테스트로 고정 |
 | Ping Cog package 이동 | `cogs/ping/__init__.py` 17줄, ping layout 대상 테스트 2개 통과 | 핑 명령 표면을 package cog로 이동하고, `cogs.ping` extension/import 호환과 root `cogs/ping.py` 제거를 테스트로 고정 |
+| Vote Cog package 이동 | `cogs/vote/__init__.py` 174줄, vote layout 대상 테스트 2개 통과 | 투표 명령과 View/Button helper 표면을 package cog로 이동하고, `cogs.vote` extension/import 호환과 root `cogs/vote.py` 제거를 테스트로 고정 |
 | env 추적 상태 | `git check-ignore -v .env .env.deploy`; `git ls-files .env .env.deploy` empty | 비밀 파일은 ignore 상태 |
 | Jenkins 테스트 단계 | 기준 커밋 `Jenkinsfile`에는 checkout/validate/deploy만 있었고, 현재 작업트리에는 `Verify` stage 추가 | 배포 전 compile/unittest gate 부재가 해소됨 |
 | 설치 안내 정합성 | README/AGENTS/Dockerfile.deps/Jenkinsfile은 `requirements.txt`를 기본 진입점으로 안내, `pip_install.txt`는 legacy/manual notes로 남음 | 기본 설치 안내 불일치는 해소, legacy 파일 처리와 pin/lock 전략은 후속 과제 |
