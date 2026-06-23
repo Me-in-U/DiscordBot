@@ -12,7 +12,7 @@ from cogs.music import (
     shuffle_queue,
 )
 from util import music_queue
-from util.music_queue import build_queue_display
+from util.music_queue import apply_queue_track_metadata, build_queue_display
 
 
 def _queue(*titles: str):
@@ -200,6 +200,39 @@ class MusicQueueHelperTests(unittest.TestCase):
         self.assertEqual(track.duration, 125)
         self.assertEqual(track.webpage_url, "https://www.youtube.com/watch?v=abc")
         self.assertEqual(track.uploader, "채널명")
+        self.assertEqual(track.thumbnail, "https://example.com/high.jpg")
+
+    def test_apply_queue_track_metadata_uses_single_entry_and_thumbnail_fallback(self):
+        track = QueuedTrack(
+            url="https://example.com/fallback",
+            title="기존 제목",
+            duration=10,
+            webpage_url="https://example.com/old",
+            uploader="기존 업로더",
+            thumbnail="https://example.com/old.jpg",
+        )
+        metadata = {
+            "entries": [
+                {
+                    "title": "추출 제목",
+                    "duration": "125",
+                    "webpage_url": "https://example.com/watch",
+                    "uploader": "추출 업로더",
+                    "thumbnails": [
+                        {"url": "https://example.com/low.jpg"},
+                        {"url": "https://example.com/high.jpg"},
+                    ],
+                }
+            ]
+        }
+
+        result = apply_queue_track_metadata(track, metadata)
+
+        self.assertIs(result, track)
+        self.assertEqual(track.title, "추출 제목")
+        self.assertEqual(track.duration, 125)
+        self.assertEqual(track.webpage_url, "https://example.com/watch")
+        self.assertEqual(track.uploader, "추출 업로더")
         self.assertEqual(track.thumbnail, "https://example.com/high.jpg")
 
 

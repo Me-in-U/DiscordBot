@@ -693,8 +693,11 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         self.assertIn("TypeError", function_source)
         self.assertIn("ValueError", function_source)
         self.assertIn("logger.debug", function_source)
+        self.assertIn("apply_queue_track_metadata", function_source)
         self.assertNotIn("except Exception", function_source)
         self.assertNotIn("dbg(", function_source)
+        self.assertNotIn("track.title =", function_source)
+        self.assertNotIn("thumbnails", function_source)
 
     def test_playback_control_paths_use_specific_exceptions(self):
         source_text = MUSIC_PATH.read_text(encoding="utf-8")

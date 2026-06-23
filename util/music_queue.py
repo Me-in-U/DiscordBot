@@ -188,6 +188,24 @@ def enqueue_search_entry_track(
     return track
 
 
+def apply_queue_track_metadata(
+    track: QueuedTrack,
+    metadata: dict[str, Any],
+) -> QueuedTrack:
+    info = metadata
+    if "entries" in info and info.get("entries"):
+        entry = (info.get("entries") or [None])[0]
+        if isinstance(entry, dict):
+            info = entry
+
+    track.title = info.get("title") or track.title
+    track.duration = int(info.get("duration") or 0) or track.duration
+    track.webpage_url = info.get("webpage_url") or track.webpage_url or track.url
+    track.uploader = info.get("uploader") or track.uploader
+    track.thumbnail = info.get("thumbnail") or _search_entry_thumbnail(info) or track.thumbnail
+    return track
+
+
 def _search_entry_thumbnail(entry: dict[str, Any]) -> str | None:
     thumbnail = entry.get("thumbnail")
     if isinstance(thumbnail, str) and thumbnail:

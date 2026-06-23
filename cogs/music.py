@@ -42,6 +42,7 @@ from util.music_embeds import (
 )
 from util.music_queue import (
     QueuedTrack,
+    apply_queue_track_metadata,
     build_queue_display,
     _track_title,
     build_queue_preview,
@@ -249,29 +250,7 @@ class MusicCog(commands.Cog):
             info = await loop.run_in_executor(YTDL_EXECUTOR, _extract)
             if not info or not isinstance(info, dict):
                 return
-            # 단일 엔트리 처리
-            if "entries" in info and info.get("entries"):
-                entry = (info.get("entries") or [None])[0]
-                if isinstance(entry, dict):
-                    info = entry
-            track.title = info.get("title") or track.title
-            track.duration = int(info.get("duration") or 0) or track.duration
-            track.webpage_url = (
-                info.get("webpage_url") or track.webpage_url or track.url
-            )
-            track.uploader = info.get("uploader") or track.uploader
-            # 썸네일은 여러 키가 있을 수 있음
-            thumbnails = info.get("thumbnails")
-            thumbnail_url = None
-            if isinstance(thumbnails, list) and thumbnails:
-                last_thumbnail = thumbnails[-1]
-                if isinstance(last_thumbnail, dict):
-                    thumbnail_url = last_thumbnail.get("url")
-            track.thumbnail = (
-                info.get("thumbnail")
-                or thumbnail_url
-                or track.thumbnail
-            )
+            apply_queue_track_metadata(track, info)
         except (RuntimeError, TypeError, ValueError, KeyError):
             logger.debug("대기열 메타데이터 반영 실패: url=%s", track.url, exc_info=True)
 
