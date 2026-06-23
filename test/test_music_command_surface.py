@@ -540,6 +540,24 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         self.assertNotIn("title=favorite.title", current_source)
         self.assertNotIn("thumbnail=favorite.thumbnail", current_source)
 
+    def test_favorite_panel_refresh_delegates_panel_mode_to_helper(self):
+        source_text = MUSIC_PATH.read_text(encoding="utf-8")
+        tree = ast.parse(source_text)
+
+        refresh_source = ast.get_source_segment(
+            source_text,
+            _function_node(tree, "_refresh_music_panel_for_favorites"),
+        )
+
+        self.assertIn("build_music_favorite_panel_refresh_action", refresh_source)
+        self.assertIn("panel_action.should_refresh", refresh_source)
+        self.assertIn("panel_action.should_use_playing_panel", refresh_source)
+        self.assertNotIn(
+            "state.control_msg is None or state.control_channel is None",
+            refresh_source,
+        )
+        self.assertNotIn("if state.player:", refresh_source)
+
     def test_panel_and_seek_validation_responses_use_shared_ephemeral_helper(self):
         source_text = MUSIC_PATH.read_text(encoding="utf-8")
         tree = ast.parse(source_text)

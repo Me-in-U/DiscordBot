@@ -6,6 +6,7 @@ from util.music_favorites import (
     MusicFavorite,
     MusicFavoriteManagerOpenAction,
     MusicFavoriteManagerSelectionAction,
+    MusicFavoritePanelRefreshAction,
     MusicFavoritePlayActionResult,
     MusicFavoritePlayRequestAction,
     MusicFavoriteSearchModalAction,
@@ -22,6 +23,7 @@ from util.music_favorites import (
     build_music_favorite_manager_open_action,
     build_music_favorite_manager_selection_action,
     build_music_favorite_button_label,
+    build_music_favorite_panel_refresh_action,
     build_music_favorite_play_action,
     build_music_favorite_play_request_action,
     build_music_favorite_search_modal_action,
@@ -295,6 +297,54 @@ class MusicFavoriteTests(unittest.IsolatedAsyncioTestCase):
                 user_message="저장 완료",
                 should_refresh_favorites=True,
                 should_refresh_panel=True,
+            ),
+        )
+
+    def test_music_favorite_panel_refresh_action_skips_without_panel_target(self):
+        result = build_music_favorite_panel_refresh_action(
+            guild_id=10,
+            has_control_message=False,
+            has_control_channel=True,
+            has_player=True,
+        )
+
+        self.assertEqual(
+            result,
+            MusicFavoritePanelRefreshAction(
+                guild_id=10,
+                should_refresh=False,
+                should_use_playing_panel=False,
+            ),
+        )
+
+    def test_music_favorite_panel_refresh_action_selects_panel_mode(self):
+        playing_result = build_music_favorite_panel_refresh_action(
+            guild_id="10",
+            has_control_message=True,
+            has_control_channel=True,
+            has_player=True,
+        )
+        helper_result = build_music_favorite_panel_refresh_action(
+            guild_id="10",
+            has_control_message=True,
+            has_control_channel=True,
+            has_player=False,
+        )
+
+        self.assertEqual(
+            playing_result,
+            MusicFavoritePanelRefreshAction(
+                guild_id=10,
+                should_refresh=True,
+                should_use_playing_panel=True,
+            ),
+        )
+        self.assertEqual(
+            helper_result,
+            MusicFavoritePanelRefreshAction(
+                guild_id=10,
+                should_refresh=True,
+                should_use_playing_panel=False,
             ),
         )
 

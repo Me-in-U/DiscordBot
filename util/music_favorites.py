@@ -56,6 +56,13 @@ class MusicFavoriteSaveResponseAction:
 
 
 @dataclass(frozen=True, slots=True)
+class MusicFavoritePanelRefreshAction:
+    guild_id: int
+    should_refresh: bool
+    should_use_playing_panel: bool = False
+
+
+@dataclass(frozen=True, slots=True)
 class MusicFavoriteSearchEntrySaveAction:
     payload: MusicFavoriteSavePayload
 
@@ -527,4 +534,19 @@ def build_music_favorite_save_response_action(
     return MusicFavoriteSaveResponseAction(
         guild_id=save_result.guild_id,
         user_message=save_result.user_message,
+    )
+
+
+def build_music_favorite_panel_refresh_action(
+    *,
+    guild_id: int | str,
+    has_control_message: bool,
+    has_control_channel: bool,
+    has_player: bool,
+) -> MusicFavoritePanelRefreshAction:
+    should_refresh = bool(has_control_message and has_control_channel)
+    return MusicFavoritePanelRefreshAction(
+        guild_id=int(guild_id),
+        should_refresh=should_refresh,
+        should_use_playing_panel=should_refresh and bool(has_player),
     )
