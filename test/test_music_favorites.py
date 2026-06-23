@@ -3,8 +3,12 @@ import unittest
 from cogs.music import GuildMusicState, MusicCog, MusicControlView, MusicHelperView
 from util.music_favorites import (
     MusicFavorite,
+    MusicFavoriteSavePayload,
     build_music_favorite_button_label,
+    build_music_favorite_save_payload,
     current_player_to_music_favorite,
+    music_favorite_to_save_payload,
+    search_entry_to_music_favorite_save_payload,
     validate_music_favorite_slot,
 )
 
@@ -81,6 +85,99 @@ class MusicFavoriteTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(favorite.title, "(제목 정보 없음)")
         self.assertEqual(favorite.url, "https://youtube.com/watch?v=fallback")
         self.assertEqual(favorite.duration, 0)
+
+    def test_music_favorite_save_payload_normalizes_values_and_message(self):
+        payload = build_music_favorite_save_payload(
+            guild_id=10,
+            slot=2,
+            title="  저장할 노래  ",
+            url="  https://youtube.com/watch?v=abc  ",
+            duration="125",
+            uploader="업로더",
+            thumbnail="https://example.com/thumb.jpg",
+            updated_by=99,
+        )
+
+        self.assertEqual(
+            payload,
+            MusicFavoriteSavePayload(
+                guild_id=10,
+                slot=2,
+                title="저장할 노래",
+                url="https://youtube.com/watch?v=abc",
+                duration=125,
+                uploader="업로더",
+                thumbnail="https://example.com/thumb.jpg",
+                updated_by=99,
+            ),
+        )
+        self.assertEqual(
+            payload.user_message,
+            "⭐ 2번 즐겨찾기에 **저장할 노래** 저장했습니다.",
+        )
+
+    def test_music_favorite_save_payload_rejects_missing_url(self):
+        with self.assertRaisesRegex(ValueError, "즐겨찾기에 저장할 URL이 없습니다"):
+            build_music_favorite_save_payload(
+                guild_id=10,
+                slot=1,
+                title="URL 없음",
+                url=" ",
+            )
+
+    def test_search_entry_to_music_favorite_save_payload_extracts_metadata(self):
+        payload = search_entry_to_music_favorite_save_payload(
+            guild_id=10,
+            slot=3,
+            entry={
+                "title": "",
+                "duration": "not-a-number",
+                "webpage_url": "/watch?v=abc123",
+                "uploader": "",
+                "channel": "채널명",
+                "thumbnails": [
+                    {"url": "https://example.com/low.jpg"},
+                    {"url": "https://example.com/high.jpg"},
+                ],
+            },
+            updated_by=99,
+        )
+
+        self.assertEqual(payload.guild_id, 10)
+        self.assertEqual(payload.slot, 3)
+        self.assertEqual(payload.title, "(제목 정보 없음)")
+        self.assertEqual(payload.url, "https://www.youtube.com/watch?v=abc123")
+        self.assertEqual(payload.duration, 0)
+        self.assertEqual(payload.uploader, "채널명")
+        self.assertEqual(payload.thumbnail, "https://example.com/high.jpg")
+        self.assertEqual(payload.updated_by, 99)
+
+    def test_music_favorite_to_save_payload_overrides_slot_and_updater(self):
+        favorite = MusicFavorite(
+            guild_id=10,
+            slot=1,
+            title="현재곡",
+            url="https://youtube.com/watch?v=abc",
+            duration=125,
+            uploader="업로더",
+            thumbnail="https://example.com/thumb.jpg",
+        )
+
+        payload = music_favorite_to_save_payload(favorite, slot=5, updated_by=99)
+
+        self.assertEqual(
+            payload,
+            MusicFavoriteSavePayload(
+                guild_id=10,
+                slot=5,
+                title="현재곡",
+                url="https://youtube.com/watch?v=abc",
+                duration=125,
+                uploader="업로더",
+                thumbnail="https://example.com/thumb.jpg",
+                updated_by=99,
+            ),
+        )
 
     async def test_default_music_view_shows_search_manage_and_five_favorite_slots(self):
         favorite = MusicFavorite(

@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from util.db import execute_query, fetch_all, fetch_one
+from util.music_search import normalize_search_entry_url
 
 
 MUSIC_FAVORITE_SLOT_MIN = 1
@@ -22,6 +23,22 @@ class MusicFavorite:
     uploader: str | None = None
     thumbnail: str | None = None
     updated_by: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class MusicFavoriteSavePayload:
+    guild_id: int
+    slot: int
+    title: str
+    url: str
+    duration: int = 0
+    uploader: str | None = None
+    thumbnail: str | None = None
+    updated_by: int | None = None
+
+    @property
+    def user_message(self) -> str:
+        return f"⭐ {self.slot}번 즐겨찾기에 **{self.title}** 저장했습니다."
 
 
 def validate_music_favorite_slot(slot: int) -> int:
@@ -97,6 +114,93 @@ def current_player_to_music_favorite(
         uploader=data.get("uploader"),
         thumbnail=data.get("thumbnail"),
     )
+
+
+def build_music_favorite_save_payload(
+    *,
+    guild_id: int,
+    slot: int,
+    title: str | None,
+    url: str | None,
+    duration: Any = 0,
+    uploader: str | None = None,
+    thumbnail: str | None = None,
+    updated_by: int | None = None,
+) -> MusicFavoriteSavePayload:
+    clean_title = (title or "").strip() or "(제목 정보 없음)"
+    clean_url = (url or "").strip()
+    if not clean_url:
+        raise ValueError("즐겨찾기에 저장할 URL이 없습니다.")
+
+    return MusicFavoriteSavePayload(
+        guild_id=int(guild_id),
+        slot=validate_music_favorite_slot(slot),
+        title=clean_title,
+        url=clean_url,
+        duration=_safe_music_duration(duration),
+        uploader=uploader or None,
+        thumbnail=thumbnail or None,
+        updated_by=int(updated_by) if updated_by else None,
+    )
+
+
+def search_entry_to_music_favorite_save_payload(
+    *,
+    guild_id: int,
+    slot: int,
+    entry: dict[str, Any],
+    updated_by: int | None = None,
+) -> MusicFavoriteSavePayload:
+    return build_music_favorite_save_payload(
+        guild_id=guild_id,
+        slot=slot,
+        title=entry.get("title") or None,
+        url=normalize_search_entry_url(entry),
+        duration=entry.get("duration") or 0,
+        uploader=entry.get("uploader") or entry.get("channel") or None,
+        thumbnail=_search_entry_thumbnail(entry),
+        updated_by=updated_by,
+    )
+
+
+def music_favorite_to_save_payload(
+    favorite: MusicFavorite,
+    *,
+    slot: int | None = None,
+    updated_by: int | None = None,
+) -> MusicFavoriteSavePayload:
+    return build_music_favorite_save_payload(
+        guild_id=favorite.guild_id,
+        slot=favorite.slot if slot is None else slot,
+        title=favorite.title,
+        url=favorite.url,
+        duration=favorite.duration,
+        uploader=favorite.uploader,
+        thumbnail=favorite.thumbnail,
+        updated_by=updated_by if updated_by is not None else favorite.updated_by,
+    )
+
+
+def _safe_music_duration(value: Any) -> int:
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _search_entry_thumbnail(entry: dict[str, Any]) -> str | None:
+    thumbnail = entry.get("thumbnail")
+    if isinstance(thumbnail, str) and thumbnail:
+        return thumbnail
+
+    thumbnails = entry.get("thumbnails") or []
+    if isinstance(thumbnails, list) and thumbnails:
+        candidate = thumbnails[-1]
+        if isinstance(candidate, dict):
+            candidate_url = candidate.get("url")
+            return candidate_url if isinstance(candidate_url, str) else None
+
+    return None
 
 
 async def list_music_favorites(guild_id: int) -> list[MusicFavorite]:

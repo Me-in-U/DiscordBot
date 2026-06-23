@@ -15,9 +15,12 @@ from yt_dlp.utils import DownloadError
 from util.channel_settings import get_channel
 from util.music_favorites import (
     MusicFavorite,
+    MusicFavoriteSavePayload,
     current_player_to_music_favorite,
     get_music_favorite,
     list_music_favorites,
+    music_favorite_to_save_payload,
+    search_entry_to_music_favorite_save_payload,
     upsert_music_favorite,
     validate_music_favorite_slot,
 )
@@ -58,7 +61,6 @@ from util.music_progress import (
 from util.music_search import (
     build_music_search_action,
     is_http_url,
-    normalize_search_entry_url,
 )
 from util.music_panel_store import (
     delete_music_panel_id,
@@ -314,30 +316,23 @@ class MusicCog(commands.Cog):
     async def _save_music_favorite(
         self,
         interaction: discord.Interaction,
-        *,
-        slot: int,
-        title: str,
-        url: str,
-        duration: int = 0,
-        uploader: str | None = None,
-        thumbnail: str | None = None,
+        payload: MusicFavoriteSavePayload,
     ) -> None:
-        guild_id = interaction.guild.id
         await upsert_music_favorite(
-            guild_id=guild_id,
-            slot=slot,
-            title=title,
-            url=url,
-            duration=duration,
-            uploader=uploader,
-            thumbnail=thumbnail,
-            updated_by=interaction.user.id,
+            guild_id=payload.guild_id,
+            slot=payload.slot,
+            title=payload.title,
+            url=payload.url,
+            duration=payload.duration,
+            uploader=payload.uploader,
+            thumbnail=payload.thumbnail,
+            updated_by=payload.updated_by,
         )
-        await self._load_music_favorites(guild_id, refresh=True)
-        await self._refresh_music_panel_for_favorites(guild_id)
+        await self._load_music_favorites(payload.guild_id, refresh=True)
+        await self._refresh_music_panel_for_favorites(payload.guild_id)
         await self._send_auto_delete(
             interaction,
-            f"⭐ {slot}번 즐겨찾기에 **{title}** 저장했습니다.",
+            payload.user_message,
         )
 
     async def _save_search_entry_as_favorite(
@@ -346,18 +341,15 @@ class MusicCog(commands.Cog):
         slot: int,
         entry: dict,
     ) -> None:
-        url = normalize_search_entry_url(entry)
+        payload = search_entry_to_music_favorite_save_payload(
+            guild_id=interaction.guild.id,
+            slot=slot,
+            entry=entry,
+            updated_by=interaction.user.id,
+        )
         await self._save_music_favorite(
             interaction,
-            slot=slot,
-            title=entry.get("title") or "(제목 정보 없음)",
-            url=url,
-            duration=int(entry.get("duration") or 0) if entry.get("duration") else 0,
-            uploader=entry.get("uploader") or entry.get("channel") or None,
-            thumbnail=(
-                entry.get("thumbnail")
-                or (entry.get("thumbnails") or [{}])[-1].get("url")
-            ),
+            payload,
         )
 
     async def _save_current_track_as_favorite(
@@ -375,14 +367,14 @@ class MusicCog(commands.Cog):
                 "❌ 현재 재생 중인 곡 정보가 없습니다.",
             )
             return
+        payload = music_favorite_to_save_payload(
+            favorite,
+            slot=slot,
+            updated_by=interaction.user.id,
+        )
         await self._save_music_favorite(
             interaction,
-            slot=slot,
-            title=favorite.title,
-            url=favorite.url,
-            duration=favorite.duration,
-            uploader=favorite.uploader,
-            thumbnail=favorite.thumbnail,
+            payload,
         )
 
     async def _refresh_music_panel_for_favorites(self, guild_id: int) -> None:

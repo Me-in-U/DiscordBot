@@ -458,6 +458,37 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         self.assertNotIn("interaction.response.send_message", play_favorite_source)
         self.assertNotIn("interaction.followup.send", play_favorite_source)
 
+    def test_favorite_save_commands_delegate_payload_mapping_to_helper(self):
+        source_text = MUSIC_PATH.read_text(encoding="utf-8")
+        tree = ast.parse(source_text)
+
+        save_source = ast.get_source_segment(
+            source_text,
+            _function_node(tree, "_save_music_favorite"),
+        )
+        self.assertIn("payload.user_message", save_source)
+        self.assertIn("payload.guild_id", save_source)
+        self.assertIn("payload.updated_by", save_source)
+
+        search_source = ast.get_source_segment(
+            source_text,
+            _function_node(tree, "_save_search_entry_as_favorite"),
+        )
+        self.assertIn("search_entry_to_music_favorite_save_payload", search_source)
+        self.assertIn("updated_by=interaction.user.id", search_source)
+        self.assertNotIn("normalize_search_entry_url", search_source)
+        self.assertNotIn("entry.get", search_source)
+        self.assertNotIn("thumbnails", search_source)
+
+        current_source = ast.get_source_segment(
+            source_text,
+            _function_node(tree, "_save_current_track_as_favorite"),
+        )
+        self.assertIn("music_favorite_to_save_payload", current_source)
+        self.assertIn("updated_by=interaction.user.id", current_source)
+        self.assertNotIn("title=favorite.title", current_source)
+        self.assertNotIn("thumbnail=favorite.thumbnail", current_source)
+
     def test_panel_and_seek_validation_responses_use_shared_ephemeral_helper(self):
         source_text = MUSIC_PATH.read_text(encoding="utf-8")
         tree = ast.parse(source_text)
