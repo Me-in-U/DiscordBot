@@ -42,6 +42,17 @@ class MusicFavoriteSavePayload:
 
 
 @dataclass(frozen=True, slots=True)
+class MusicFavoriteCurrentTrackSaveAction:
+    slot: int
+    payload: MusicFavoriteSavePayload | None = None
+    user_message: str | None = None
+
+    @property
+    def should_save(self) -> bool:
+        return self.payload is not None
+
+
+@dataclass(frozen=True, slots=True)
 class MusicFavoritePlayActionResult:
     slot: int
     should_play: bool
@@ -175,6 +186,29 @@ def build_music_favorite_current_save_button_action(
     return MusicFavoriteCurrentSaveButtonAction(
         slot=validate_music_favorite_slot(selected_slot),
         disabled=current_track is None,
+    )
+
+
+def build_music_favorite_current_track_save_action(
+    *,
+    current_track: MusicFavorite | None,
+    slot: int | str,
+    updated_by: int | None = None,
+) -> MusicFavoriteCurrentTrackSaveAction:
+    slot = validate_music_favorite_slot(slot)
+    if current_track is None:
+        return MusicFavoriteCurrentTrackSaveAction(
+            slot=slot,
+            user_message="❌ 현재 재생 중인 곡 정보가 없습니다.",
+        )
+
+    return MusicFavoriteCurrentTrackSaveAction(
+        slot=slot,
+        payload=music_favorite_to_save_payload(
+            current_track,
+            slot=slot,
+            updated_by=updated_by,
+        ),
     )
 
 

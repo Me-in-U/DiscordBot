@@ -10,6 +10,7 @@ from util.music_favorites import (
     MusicFavoriteSavePayload,
     MusicFavoriteCurrentSaveButtonAction,
     build_music_favorite_current_save_button_action,
+    build_music_favorite_current_track_save_action,
     build_music_favorite_manager_selection_action,
     build_music_favorite_button_label,
     build_music_favorite_play_action,
@@ -306,6 +307,59 @@ class MusicFavoriteTests(unittest.IsolatedAsyncioTestCase):
             build_music_favorite_current_save_button_action(
                 selected_slot=9,
                 current_track=None,
+            )
+
+    def test_music_favorite_current_track_save_action_returns_missing_track_message(self):
+        result = build_music_favorite_current_track_save_action(
+            current_track=None,
+            slot="2",
+            updated_by=99,
+        )
+
+        self.assertEqual(result.slot, 2)
+        self.assertFalse(result.should_save)
+        self.assertIsNone(result.payload)
+        self.assertEqual(result.user_message, "❌ 현재 재생 중인 곡 정보가 없습니다.")
+
+    def test_music_favorite_current_track_save_action_builds_payload(self):
+        current_track = MusicFavorite(
+            guild_id=10,
+            slot=1,
+            title="현재곡",
+            url="https://youtube.com/watch?v=abc",
+            duration=125,
+            uploader="업로더",
+            thumbnail="https://example.com/thumb.jpg",
+        )
+
+        result = build_music_favorite_current_track_save_action(
+            current_track=current_track,
+            slot=4,
+            updated_by=99,
+        )
+
+        self.assertTrue(result.should_save)
+        self.assertIsNone(result.user_message)
+        self.assertEqual(
+            result.payload,
+            MusicFavoriteSavePayload(
+                guild_id=10,
+                slot=4,
+                title="현재곡",
+                url="https://youtube.com/watch?v=abc",
+                duration=125,
+                uploader="업로더",
+                thumbnail="https://example.com/thumb.jpg",
+                updated_by=99,
+            ),
+        )
+
+    def test_music_favorite_current_track_save_action_validates_slot(self):
+        with self.assertRaisesRegex(ValueError, "즐겨찾기 번호는 1~5"):
+            build_music_favorite_current_track_save_action(
+                current_track=None,
+                slot=9,
+                updated_by=99,
             )
 
     async def test_default_music_view_shows_search_manage_and_five_favorite_slots(self):

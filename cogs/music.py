@@ -16,11 +16,11 @@ from util.channel_settings import get_channel
 from util.music_favorites import (
     MusicFavorite,
     MusicFavoriteSavePayload,
+    build_music_favorite_current_track_save_action,
     build_music_favorite_play_action,
     current_player_to_music_favorite,
     get_music_favorite,
     list_music_favorites,
-    music_favorite_to_save_payload,
     search_entry_to_music_favorite_save_payload,
     upsert_music_favorite,
     validate_music_favorite_slot,
@@ -362,20 +362,22 @@ class MusicCog(commands.Cog):
         guild_id = interaction.guild.id
         state = self._get_state(guild_id)
         favorite = self._current_player_as_favorite(guild_id, state.player)
-        if favorite is None:
-            await self._send_auto_delete(
-                interaction,
-                "❌ 현재 재생 중인 곡 정보가 없습니다.",
-            )
-            return
-        payload = music_favorite_to_save_payload(
-            favorite,
+        current_action = build_music_favorite_current_track_save_action(
+            current_track=favorite,
             slot=slot,
             updated_by=interaction.user.id,
         )
+        if current_action.user_message:
+            await self._send_auto_delete(
+                interaction,
+                current_action.user_message,
+            )
+            return
+        if current_action.payload is None:
+            return
         await self._save_music_favorite(
             interaction,
-            payload,
+            current_action.payload,
         )
 
     async def _refresh_music_panel_for_favorites(self, guild_id: int) -> None:
