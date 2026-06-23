@@ -990,6 +990,35 @@ class MusicCog(commands.Cog):
             )
             return None
 
+    async def _start_play_url_now_prepared_playback(
+        self,
+        interaction: discord.Interaction,
+        *,
+        guild_id: int,
+        state: GuildMusicState,
+        player: Any,
+        success_prefix: str,
+        replacing: bool,
+    ) -> None:
+        playback_start = build_prepared_playback_start(
+            player,
+            success_prefix=success_prefix,
+        )
+        try:
+            await self._start_prepared_playback(
+                guild_id=guild_id,
+                state=state,
+                player=player,
+                playback_start=playback_start,
+            )
+        finally:
+            complete_play_url_now_playback_action(state, replacing=replacing)
+
+        await self._send_auto_delete(
+            interaction,
+            playback_start.confirmation_message,
+        )
+
     async def _play_url_now(
         self,
         interaction: discord.Interaction,
@@ -1015,23 +1044,13 @@ class MusicCog(commands.Cog):
         if replacing:
             voice_client.stop()
 
-        playback_start = build_prepared_playback_start(
-            player,
-            success_prefix=success_prefix,
-        )
-        try:
-            await self._start_prepared_playback(
-                guild_id=guild_id,
-                state=state,
-                player=player,
-                playback_start=playback_start,
-            )
-        finally:
-            complete_play_url_now_playback_action(state, replacing=replacing)
-
-        await self._send_auto_delete(
+        await self._start_play_url_now_prepared_playback(
             interaction,
-            playback_start.confirmation_message,
+            guild_id=guild_id,
+            state=state,
+            player=player,
+            success_prefix=success_prefix,
+            replacing=replacing,
         )
 
     async def _start_music_url_immediate_playback(

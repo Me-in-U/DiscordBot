@@ -374,9 +374,9 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         )
 
         self.assertIn("begin_play_url_now_playback_action", play_url_now_source)
-        self.assertIn("complete_play_url_now_playback_action", play_url_now_source)
         self.assertIn("is_voice_client_active(voice_client)", play_url_now_source)
         self.assertIn("voice_client.stop()", play_url_now_source)
+        self.assertNotIn("complete_play_url_now_playback_action", play_url_now_source)
         self.assertNotIn("state.is_stopping = False", play_url_now_source)
         self.assertNotIn("state.is_skipping = False", play_url_now_source)
         self.assertNotIn("state.is_seeking = True", play_url_now_source)
@@ -404,6 +404,29 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         self.assertIn("exc.failure.user_message", helper_source)
         self.assertIn("exc.failure.delete_after", helper_source)
         self.assertIn("return None", helper_source)
+
+    def test_play_url_now_playback_start_delegates_to_helper(self):
+        source_text = MUSIC_PATH.read_text(encoding="utf-8")
+        tree = ast.parse(source_text)
+        play_url_now_source = ast.get_source_segment(
+            source_text,
+            _function_node(tree, "_play_url_now"),
+        )
+        helper_source = ast.get_source_segment(
+            source_text,
+            _function_node(tree, "_start_play_url_now_prepared_playback"),
+        )
+
+        self.assertIn("_start_play_url_now_prepared_playback", play_url_now_source)
+        self.assertNotIn("build_prepared_playback_start", play_url_now_source)
+        self.assertNotIn("_start_prepared_playback", play_url_now_source)
+        self.assertNotIn("complete_play_url_now_playback_action", play_url_now_source)
+        self.assertNotIn("playback_start.confirmation_message", play_url_now_source)
+        self.assertIn("build_prepared_playback_start", helper_source)
+        self.assertIn("_start_prepared_playback", helper_source)
+        self.assertIn("complete_play_url_now_playback_action", helper_source)
+        self.assertIn("playback_start.confirmation_message", helper_source)
+        self.assertIn("self._send_auto_delete(", helper_source)
 
     def test_play_url_preparation_error_uses_shared_auto_delete_response(self):
         source_text = MUSIC_PATH.read_text(encoding="utf-8")
@@ -497,7 +520,10 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         source_text = MUSIC_PATH.read_text(encoding="utf-8")
         tree = ast.parse(source_text)
 
-        for function_name in ("_play_url_now", "_start_music_url_immediate_playback"):
+        for function_name in (
+            "_start_play_url_now_prepared_playback",
+            "_start_music_url_immediate_playback",
+        ):
             function_source = ast.get_source_segment(
                 source_text,
                 _function_node(tree, function_name),
