@@ -1,9 +1,18 @@
 import unittest
+from pathlib import Path
+
+
+MUSIC_SOURCE_PATH = Path("util/music/source.py")
+LEGACY_MUSIC_SOURCE_PATH = Path("util/music_source.py")
 
 
 class MusicSourceTests(unittest.TestCase):
+    def test_music_source_lives_under_music_package(self):
+        self.assertTrue(MUSIC_SOURCE_PATH.exists())
+        self.assertFalse(LEGACY_MUSIC_SOURCE_PATH.exists())
+
     def test_build_ffmpeg_options_adds_seek_and_input_headers_without_mutating_base(self):
-        from util.music_source import build_ffmpeg_options
+        from util.music.source import build_ffmpeg_options
 
         base_options = {
             "before_options": "-reconnect 1",
@@ -26,7 +35,7 @@ class MusicSourceTests(unittest.TestCase):
         self.assertEqual(options["options"], "-ss 37 -vn")
 
     def test_build_ffmpeg_options_can_place_headers_in_output_options_for_fallback(self):
-        from util.music_source import build_ffmpeg_options
+        from util.music.source import build_ffmpeg_options
 
         options = build_ffmpeg_options(
             base_options={"before_options": "-reconnect 1", "options": "-vn"},
@@ -42,7 +51,7 @@ class MusicSourceTests(unittest.TestCase):
         )
 
     def test_music_source_exports_ytdl_source_and_shared_extractors(self):
-        from util.music_source import (
+        from util.music.source import (
             YTDLSource,
             info_ytdl,
             search_ytdl,

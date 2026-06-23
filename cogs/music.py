@@ -103,7 +103,7 @@ from util.music_playback_actions import (
     toggle_loop_action,
     validate_seek_playback_action,
 )
-from util.music_source import (
+from util.music.source import (
     YTDL_EXECUTOR,
     YTDLSource,
     _detect_ffmpeg_executable,
