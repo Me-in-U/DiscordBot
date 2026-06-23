@@ -1065,18 +1065,10 @@ class MusicCog(commands.Cog):
             self._spawn_bg(self._fill_queue_meta(url_play_result.queued_track))
         await self._send_auto_delete(interaction, url_play_result.user_message)
 
-    async def _play_music_url_branch(
+    async def _ensure_music_url_voice_client(
         self,
         interaction: discord.Interaction,
-        url: str,
-        *,
-        skip_defer: bool = False,
-    ) -> None:
-        if not skip_defer:
-            await interaction.response.defer(thinking=True, ephemeral=True)
-
-        # ! 기본정보 로드
-        guild_id = interaction.guild.id
+    ) -> Any | None:
         user_channel = get_interaction_voice_channel(interaction)
         voice_result = await ensure_music_voice_client(
             voice_client=interaction.guild.voice_client,
@@ -1089,16 +1081,33 @@ class MusicCog(commands.Cog):
                 interaction,
                 voice_result.error_message,
             )
-            return
+            return None
         voice_client = voice_result.voice_client
         if voice_client is None:
-            return
+            return None
         if transition_log := describe_voice_transition(
             voice_result,
             action="_play",
             user_channel=user_channel,
         ):
             dbg(transition_log)
+        return voice_client
+
+    async def _play_music_url_branch(
+        self,
+        interaction: discord.Interaction,
+        url: str,
+        *,
+        skip_defer: bool = False,
+    ) -> None:
+        if not skip_defer:
+            await interaction.response.defer(thinking=True, ephemeral=True)
+
+        # ! 기본정보 로드
+        guild_id = interaction.guild.id
+        voice_client = await self._ensure_music_url_voice_client(interaction)
+        if voice_client is None:
+            return
 
         # ! 이미 재생(또는 일시정지) 중이면 URL만 큐에 추가
         state = self._get_state(interaction.guild.id)
