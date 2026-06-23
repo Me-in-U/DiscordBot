@@ -85,6 +85,7 @@ from util.music_playback import (
     prepare_replay_source,
 )
 from util.music_playback_actions import (
+    UrlPlayActionResult,
     begin_seek_playback_action,
     begin_stop_playback_action,
     begin_url_play_action,
@@ -1054,6 +1055,16 @@ class MusicCog(commands.Cog):
             playback_start.confirmation_message,
         )
 
+    async def _send_music_url_queued_response(
+        self,
+        interaction: discord.Interaction,
+        url_play_result: UrlPlayActionResult,
+    ) -> None:
+        dbg(f"_play: appended URL to queue size={url_play_result.queue_size}")
+        if url_play_result.queued_track is not None:
+            self._spawn_bg(self._fill_queue_meta(url_play_result.queued_track))
+        await self._send_auto_delete(interaction, url_play_result.user_message)
+
     async def _play_music_url_branch(
         self,
         interaction: discord.Interaction,
@@ -1099,11 +1110,10 @@ class MusicCog(commands.Cog):
             is_active=is_voice_client_active(voice_client),
         )
         if not url_play_result.should_prepare:
-            dbg(f"_play: appended URL to queue size={url_play_result.queue_size}")
-            # 메타데이터는 백그라운드에서 채움(가벼운 작업으로 유지)
-            self._spawn_bg(self._fill_queue_meta(url_play_result.queued_track))
-            # ! 완료 메시지
-            await self._send_auto_delete(interaction, url_play_result.user_message)
+            await self._send_music_url_queued_response(
+                interaction,
+                url_play_result,
+            )
             return
 
         # ! 재생 중이 아니면 지금 URL로 바로 준비 후 재생

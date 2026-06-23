@@ -207,14 +207,14 @@ class MusicCommandSurfaceTests(unittest.TestCase):
             'QUEUE_ADDED_MESSAGE = "▶ **대기열에 추가되었습니다.**"',
             queue_actions_text,
         )
-        play_url_source = ast.get_source_segment(
+        queued_response_source = ast.get_source_segment(
             source_text,
-            _function_node(tree, "_play_music_url_branch"),
+            _function_node(tree, "_send_music_url_queued_response"),
         )
-        self.assertIn("_send_auto_delete", play_url_source)
-        self.assertIn("url_play_result.user_message", play_url_source)
-        self.assertNotIn("MSG_QUEUE_ADDED", play_url_source)
-        self.assertNotIn('"▶ **대기열에 추가되었습니다.**"', play_url_source)
+        self.assertIn("_send_auto_delete", queued_response_source)
+        self.assertIn("url_play_result.user_message", queued_response_source)
+        self.assertNotIn("MSG_QUEUE_ADDED", queued_response_source)
+        self.assertNotIn('"▶ **대기열에 추가되었습니다.**"', queued_response_source)
 
         play_source = ast.get_source_segment(source_text, _function_node(tree, "_play"))
         self.assertIn("_play_music_url_branch", play_source)
@@ -238,13 +238,25 @@ class MusicCommandSurfaceTests(unittest.TestCase):
 
         self.assertIn("begin_url_play_action", play_source)
         self.assertIn("url_play_result.should_prepare", play_source)
-        self.assertIn("url_play_result.queued_track", play_source)
-        self.assertIn("url_play_result.user_message", play_source)
+        self.assertIn("_send_music_url_queued_response", play_source)
         self.assertIn("_start_music_url_immediate_playback", play_source)
         self.assertNotIn("enqueue_url_track", play_source)
         self.assertNotIn("state.queue", play_source)
+        self.assertNotIn("url_play_result.queued_track", play_source)
+        self.assertNotIn("url_play_result.user_message", play_source)
+        self.assertNotIn("_fill_queue_meta", play_source)
+        self.assertNotIn("_spawn_bg", play_source)
         self.assertNotIn("prepare_music_player", play_source)
         self.assertNotIn("build_prepared_playback_start", play_source)
+
+        queued_response_source = ast.get_source_segment(
+            source_text,
+            _function_node(tree, "_send_music_url_queued_response"),
+        )
+        self.assertIn("url_play_result.queued_track", queued_response_source)
+        self.assertIn("url_play_result.user_message", queued_response_source)
+        self.assertIn("_fill_queue_meta", queued_response_source)
+        self.assertIn("_spawn_bg", queued_response_source)
 
         play_command_source = ast.get_source_segment(
             source_text,
