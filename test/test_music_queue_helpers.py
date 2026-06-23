@@ -12,7 +12,11 @@ from cogs.music import (
     shuffle_queue,
 )
 from util import music_queue
-from util.music_queue import apply_queue_track_metadata, build_queue_display
+from util.music_queue import (
+    apply_queue_track_metadata,
+    build_queue_display,
+    extract_queue_track_metadata,
+)
 
 
 def _queue(*titles: str):
@@ -234,6 +238,21 @@ class MusicQueueHelperTests(unittest.TestCase):
         self.assertEqual(track.webpage_url, "https://example.com/watch")
         self.assertEqual(track.uploader, "추출 업로더")
         self.assertEqual(track.thumbnail, "https://example.com/high.jpg")
+
+    def test_extract_queue_track_metadata_returns_dict_result(self):
+        def extractor(url: str):
+            return {"title": f"title:{url}"}
+
+        self.assertEqual(
+            extract_queue_track_metadata("abc", extractor),
+            {"title": "title:abc"},
+        )
+
+    def test_extract_queue_track_metadata_returns_none_for_extraction_errors(self):
+        def extractor(url: str):
+            raise ValueError("bad metadata")
+
+        self.assertIsNone(extract_queue_track_metadata("abc", extractor))
 
 
 if __name__ == "__main__":

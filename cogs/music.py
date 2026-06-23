@@ -11,7 +11,6 @@ import discord
 from discord import Embed, Message, Object, TextChannel, app_commands
 from discord.ext import commands
 from discord.utils import utcnow
-from yt_dlp.utils import DownloadError
 from util.channel_settings import get_channel
 from util.music_favorites import (
     MusicFavorite,
@@ -44,6 +43,7 @@ from util.music_queue import (
     QueuedTrack,
     apply_queue_track_metadata,
     build_queue_display,
+    extract_queue_track_metadata,
     _track_title,
     build_queue_preview,
     move_queue_track,
@@ -241,14 +241,13 @@ class MusicCog(commands.Cog):
             loop = asyncio.get_event_loop()
 
             def _extract():
-                try:
-                    return info_ytdl.extract_info(track.url, download=False)
-                except (DownloadError, OSError, TypeError, ValueError):
-                    logger.debug("대기열 메타데이터 추출 실패: url=%s", track.url, exc_info=True)
-                    return None
+                return extract_queue_track_metadata(
+                    track.url,
+                    lambda url: info_ytdl.extract_info(url, download=False),
+                )
 
             info = await loop.run_in_executor(YTDL_EXECUTOR, _extract)
-            if not info or not isinstance(info, dict):
+            if info is None:
                 return
             apply_queue_track_metadata(track, info)
         except (RuntimeError, TypeError, ValueError, KeyError):

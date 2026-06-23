@@ -680,7 +680,7 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         self.assertNotIn("self._favorite_cache[store_action.guild_id]", favorite_loader)
         self.assertNotIn("favorites = []", favorite_loader)
 
-    def test_queue_metadata_loader_uses_specific_extraction_exceptions(self):
+    def test_queue_metadata_loader_uses_extraction_helper(self):
         source_text = MUSIC_PATH.read_text(encoding="utf-8")
         tree = ast.parse(source_text)
 
@@ -688,12 +688,13 @@ class MusicCommandSurfaceTests(unittest.TestCase):
             source_text,
             _function_node(tree, "_fill_queue_meta"),
         )
-        self.assertIn("DownloadError", function_source)
-        self.assertIn("OSError", function_source)
         self.assertIn("TypeError", function_source)
         self.assertIn("ValueError", function_source)
         self.assertIn("logger.debug", function_source)
+        self.assertIn("extract_queue_track_metadata", function_source)
         self.assertIn("apply_queue_track_metadata", function_source)
+        self.assertNotIn("info_ytdl.extract_info(track.url", function_source)
+        self.assertNotIn("except (DownloadError", function_source)
         self.assertNotIn("except Exception", function_source)
         self.assertNotIn("dbg(", function_source)
         self.assertNotIn("track.title =", function_source)

@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import random
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, Deque, Optional, Tuple
+
+from yt_dlp.utils import DownloadError
 
 
 @dataclass
@@ -204,6 +207,17 @@ def apply_queue_track_metadata(
     track.uploader = info.get("uploader") or track.uploader
     track.thumbnail = info.get("thumbnail") or _search_entry_thumbnail(info) or track.thumbnail
     return track
+
+
+def extract_queue_track_metadata(
+    url: str,
+    extractor: Callable[[str], Any],
+) -> dict[str, Any] | None:
+    try:
+        metadata = extractor(url)
+    except (DownloadError, OSError, TypeError, ValueError):
+        return None
+    return metadata if isinstance(metadata, dict) else None
 
 
 def _search_entry_thumbnail(entry: dict[str, Any]) -> str | None:
