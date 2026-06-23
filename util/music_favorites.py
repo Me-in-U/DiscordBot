@@ -48,6 +48,14 @@ class MusicFavoriteSaveResult:
 
 
 @dataclass(frozen=True, slots=True)
+class MusicFavoriteSaveResponseAction:
+    guild_id: int
+    user_message: str
+    should_refresh_favorites: bool = True
+    should_refresh_panel: bool = True
+
+
+@dataclass(frozen=True, slots=True)
 class MusicFavoriteSearchEntrySaveAction:
     payload: MusicFavoriteSavePayload
 
@@ -510,4 +518,13 @@ async def save_music_favorite_payload(
     return MusicFavoriteSaveResult(
         guild_id=payload.guild_id,
         user_message=payload.user_message,
+    )
+
+
+def build_music_favorite_save_response_action(
+    save_result: MusicFavoriteSaveResult,
+) -> MusicFavoriteSaveResponseAction:
+    return MusicFavoriteSaveResponseAction(
+        guild_id=save_result.guild_id,
+        user_message=save_result.user_message,
     )

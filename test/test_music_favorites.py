@@ -12,6 +12,7 @@ from util.music_favorites import (
     MusicFavoriteSearchEntrySaveAction,
     MusicFavoriteSearchRequestAction,
     MusicFavoriteSearchSubmitAction,
+    MusicFavoriteSaveResponseAction,
     MusicFavoriteSaveResult,
     MusicFavoriteSavePayload,
     MusicFavoriteCurrentSaveButtonAction,
@@ -26,6 +27,7 @@ from util.music_favorites import (
     build_music_favorite_search_modal_action,
     build_music_favorite_search_request_action,
     build_music_favorite_search_submit_action,
+    build_music_favorite_save_response_action,
     build_music_favorite_save_payload,
     current_player_to_music_favorite,
     music_favorite_to_save_payload,
@@ -275,6 +277,24 @@ class MusicFavoriteTests(unittest.IsolatedAsyncioTestCase):
             MusicFavoriteSaveResult(
                 guild_id=10,
                 user_message="⭐ 2번 즐겨찾기에 **저장곡** 저장했습니다.",
+            ),
+        )
+
+    def test_music_favorite_save_response_action_uses_save_result(self):
+        result = build_music_favorite_save_response_action(
+            MusicFavoriteSaveResult(
+                guild_id=10,
+                user_message="저장 완료",
+            )
+        )
+
+        self.assertEqual(
+            result,
+            MusicFavoriteSaveResponseAction(
+                guild_id=10,
+                user_message="저장 완료",
+                should_refresh_favorites=True,
+                should_refresh_panel=True,
             ),
         )
 

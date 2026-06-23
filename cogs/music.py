@@ -20,6 +20,7 @@ from util.music_favorites import (
     build_music_favorite_manager_open_action,
     build_music_favorite_play_action,
     build_music_favorite_play_request_action,
+    build_music_favorite_save_response_action,
     build_music_favorite_search_entry_save_action,
     build_music_favorite_search_request_action,
     current_player_to_music_favorite,
@@ -335,11 +336,14 @@ class MusicCog(commands.Cog):
         payload: MusicFavoriteSavePayload,
     ) -> None:
         save_result = await save_music_favorite_payload(payload)
-        await self._load_music_favorites(save_result.guild_id, refresh=True)
-        await self._refresh_music_panel_for_favorites(save_result.guild_id)
+        response_action = build_music_favorite_save_response_action(save_result)
+        if response_action.should_refresh_favorites:
+            await self._load_music_favorites(response_action.guild_id, refresh=True)
+        if response_action.should_refresh_panel:
+            await self._refresh_music_panel_for_favorites(response_action.guild_id)
         await self._send_auto_delete(
             interaction,
-            save_result.user_message,
+            response_action.user_message,
         )
 
     async def _save_search_entry_as_favorite(
