@@ -1,8 +1,9 @@
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 
 from cogs.music import MusicCog
-from util.music_playback import (
+from util.music.playback import (
     MusicPlayerPreparationError,
     prepare_music_player,
     prepare_replay_source,
@@ -10,9 +11,17 @@ from util.music_playback import (
 from util.music_state import GuildMusicState
 
 
+MUSIC_PLAYBACK_PATH = Path("util/music/playback.py")
+LEGACY_MUSIC_PLAYBACK_PATH = Path("util/music_playback.py")
+
+
 class MusicPlaybackTests(unittest.IsolatedAsyncioTestCase):
+    def test_music_playback_lives_under_music_package(self):
+        self.assertTrue(MUSIC_PLAYBACK_PATH.exists())
+        self.assertFalse(LEGACY_MUSIC_PLAYBACK_PATH.exists())
+
     def test_build_prepared_playback_start_exposes_source_and_confirmation_message(self):
-        from util.music_playback import build_prepared_playback_start
+        from util.music.playback import build_prepared_playback_start
 
         player = SimpleNamespace(source="audio-source", title="테스트 곡")
 

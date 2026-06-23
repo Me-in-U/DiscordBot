@@ -82,7 +82,7 @@ from util.music_panel_store import (
     load_music_panel_ids,
     save_music_panel_id,
 )
-from util.music_playback import (
+from util.music.playback import (
     MusicPlayerPreparationError,
     build_prepared_playback_start,
     prepare_music_player,

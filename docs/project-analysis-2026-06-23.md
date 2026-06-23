@@ -14,8 +14,8 @@
 6. Top 5 리스크는 `music.py`, `youtube_summary.py`, `loop.py` 같은 대형 파일이 변경 위험을 키우는 점이다.
 7. 권장 처리 순서는 Jenkins 테스트 게이트, `on_ready` guard, YouTube temp workspace, 민감 로그 제거, 문서 최신화다.
 8. 현재 작업트리에서는 위 1-4번 리스크의 1차 보강과 대형 파일 일부 분리가 구현되었다.
-9. 현재 최신 검증은 `compileall` 통과, unittest 458개 통과다.
-10. 이번 패치로 music source facade가 `util/music/` 카테고리 패키지로 이동되었고, 다음 후보는 music playback payload helper의 `util/music/` 패키지 이동이다.
+9. 현재 최신 검증은 `compileall` 통과, unittest 459개 통과다.
+10. 이번 패치로 music playback payload helper가 `util/music/` 카테고리 패키지로 이동되었고, 다음 후보는 music playback action facade의 `util/music/` 패키지 이동이다.
 
 ## 기준선
 
@@ -31,7 +31,7 @@
 
 이 문서의 진단은 기준 커밋 `34aab00` 상태를 대상으로 한다. 이후 현재 작업트리에서는 아래 항목이 구현되었다.
 
-최신 검증 결과: `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` 458개 통과.
+최신 검증 결과: `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` 459개 통과.
 
 | 상태 | 항목 | 구현 근거 |
 | --- | --- | --- |
@@ -148,10 +148,10 @@
 | 완료 | music state helper 1차 분리 | `util/music_state.py`로 `GuildMusicState`와 playback/idle reset/start/finish 상태 전이 이동 |
 | 완료 | music voice helper 1차 분리 | `util/music_voice.py`로 음성 연결, 채널 이동, 활성 상태 판단, 같은 음성 채널 guard, 연결 transition debug 이동 |
 | 완료 | music playback start state 보강 | `util/music_state.py`에 재생 시작 상태 전이 helper 추가 |
-| 완료 | music source preparation helper 분리 | `util/music_playback.py`로 `YTDLSource.from_url` 호출, 준비 실패 사용자 메시지 매핑, prepared playback payload 생성 이동 |
+| 완료 | music source preparation helper 분리 | `util/music/playback.py`로 `YTDLSource.from_url` 호출, 준비 실패 사용자 메시지 매핑, prepared playback payload 생성 이동 |
 | 완료 | music playback side effect helper 분리 | `MusicCog._start_prepared_playback()`로 prepared player 이후 state/control view/voice/updater/panel edit sequence 단일화 |
 | 완료 | music seek/queue continuation 준비 경로 보강 | seek, loop fallback refresh, 다음 대기열 곡 준비가 `prepare_music_player()`를 통과하도록 정리 |
-| 완료 | music loop/skip replay source reuse 분리 | `util/music_playback.py`로 기존 audio URL 재사용과 refresh fallback source 준비 이동 |
+| 완료 | music loop/skip replay source reuse 분리 | `util/music/playback.py`로 기존 audio URL 재사용과 refresh fallback source 준비 이동 |
 | 완료 | music stream extraction helper 분리 | `util/music/stream.py`로 `ytInitialPlayerResponse` 파싱, HTML fallback audio URL/메타데이터 추출 이동 |
 | 완료 | music search/meta extraction helper 분리 | `util/music/extractor.py`로 keyword search 결과 URL 결정과 yt-dlp entries selection 이동 |
 | 완료 | music source facade 분리 | `util/music/source.py`로 `YTDLSource`, yt-dlp fallback, FFmpeg 옵션 조립, HTML stream fallback 호출 이동 |
@@ -162,7 +162,7 @@
 | 완료 | MapleStory sender 1차 분리 | `util/maplestory_sender.py`로 embed/message build, 채널 resolve, Discord send helper 이동, 기존 `util.maplestory_events` 공개 import 호환 유지 |
 | 완료 | YouTube notification state 1차 분리 | `util/youtube_notification_state.py`로 notified ID 정규화, YouTube datetime 파싱, pending live 재검사 판단 이동 |
 
-이번 패치로 music source facade의 `util/music/` 패키지 이동이 완료되었다. 다음 작은 후보는 music playback payload helper의 `util/music/` 패키지 이동이다.
+이번 패치로 music playback payload helper의 `util/music/` 패키지 이동이 완료되었다. 다음 작은 후보는 music playback action facade의 `util/music/` 패키지 이동이다.
 
 ## 현재 구조 요약
 
@@ -586,7 +586,7 @@
 | Docker Python | 기준 커밋 `Dockerfile.deps` -> `FROM python:3.12-slim`, 현재 작업트리 -> `FROM python:3.11-slim` | 로컬/운영 Python minor version 불일치가 해소됨 |
 | 테스트 기준선 | `python -m unittest discover -s test` -> 154개 통과 | 현재 회귀 테스트 기준 |
 | 컴파일 기준선 | `python -m compileall -q bot.py api cogs common func util test` 통과 | 문법/import 기본 검증 |
-| 작업트리 최신 검증 | `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` -> 458개 통과 | 구현 진행 후 회귀 확인 |
+| 작업트리 최신 검증 | `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` -> 459개 통과 | 구현 진행 후 회귀 확인 |
 | 파일 수 | PowerShell 파일 집계 -> Python 파일 96개 | 분석 규모 |
 | 대형 파일 기준선 | 기준 커밋 line count: `music.py` 2663, `youtube_summary.py` 1072, `loop.py` 954, `maplestory_events.py` 875 | 분리 우선 후보였던 초기 상태 |
 | 대형 파일 현재 | Python read line count: `music.py` 1706, `youtube_summary.py` 191, `loop.py` 309, `maplestory_events.py` 251 | 분리 진행 후에도 `music.py`는 command/action facade 축소 여지가 큼 |
@@ -606,7 +606,7 @@
 | music favorite snapshot/payload/play/play-request/save-entry/save-side-effect/save-response/panel-refresh/cache-load/cache-hit/cache-store/cache-apply/load-failure/manager/modal/current-button/current-track/search-request/manager-open/current-player-wrapper helper 분리 | `util/music_favorites.py` 현재 634줄, `cogs/music.py` 현재 1706줄, favorite 대상 테스트 47개 및 command surface 대상 테스트 50개 통과 | 현재 재생 player를 즐겨찾기 snapshot으로 바꾸고, 검색 결과 entry와 현재 재생 snapshot을 저장 payload/action으로 정규화하며, 저장 DB side effect와 완료 메시지 결과 생성을 util helper로 이동하고, 저장 결과 이후 favorites reload, 패널 refresh, 사용자 응답 정책과 패널 refresh skip/playing/helper 모드 선택, 캐시 hit/refresh bypass 판단, cache hit 반환 payload, cache 저장 payload 생성, cache 저장 side effect/반환값, 로드 실패 fallback payload 생성을 action/helper로 고정하고 현재곡 저장 wrapper를 제거했으며, 빈 슬롯/재생 URL action 판단, 즐겨찾기 재생 URL voice guard/playback state/player preparation, 즐겨찾기 재생 요청 슬롯 검증, 검색 결과 저장 action payload 생성, manager 슬롯 선택/관리자 open 상태 계산, favorite 검색 modal/submit 정규화, 현재곡 저장 버튼 disabled/slot 판정, 현재 재생곡 없음 메시지/저장 payload 생성, 검색 저장 요청 슬롯/검색어 검증을 music Cog/View 본문에서 분리 |
 | music state helper 분리 | `util/music_state.py` 67줄 추출, `cogs/music.py` 현재 1706줄, state 대상 테스트 5개 통과 | `GuildMusicState`와 playback/idle reset/playback start/track finish 상태 전이를 music Cog 본문에서 분리 |
 | music voice helper 분리 | `util/music_voice.py` 96줄 추출, `cogs/music.py` 현재 1706줄, voice 대상 테스트 11개 통과 | 음성 연결, 채널 이동, 재생/일시정지 활성 상태 판단, 같은 음성 채널 guard, 연결 transition debug를 music Cog 본문에서 분리 |
-| music source preparation/playback payload helper 분리 | `util/music_playback.py` 132줄 추출, `cogs/music.py` 현재 1706줄, playback 대상 테스트 8개 통과 | 일반 재생, 즐겨찾기 재생, seek, loop fallback refresh, 다음 대기열 곡 준비의 `YTDLSource.from_url` 호출과 FFmpeg/스트림 준비 실패 매핑, loop/skip replay source 재사용, prepared player의 source/확인 메시지 payload와 prepared playback side effect sequence를 단일화 |
+| music source preparation/playback payload helper 분리 | `util/music/playback.py` 113줄, `cogs/music.py` 현재 1706줄, playback 대상 테스트 9개 통과, `test_music*.py` 219개 통과 | 일반 재생, 즐겨찾기 재생, seek, loop fallback refresh, 다음 대기열 곡 준비의 `YTDLSource.from_url` 호출과 FFmpeg/스트림 준비 실패 매핑, loop/skip replay source 재사용, prepared player의 source/확인 메시지 payload와 prepared playback side effect sequence를 단일화하고, root `util/music_playback.py` 제거를 테스트로 고정 |
 | music stream extraction helper 분리 | `util/music/stream.py` 51줄, `cogs/music.py` 현재 1706줄, stream 대상 테스트 5개 통과, `test_music*.py` 217개 통과 | HTML fallback의 `ytInitialPlayerResponse` 파싱, 최고 bitrate audio URL 선택, stream metadata 구성을 music Cog 본문에서 분리하고, root `util/music_stream.py` 제거를 테스트로 고정 |
 | music search/meta extraction helper 분리 | `util/music/extractor.py` 47줄, `test/test_music_extractor.py` 11개 통과, `test_music*.py` 216개 통과 | keyword search 결과 URL 결정과 yt-dlp `entries` 중 포맷 포함 엔트리 선택을 테스트 가능한 helper로 고정하고, root `util/music_extractor.py` 제거를 테스트로 고정 |
 | music source facade 분리 | `util/music/source.py` 306줄, `cogs/music.py` 현재 1706줄, source 대상 테스트 4개 통과, `test_music*.py` 218개 통과 | `YTDLSource`, yt-dlp fallback 전략, FFmpeg 옵션 조립, HTML stream fallback 호출을 music Cog 본문에서 분리하고, root `util/music_source.py` 제거를 테스트로 고정 |
