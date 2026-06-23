@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from util.db import execute_query, fetch_all, fetch_one
-from util.music_search import normalize_search_entry_url
+from util.music.search import normalize_search_entry_url
 
 
 MUSIC_FAVORITE_SLOT_MIN = 1

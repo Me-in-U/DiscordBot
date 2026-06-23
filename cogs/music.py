@@ -72,7 +72,7 @@ from util.music.progress import (
     make_progress_bar as build_music_progress_bar,
     make_timeline_line as build_music_timeline_line,
 )
-from util.music_search import (
+from util.music.search import (
     MusicSearchActionResult,
     build_music_search_flow,
     is_http_url,

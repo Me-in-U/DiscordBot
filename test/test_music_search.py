@@ -1,9 +1,18 @@
 import unittest
+from pathlib import Path
+
+
+MUSIC_SEARCH_PATH = Path("util/music/search.py")
+LEGACY_MUSIC_SEARCH_PATH = Path("util/music_search.py")
 
 
 class MusicSearchHelperTests(unittest.TestCase):
+    def test_search_helper_lives_under_music_package(self):
+        self.assertTrue(MUSIC_SEARCH_PATH.exists())
+        self.assertFalse(LEGACY_MUSIC_SEARCH_PATH.exists())
+
     def test_is_http_url_accepts_http_and_https_only(self):
-        from util.music_search import is_http_url
+        from util.music.search import is_http_url
 
         self.assertTrue(is_http_url("https://www.youtube.com/watch?v=1"))
         self.assertTrue(is_http_url("http://example.com"))
@@ -13,7 +22,7 @@ class MusicSearchHelperTests(unittest.TestCase):
         self.assertFalse(is_http_url(None))
 
     def test_normalize_search_entry_url_prefers_webpage_url_and_expands_relative_watch_url(self):
-        from util.music_search import normalize_search_entry_url
+        from util.music.search import normalize_search_entry_url
 
         self.assertEqual(
             normalize_search_entry_url(
@@ -23,7 +32,7 @@ class MusicSearchHelperTests(unittest.TestCase):
         )
 
     def test_filter_youtube_watch_entries_keeps_existing_url_predicate_and_limit(self):
-        from util.music_search import filter_youtube_watch_entries
+        from util.music.search import filter_youtube_watch_entries
 
         entries = [
             {"url": "https://www.youtube.com/watch?v=1", "title": "one"},
@@ -40,7 +49,7 @@ class MusicSearchHelperTests(unittest.TestCase):
         self.assertEqual([entry["title"] for entry in filtered], ["one", "two"])
 
     def test_build_search_results_display_formats_embed_content(self):
-        from util.music_search import build_search_results_display
+        from util.music.search import build_search_results_display
 
         display = build_search_results_display(
             "lofi",
@@ -58,7 +67,7 @@ class MusicSearchHelperTests(unittest.TestCase):
         )
 
     def test_build_music_search_action_returns_no_results_message(self):
-        from util.music_search import build_music_search_action
+        from util.music.search import build_music_search_action
 
         result = build_music_search_action(
             "lofi",
@@ -71,7 +80,7 @@ class MusicSearchHelperTests(unittest.TestCase):
         self.assertIsNone(result.embed_description)
 
     def test_build_music_search_action_formats_play_search_results(self):
-        from util.music_search import build_music_search_action
+        from util.music.search import build_music_search_action
 
         result = build_music_search_action(
             "lofi",
@@ -91,7 +100,7 @@ class MusicSearchHelperTests(unittest.TestCase):
         self.assertEqual(result.embed_description, "1. one\n2. two")
 
     def test_build_music_search_action_formats_favorite_slot_results(self):
-        from util.music_search import build_music_search_action
+        from util.music.search import build_music_search_action
 
         result = build_music_search_action(
             "lofi",
@@ -106,7 +115,7 @@ class MusicSearchHelperTests(unittest.TestCase):
 
 class MusicSearchExecutorTests(unittest.IsolatedAsyncioTestCase):
     async def test_run_music_search_query_adds_ytdlp_search_prefix(self):
-        from util.music_search import run_music_search_query
+        from util.music.search import run_music_search_query
 
         seen_searches: list[str] = []
 
@@ -123,14 +132,14 @@ class MusicSearchExecutorTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_run_music_search_query_preserves_extractor_result_type(self):
-        from util.music_search import run_music_search_query
+        from util.music.search import run_music_search_query
 
         result = await run_music_search_query("lofi", lambda search: None)
 
         self.assertIsNone(result)
 
     async def test_run_music_search_query_accepts_ytdlp_extractor_object(self):
-        from util.music_search import run_music_search_query
+        from util.music.search import run_music_search_query
 
         class FakeYtdlp:
             def __init__(self):
@@ -150,7 +159,7 @@ class MusicSearchExecutorTests(unittest.IsolatedAsyncioTestCase):
 
 class MusicSearchFlowTests(unittest.IsolatedAsyncioTestCase):
     async def test_build_music_search_flow_runs_search_and_maps_play_results(self):
-        from util.music_search import build_music_search_flow
+        from util.music.search import build_music_search_flow
 
         def extractor(search: str):
             return {
@@ -168,7 +177,7 @@ class MusicSearchFlowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.embed_description, "1. ytsearch10:lofi")
 
     async def test_build_music_search_flow_preserves_favorite_slot_mapping(self):
-        from util.music_search import build_music_search_flow
+        from util.music.search import build_music_search_flow
 
         class FakeYtdlp:
             def extract_info(self, search: str, *, download: bool):

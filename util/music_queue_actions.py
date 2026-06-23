@@ -12,7 +12,7 @@ from util.music_queue import (
     remove_queue_track,
     shuffle_queue,
 )
-from util.music_search import normalize_search_entry_url
+from util.music.search import normalize_search_entry_url
 
 
 QUEUE_ADDED_MESSAGE = "▶ **대기열에 추가되었습니다.**"
