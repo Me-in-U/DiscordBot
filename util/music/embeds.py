@@ -7,7 +7,7 @@ from typing import Any, Protocol
 from discord import Embed
 
 from util.music.progress import make_progress_bar, make_timeline_line
-from util.music_queue import QueuedTrack, build_queue_preview
+from util.music.queue import QueuedTrack, build_queue_preview
 
 
 PANEL_TITLE = "🎵 신창섭의 다해줬잖아"

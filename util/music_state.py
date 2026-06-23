@@ -4,7 +4,7 @@ import collections
 from dataclasses import dataclass, field
 from typing import Any, Deque
 
-from util.music_queue import QueuedTrack
+from util.music.queue import QueuedTrack
 
 
 @dataclass

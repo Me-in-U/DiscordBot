@@ -1,6 +1,7 @@
 import collections
 import random
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 
 from cogs.music import (
@@ -11,13 +12,16 @@ from cogs.music import (
     remove_queue_track,
     shuffle_queue,
 )
-from util import music_queue
-from util.music_queue import (
+from util.music import queue as music_queue
+from util.music.queue import (
     apply_queue_track_metadata,
     build_queue_display,
     extract_queue_track_metadata,
     fill_queue_track_metadata,
 )
+
+MUSIC_QUEUE_PATH = Path("util/music/queue.py")
+LEGACY_MUSIC_QUEUE_PATH = Path("util/music_queue.py")
 
 
 def _queue(*titles: str):
@@ -25,6 +29,10 @@ def _queue(*titles: str):
 
 
 class MusicQueueHelperTests(unittest.TestCase):
+    def test_music_queue_helper_lives_under_music_package(self):
+        self.assertTrue(MUSIC_QUEUE_PATH.exists())
+        self.assertFalse(LEGACY_MUSIC_QUEUE_PATH.exists())
+
     def test_queue_helpers_are_available_from_util_module(self):
         queue = collections.deque(
             [
@@ -162,7 +170,7 @@ class MusicQueueHelperTests(unittest.TestCase):
         )
 
     def test_enqueue_url_track_appends_lightweight_track_and_returns_it(self):
-        from util.music_queue import enqueue_url_track
+        from util.music.queue import enqueue_url_track
 
         requester = SimpleNamespace(id=123)
         queue = collections.deque()
@@ -175,7 +183,7 @@ class MusicQueueHelperTests(unittest.TestCase):
         self.assertIsNone(track.title)
 
     def test_enqueue_search_entry_track_preserves_search_metadata(self):
-        from util.music_queue import enqueue_search_entry_track
+        from util.music.queue import enqueue_search_entry_track
 
         requester = SimpleNamespace(id=123)
         queue = collections.deque()

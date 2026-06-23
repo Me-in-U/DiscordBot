@@ -4,7 +4,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Deque
 
-from util.music_queue import (
+from util.music.queue import (
     QueuedTrack,
     _track_title,
     enqueue_search_entry_track,

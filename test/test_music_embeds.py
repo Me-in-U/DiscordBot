@@ -4,7 +4,7 @@ import warnings
 from pathlib import Path
 from types import SimpleNamespace
 
-from util.music_queue import QueuedTrack
+from util.music.queue import QueuedTrack
 
 
 MUSIC_EMBEDS_PATH = Path("util/music/embeds.py")

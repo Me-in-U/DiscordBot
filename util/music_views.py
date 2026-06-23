@@ -14,7 +14,7 @@ from util.music_favorites import (
     build_music_favorite_search_modal_action,
     build_music_favorite_search_submit_action,
 )
-from util.music_queue import parse_seek_seconds
+from util.music.queue import parse_seek_seconds
 
 
 def _favorite_by_slot(favorites: list[MusicFavorite]) -> dict[int, MusicFavorite]:

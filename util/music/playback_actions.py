@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from util.music_queue import enqueue_url_track
+from util.music.queue import enqueue_url_track
 from util.music.queue_actions import QUEUE_ADDED_MESSAGE
 from util.music_state import GuildMusicState
 

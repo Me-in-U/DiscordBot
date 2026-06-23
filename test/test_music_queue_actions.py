@@ -2,7 +2,7 @@ import collections
 import unittest
 from pathlib import Path
 
-from util.music_queue import QueuedTrack
+from util.music.queue import QueuedTrack
 from util.music.queue_actions import (
     begin_search_pick_queue_action,
     clear_queue_action,

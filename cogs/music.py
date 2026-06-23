@@ -43,7 +43,7 @@ from util.music.embeds import (
     make_default_music_embed,
     make_playing_music_embed,
 )
-from util.music_queue import (
+from util.music.queue import (
     QueuedTrack,
     build_queue_display,
     fill_queue_track_metadata,

@@ -1,6 +1,6 @@
 import unittest
 
-from util.music_queue import QueuedTrack
+from util.music.queue import QueuedTrack
 from util.music_state import (
     GuildMusicState,
     finish_music_track_state,
