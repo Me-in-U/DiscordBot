@@ -434,6 +434,22 @@ class MusicCommandSurfaceTests(unittest.TestCase):
                 self.assertNotIn("build_search_results_display", function_source)
                 self.assertNotIn("description = \"\\n\".join", function_source)
 
+    def test_favorite_search_request_delegates_input_mapping_to_helper(self):
+        source_text = MUSIC_PATH.read_text(encoding="utf-8")
+        tree = ast.parse(source_text)
+        function_source = ast.get_source_segment(
+            source_text,
+            _function_node(tree, "_search_music_for_favorite_slot"),
+        )
+
+        self.assertIn("build_music_favorite_search_request_action", function_source)
+        self.assertIn("favorite_search_action.user_message", function_source)
+        self.assertIn("favorite_search_action.query", function_source)
+        self.assertIn("favorite_slot=favorite_search_action.slot", function_source)
+        self.assertNotIn("validate_music_favorite_slot", function_source)
+        self.assertNotIn("(query or \"\").strip()", function_source)
+        self.assertNotIn("검색어를 입력", function_source)
+
     def test_favorite_management_responses_use_shared_ephemeral_helper(self):
         source_text = MUSIC_PATH.read_text(encoding="utf-8")
         tree = ast.parse(source_text)

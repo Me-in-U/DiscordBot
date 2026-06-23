@@ -83,6 +83,17 @@ class MusicFavoriteSearchSubmitAction:
 
 
 @dataclass(frozen=True, slots=True)
+class MusicFavoriteSearchRequestAction:
+    slot: int
+    query: str
+    user_message: str | None = None
+
+    @property
+    def should_search(self) -> bool:
+        return self.user_message is None
+
+
+@dataclass(frozen=True, slots=True)
 class MusicFavoriteCurrentSaveButtonAction:
     slot: int
     disabled: bool
@@ -176,6 +187,22 @@ def build_music_favorite_search_submit_action(
         slot=validate_music_favorite_slot(slot),
         query=str(query_value or "").strip(),
     )
+
+
+def build_music_favorite_search_request_action(
+    *,
+    slot: int | str,
+    query_value: object,
+) -> MusicFavoriteSearchRequestAction:
+    slot = validate_music_favorite_slot(slot)
+    query = str(query_value or "").strip()
+    if not query:
+        return MusicFavoriteSearchRequestAction(
+            slot=slot,
+            query="",
+            user_message="❌ 검색어를 입력해 주세요.",
+        )
+    return MusicFavoriteSearchRequestAction(slot=slot, query=query)
 
 
 def build_music_favorite_current_save_button_action(

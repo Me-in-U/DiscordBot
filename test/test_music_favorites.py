@@ -6,6 +6,7 @@ from util.music_favorites import (
     MusicFavoriteManagerSelectionAction,
     MusicFavoritePlayActionResult,
     MusicFavoriteSearchModalAction,
+    MusicFavoriteSearchRequestAction,
     MusicFavoriteSearchSubmitAction,
     MusicFavoriteSavePayload,
     MusicFavoriteCurrentSaveButtonAction,
@@ -15,6 +16,7 @@ from util.music_favorites import (
     build_music_favorite_button_label,
     build_music_favorite_play_action,
     build_music_favorite_search_modal_action,
+    build_music_favorite_search_request_action,
     build_music_favorite_search_submit_action,
     build_music_favorite_save_payload,
     current_player_to_music_favorite,
@@ -272,6 +274,39 @@ class MusicFavoriteTests(unittest.IsolatedAsyncioTestCase):
     def test_music_favorite_search_submit_action_validates_slot(self):
         with self.assertRaisesRegex(ValueError, "즐겨찾기 번호는 1~5"):
             build_music_favorite_search_submit_action(slot=7, query_value="lofi")
+
+    def test_music_favorite_search_request_action_normalizes_query(self):
+        result = build_music_favorite_search_request_action(
+            slot="2",
+            query_value="  lofi hiphop  ",
+        )
+
+        self.assertEqual(
+            result,
+            MusicFavoriteSearchRequestAction(
+                slot=2,
+                query="lofi hiphop",
+            ),
+        )
+        self.assertTrue(result.should_search)
+
+    def test_music_favorite_search_request_action_returns_empty_query_message(self):
+        result = build_music_favorite_search_request_action(
+            slot=3,
+            query_value=None,
+        )
+
+        self.assertEqual(result.slot, 3)
+        self.assertEqual(result.query, "")
+        self.assertEqual(result.user_message, "❌ 검색어를 입력해 주세요.")
+        self.assertFalse(result.should_search)
+
+    def test_music_favorite_search_request_action_validates_slot(self):
+        with self.assertRaisesRegex(ValueError, "즐겨찾기 번호는 1~5"):
+            build_music_favorite_search_request_action(
+                slot=7,
+                query_value="lofi",
+            )
 
     def test_music_favorite_current_save_button_action_enables_for_current_track(self):
         current_track = MusicFavorite(

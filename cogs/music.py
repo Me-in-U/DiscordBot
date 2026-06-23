@@ -18,12 +18,12 @@ from util.music_favorites import (
     MusicFavoriteSavePayload,
     build_music_favorite_current_track_save_action,
     build_music_favorite_play_action,
+    build_music_favorite_search_request_action,
     current_player_to_music_favorite,
     get_music_favorite,
     list_music_favorites,
     search_entry_to_music_favorite_save_payload,
     upsert_music_favorite,
-    validate_music_favorite_slot,
 )
 from util.music_embeds import (
     PANEL_TITLE,
@@ -281,23 +281,28 @@ class MusicCog(commands.Cog):
         slot: int,
         query: str,
     ) -> None:
-        slot = validate_music_favorite_slot(slot)
-        query = (query or "").strip()
-        if not query:
+        favorite_search_action = build_music_favorite_search_request_action(
+            slot=slot,
+            query_value=query,
+        )
+        if favorite_search_action.user_message:
             await self._send_ephemeral_response(
                 interaction,
-                "❌ 검색어를 입력해 주세요.",
+                favorite_search_action.user_message,
             )
             return
 
         info = await asyncio.get_event_loop().run_in_executor(
             None,
-            lambda: search_ytdl.extract_info(f"ytsearch10:{query}", download=False),
+            lambda: search_ytdl.extract_info(
+                f"ytsearch10:{favorite_search_action.query}",
+                download=False,
+            ),
         )
         search_result = build_music_search_action(
-            query=query,
+            query=favorite_search_action.query,
             info=info,
-            favorite_slot=slot,
+            favorite_slot=favorite_search_action.slot,
         )
         if search_result.user_message:
             await self._send_ephemeral_response(
@@ -311,7 +316,11 @@ class MusicCog(commands.Cog):
             description=search_result.embed_description,
             color=0xFFC0CB,
         )
-        view = SearchResultView(self, search_result.videos, favorite_slot=slot)
+        view = SearchResultView(
+            self,
+            search_result.videos,
+            favorite_slot=favorite_search_action.slot,
+        )
         await self._send_ephemeral_response(interaction, embed=embed, view=view)
 
     async def _save_music_favorite(
