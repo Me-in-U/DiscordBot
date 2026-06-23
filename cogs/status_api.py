@@ -9,10 +9,38 @@ from aiohttp import web
 from discord.ext import commands
 
 from util.celebration import refresh_celebration_messages
+from util.db import DB_SCHEMA_VERSION
 from util.env_utils import getenv_clean
 
 
 logger = logging.getLogger(__name__)
+PRODUCTION_ENV_VALUES = {"prod", "production"}
+
+
+def is_deploy_runtime() -> bool:
+    env_file = (getenv_clean("ENV_FILE", "") or "").strip()
+    runtime_env = (
+        getenv_clean("APP_ENV", "")
+        or getenv_clean("ENVIRONMENT", "")
+        or getenv_clean("BOT_ENV", "")
+        or ""
+    ).strip().lower()
+    return os.path.basename(env_file) == ".env.deploy" or runtime_env in PRODUCTION_ENV_VALUES
+
+
+def get_youtube_websub_verify_token() -> str:
+    token = (getenv_clean("YOUTUBE_WEBSUB_VERIFY_TOKEN", "") or "").strip()
+    if token:
+        return token
+    if is_deploy_runtime():
+        raise RuntimeError(
+            "YOUTUBE_WEBSUB_VERIFY_TOKEN is required for deployed WebSub callbacks."
+        )
+    logger.warning(
+        "YOUTUBE_WEBSUB_VERIFY_TOKEN is not configured; "
+        "WebSub token validation is disabled for local development."
+    )
+    return ""
 
 
 class StatusApi(commands.Cog):
@@ -24,6 +52,7 @@ class StatusApi(commands.Cog):
         self.start_time = time.time()
         # 기본 포트는 1557으로 설정, .env 등에서 API_PORT로 변경 가능
         self.port = int(getenv_clean("API_PORT", "1557"))
+        self.youtube_websub_verify_token = get_youtube_websub_verify_token()
         # 미들웨어 등록: Host 헤더 검사
         self.app = web.Application(
             middlewares=[self.host_check_middleware, self.api_key_middleware]
@@ -84,7 +113,7 @@ class StatusApi(commands.Cog):
         return await handler(request)
 
     def _is_valid_youtube_websub_request(self, request) -> bool:
-        expected_token = getenv_clean("YOUTUBE_WEBSUB_VERIFY_TOKEN", "")
+        expected_token = self.youtube_websub_verify_token
         if not expected_token:
             return True
 
@@ -119,6 +148,7 @@ class StatusApi(commands.Cog):
             "guild_count": guild_count,
             "user_count": total_members,
             "message_count": message_count,
+            "schema_version": DB_SCHEMA_VERSION,
             "timestamp_utc": datetime.now(timezone.utc).isoformat(),
             "bot_name": str(self.bot.user) if self.bot.user else "Unknown",
         }

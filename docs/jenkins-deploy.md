@@ -26,6 +26,15 @@
 - Docker 컨테이너 이름은 공백과 특수 문자를 허용하지 않으므로 실제 `container_name` 은 `discord-bot-shin` 으로 사용한다.
 - 운영 문서와 알림에는 표시용 이름 `discord bot 神` 을 함께 표기할 수 있다.
 
+## 권장 운영 리소스
+
+- 현재 `docker-compose.yml` 의 기본 메모리 제한은 `mem_limit: 500m` 이다.
+- 일반 텍스트 명령, 예약, 알림, 상태 API 중심 운영이면 500MB 제한으로 시작할 수 있다.
+- YouTube 요약은 `yt-dlp`, ffmpeg, OpenAI 호출을 같은 프로세스에서 사용하므로 동시 요청이 많으면 메모리와 CPU 사용량이 커질 수 있다.
+- 음성 대화/STT 기능은 Whisper 모델을 CPU에서 실행하므로 YouTube 요약과 겹치면 처리 지연이나 OOM 가능성이 있다.
+- YouTube 요약 또는 STT를 운영에서 자주 쓰는 서버라면 1GB 이상 메모리 제한과 최소 1 vCPU 이상의 여유를 권장한다.
+- `health check` 실패가 반복되면 먼저 `docker compose ps`, 최근 컨테이너 로그, OOM kill 여부, host CPU/memory 사용량을 확인한다.
+
 ## 예시 Jenkins Credential
 
 현재 예시 `Jenkinsfile` 은 아래 Credential ID 를 사용한다.
@@ -66,7 +75,9 @@
 - `main` 브랜치 push 시 Jenkins 가 자동 실행된다.
 - Jenkins 는 저장소를 checkout 한 뒤 `discordbot-env` Credential 로 `.env.deploy` 를 복원한다.
 - Docker Compose 는 로컬 기본값으로 `.env` 를 사용하고, Jenkins 배포에서는 `ENV_FILE=.env.deploy` 를 통해 배포 전용 env 파일을 사용한다.
-- 배포 스크립트는 다음 순서로 동작한다.
+- `.env.deploy` 배포 런타임에서는 `YOUTUBE_WEBSUB_VERIFY_TOKEN` 이 필수이며, 누락되면 Status API Cog 로드 단계에서 부팅이 중단된다.
+- Jenkins 는 Deploy 전에 `scripts/migrate_db.py` 를 실행해 DB DDL과 schema version 기록을 먼저 적용한다.
+- 배포 스크립트는 migration 이후 다음 순서로 동작한다.
   - `docker compose build discord-bot`
   - `docker compose up -d --no-build discord-bot`
   - `http://host.docker.internal:1557/health` 헬스체크 확인

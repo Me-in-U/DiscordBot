@@ -1,4 +1,5 @@
 # https://github.com/openai/openai-python
+import logging
 import os
 
 from dotenv import load_dotenv
@@ -13,7 +14,12 @@ OPENAI_KEY = getenv_clean("OPENAI_KEY")
 if not OPENAI_KEY:
     raise EnvironmentError("OPENAI_KEY 환경 변수가 설정되지 않았습니다.")
 
+logger = logging.getLogger(__name__)
 clientGPT = OpenAI(api_key=OPENAI_KEY)
+
+
+class OpenAIModelError(Exception):
+    """Raised when the OpenAI Responses API call or response parsing fails."""
 
 
 def _extract_response_text(response) -> str:
@@ -30,17 +36,20 @@ def _extract_response_text(response) -> str:
 
 
 def custom_prompt_model(prompt, image_content=None):
-    if image_content:
-        response = clientGPT.responses.create(
-            input=image_content,
-            prompt=prompt,
-        )
-    else:
-        response = clientGPT.responses.create(
-            prompt=prompt,
-        )
-    print(response)
-    return _extract_response_text(response)
+    try:
+        if image_content:
+            response = clientGPT.responses.create(
+                input=image_content,
+                prompt=prompt,
+            )
+        else:
+            response = clientGPT.responses.create(
+                prompt=prompt,
+            )
+        logger.debug("OpenAI prompt response received: type=%s", type(response).__name__)
+        return _extract_response_text(response)
+    except Exception as exc:
+        raise OpenAIModelError("OpenAI prompt response failed.") from exc
 
 
 def generate_text_model(
@@ -59,6 +68,9 @@ def generate_text_model(
     if max_output_tokens is not None:
         request_kwargs["max_output_tokens"] = max_output_tokens
 
-    response = clientGPT.responses.create(**request_kwargs)
-    print(response)
-    return _extract_response_text(response)
+    try:
+        response = clientGPT.responses.create(**request_kwargs)
+        logger.debug("OpenAI text response received: type=%s", type(response).__name__)
+        return _extract_response_text(response)
+    except Exception as exc:
+        raise OpenAIModelError("OpenAI text response failed.") from exc

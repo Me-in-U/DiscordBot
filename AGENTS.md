@@ -48,14 +48,17 @@ This repository hosts a modular Discord bot built with `discord.py`. Follow thes
 ## Developer Workflows
 
 - **Dependency Management**:
-  - Use `pip_install.txt` for dependencies.
-  - Run: `pip install -r pip_install.txt`
+  - Use Python 3.11 for local development, tests, and Docker runtime parity.
+  - Use `requirements.txt` as the primary dependency entry point.
+  - Run: `pip install -r requirements.txt`
+  - Treat `pip_install.txt` as legacy/manual installation notes unless it is converted into an executable script.
 - **Execution (Windows)**:
   - Use `_launchBot.ps1` to activate the virtual environment and run the bot.
   - If PowerShell is inconvenient, `_launchBot.bat` provides the same local entry point.
 - **Testing**:
-  - Ad-hoc tests in `test/` directory (e.g., `spring_ai_test.py`).
-  - No formal unit test suite; rely on manual verification or script execution.
+  - Run syntax/import verification with `python -m compileall -q bot.py api cogs common func util test`.
+  - Run the unittest suite with `python -m unittest discover -s test`.
+  - `test/`는 importable package가 아니므로 focused checks should still use discovery mode, for example `python -m unittest discover -s test -p "test_scheduler.py"`.
 
 ## Deployment Ownership
 

@@ -14,6 +14,7 @@ services:
       - ${ENV_FILE:-.env}
     environment:
       - API_PORT=1557
+      - ENV_FILE=${ENV_FILE:-.env}
     ports:
       - "127.0.0.1:1557:1557"
     extra_hosts:

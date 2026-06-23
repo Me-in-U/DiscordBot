@@ -25,7 +25,13 @@ DB_NAME = getenv_clean("DB_DATABASE")
 
 QueryArgs: TypeAlias = Sequence[Any] | dict[str, Any] | None
 DbRow: TypeAlias = dict[str, Any]
+DB_SCHEMA_VERSION = 1
+SCHEMA_MIGRATION_KEY = "core"
 pool: aiomysql.Pool | None = None
+
+
+class SchemaMigrationRequiredError(RuntimeError):
+    """Raised when the DB schema is missing or behind the application contract."""
 
 
 async def get_db_pool() -> aiomysql.Pool:
@@ -78,8 +84,8 @@ async def fetch_all(query: str, args: QueryArgs = None) -> list[DbRow]:
             return await cur.fetchall()
 
 
-async def create_tables() -> None:
-    """Creates necessary tables if they do not exist."""
+async def run_schema_migrations() -> None:
+    """Apply schema DDL and record the current schema version."""
     queries = [
         """
         CREATE TABLE IF NOT EXISTS guild (
@@ -213,6 +219,16 @@ async def create_tables() -> None:
     pool = await get_db_pool()
     async with pool.acquire() as conn:
         async with conn.cursor() as cur:
+            await cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS schema_migrations (
+                    migration_key VARCHAR(64) PRIMARY KEY,
+                    version INT NOT NULL,
+                    applied_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)
+                        ON UPDATE CURRENT_TIMESTAMP(6)
+                ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+                """
+            )
             # Create tables if missing
             for query in queries:
                 await cur.execute(query)
@@ -294,6 +310,44 @@ async def create_tables() -> None:
                 "DELETE FROM setting_data WHERE setting_key = %s",
                 ("youtubeLiveChecker",),
             )
+            await cur.execute(
+                """
+                INSERT INTO schema_migrations (migration_key, version)
+                VALUES (%s, %s)
+                ON DUPLICATE KEY UPDATE
+                    version = VALUES(version),
+                    applied_at = CURRENT_TIMESTAMP(6)
+                """,
+                (SCHEMA_MIGRATION_KEY, DB_SCHEMA_VERSION),
+            )
+
+
+async def create_tables() -> None:
+    """Backward-compatible migration entrypoint."""
+    await run_schema_migrations()
+
+
+async def get_schema_version() -> int | None:
+    try:
+        row = await fetch_one(
+            "SELECT version FROM schema_migrations WHERE migration_key = %s",
+            (SCHEMA_MIGRATION_KEY,),
+        )
+    except aiomysql.ProgrammingError:
+        return None
+    if row is None:
+        return None
+    return int(row["version"])
+
+
+async def ensure_schema_ready() -> None:
+    current_version = await get_schema_version()
+    if current_version == DB_SCHEMA_VERSION:
+        return
+    raise SchemaMigrationRequiredError(
+        "Database schema is not current. "
+        f"expected={DB_SCHEMA_VERSION} actual={current_version}"
+    )
 
 
 async def upsert_guild(guild_id: int, guild_name: str) -> None:

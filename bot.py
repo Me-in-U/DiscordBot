@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+from collections.abc import Iterable
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -12,8 +13,7 @@ from dotenv import load_dotenv
 
 from func.find1557 import find1557
 from func.youtube_summary import check_youtube_link
-from util.get_recent_messages import get_recent_messages
-from util.db import create_tables, upsert_guild, upsert_user
+from util.db import ensure_schema_ready, upsert_guild, upsert_user
 from util.env_utils import getenv_clean, sanitize_environment
 from util.logging_utils import configure_logging
 
@@ -25,6 +25,7 @@ MessagePart = dict[str, str | None]
 StoredMessage = dict[str, Any]
 UserMessages = dict[int, dict[str, list[StoredMessage]]]
 PartyList = dict[int, list[discord.CategoryChannel]]
+REQUIRED_COGS = frozenset({"cogs.status_api"})
 
 # Client 설정, 변수
 intents = discord.Intents.default()
@@ -35,6 +36,7 @@ DISCORD_CLIENT = commands.Bot(command_prefix="/", intents=intents)
 DISCORD_CLIENT.remove_command("help")
 DISCORD_CLIENT.USER_MESSAGES: UserMessages = {}  # 길드별 -> 유저별 -> 메시지 리스트
 DISCORD_CLIENT.PARTY_LIST: PartyList = {}
+_startup_completed = False
 
 # 환경 변수를 .env 파일에서 로딩
 load_dotenv()
@@ -47,11 +49,13 @@ SSAFY_GUILD_ID = int(getenv_clean("SSAFY_GUILD_ID"))
 SEOUL_TZ = timezone(timedelta(hours=9))  # 서울 시간대 설정 (UTC+9)
 
 
-# Cog 로드
-async def load_cogs() -> None:
-    """Cog를 로드하고 초기 설정값을 전달합니다."""
-    print("-------------------Cog 로드 시작-------------------")
-    cogs_path = os.path.join(BASE_DIR, "cogs")
+class RequiredCogLoadError(RuntimeError):
+    """Raised when a startup-critical Cog cannot be loaded."""
+
+
+def discover_cog_extensions(cogs_path: str | None = None) -> list[str]:
+    """Discover standard and package Cog extension names in stable order."""
+    cogs_path = cogs_path or os.path.join(BASE_DIR, "cogs")
     entries = os.listdir(cogs_path)
     package_names = {
         entry
@@ -59,23 +63,57 @@ async def load_cogs() -> None:
         if os.path.isdir(os.path.join(cogs_path, entry))
         and os.path.exists(os.path.join(cogs_path, entry, "__init__.py"))
     }
-
+    extensions: list[str] = []
     for entry in sorted(entries):
         if entry.endswith(".py"):
             base_name = entry[:-3]
             if base_name in package_names:
                 continue
-            extension = f"cogs.{base_name}"
+            extensions.append(f"cogs.{base_name}")
         elif entry in package_names:
-            extension = f"cogs.{entry}"
-        else:
-            continue
+            extensions.append(f"cogs.{entry}")
+    return extensions
 
+
+# Cog 로드
+async def load_cogs() -> None:
+    """Cog를 로드하고 초기 설정값을 전달합니다."""
+    print("-------------------Cog 로드 시작-------------------")
+    failed_optional: list[str] = []
+
+    for extension in discover_cog_extensions():
         if extension in DISCORD_CLIENT.extensions:
             continue
 
-        await DISCORD_CLIENT.load_extension(extension)
+        try:
+            await DISCORD_CLIENT.load_extension(extension)
+        except Exception as exc:
+            if extension in REQUIRED_COGS:
+                logger.exception("필수 Cog 로드 실패: extension=%s", extension)
+                raise RequiredCogLoadError(
+                    f"Required Cog failed to load: {extension}"
+                ) from exc
+            failed_optional.append(extension)
+            logger.exception("선택 Cog 로드 실패: extension=%s", extension)
+
+    if failed_optional:
+        logger.warning("선택 Cog 로드 실패 목록: %s", ", ".join(failed_optional))
+
     print("-------------------Cog 로드 완료-------------------\n")
+
+
+def build_party_list(guilds: Iterable[Any]) -> PartyList:
+    """Return a fresh guild -> party category map from the current guild cache."""
+    party_list: PartyList = {}
+    for guild in guilds:
+        categories = [
+            category
+            for category in getattr(guild, "categories", [])
+            if getattr(category, "name", "").endswith("-파티")
+        ]
+        if categories:
+            party_list[guild.id] = categories
+    return party_list
 
 
 async def load_party_list() -> None:
@@ -83,12 +121,7 @@ async def load_party_list() -> None:
     모든 길드의 카테고리 중 이름이 '-파티'로 끝나는 카테고리들을 DISCORD_CLIENT.PARTY_LIST에 저장합니다.
     """
     print("---------------- 파티 카테고리 로드 ----------------")
-    for guild in DISCORD_CLIENT.guilds:
-        for category in guild.categories:
-            if category.name.endswith("-파티"):
-                if guild.id not in DISCORD_CLIENT.PARTY_LIST:
-                    DISCORD_CLIENT.PARTY_LIST[guild.id] = []
-                DISCORD_CLIENT.PARTY_LIST[guild.id].append(category)
+    DISCORD_CLIENT.PARTY_LIST = build_party_list(DISCORD_CLIENT.guilds)
     # 저장된 결과를 서버 이름과 파티 목록으로 출력
     for guild in DISCORD_CLIENT.guilds:
         if guild.id in DISCORD_CLIENT.PARTY_LIST:
@@ -109,7 +142,7 @@ async def update_db_info() -> None:
     """Update guild and user info in DB on startup."""
     print("---------------- DB 정보 업데이트 시작 ----------------")
     try:
-        await create_tables()
+        await ensure_schema_ready()
 
         for guild in DISCORD_CLIENT.guilds:
             await upsert_guild(guild.id, guild.name)
@@ -136,24 +169,31 @@ async def on_ready() -> None:
     """
     봇 실행 준비.
     """
-    # 파티 목록 등 기타 초기화
-    await load_variable()
-    await update_db_info()
+    global _startup_completed
 
-    # 슬래시 커맨드 등록(동기화)
-    # 로드된 Cog 정보 출력
-    print("Loaded Cogs:", DISCORD_CLIENT.cogs.keys())
-    try:
-        # 테스트 서버(개발용)에 우선 동기화
-        # TEST_GUILD = discord.Object(id=GUILD_ID)
-        # synced_test = await DISCORD_CLIENT.tree.sync(guild=TEST_GUILD)
-        # print(f"[TEST SYNC] {len(synced_test)}개 명령어 동기화 (길드 ID={GUILD_ID})")
+    if not _startup_completed:
+        # 파티 목록 등 기타 초기화
+        await load_variable()
+        await update_db_info()
 
-        # 글로벌 동기화
-        synced_global = await DISCORD_CLIENT.tree.sync()
-        print(f"[GLOBAL SYNC] {len(synced_global)}개 명령어 동기화")
-    except Exception:
-        logger.exception("슬래시 커맨드 동기화 실패")
+        # 슬래시 커맨드 등록(동기화)
+        # 로드된 Cog 정보 출력
+        print("Loaded Cogs:", DISCORD_CLIENT.cogs.keys())
+        try:
+            # 테스트 서버(개발용)에 우선 동기화
+            # TEST_GUILD = discord.Object(id=GUILD_ID)
+            # synced_test = await DISCORD_CLIENT.tree.sync(guild=TEST_GUILD)
+            # print(f"[TEST SYNC] {len(synced_test)}개 명령어 동기화 (길드 ID={GUILD_ID})")
+
+            # 글로벌 동기화
+            synced_global = await DISCORD_CLIENT.tree.sync()
+            print(f"[GLOBAL SYNC] {len(synced_global)}개 명령어 동기화")
+        except Exception:
+            logger.exception("슬래시 커맨드 동기화 실패")
+        _startup_completed = True
+    else:
+        await load_party_list()
+        logger.info("Discord reconnect detected; skipped startup-only initialization.")
 
     # 로그인 완료 로그
     print(f"Logged on as {DISCORD_CLIENT.user}!")
@@ -207,11 +247,14 @@ async def on_message(message: discord.Message) -> None:
         # DM 또는 봇(Self) 메시지 등은 name
         author_key = message.author.name
 
-    #! 일반 채팅 저장
-    if image_url:
-        print(f"{timestamp} {author_key}: {message.content} [이미지 첨부]")
-    else:
-        print(f"{timestamp} {author_key}: {message.content}")
+    logger.debug(
+        "message cached: guild_id=%s channel_id=%s author=%s has_image=%s content_length=%s",
+        getattr(message.guild, "id", None),
+        getattr(getattr(message, "channel", None), "id", None),
+        author_key,
+        bool(image_url),
+        len(message.content or ""),
+    )
 
     # 길드별 -> 유저별 저장소 준비 (DM은 스킵)
     if not message.guild:
@@ -409,9 +452,15 @@ async def load_recent_messages(guild_id: int | None = None) -> None:
                 reversed(DISCORD_CLIENT.USER_MESSAGES[guild.id][author])
             )
 
-        # 로그 샘플
-        sample = get_recent_messages(client=DISCORD_CLIENT, guild_id=guild.id, limit=50)
-        print(f"[guild={guild.id}] recent sample:\n", sample)
+        message_count = sum(
+            len(messages) for messages in DISCORD_CLIENT.USER_MESSAGES[guild.id].values()
+        )
+        logger.debug(
+            "recent messages loaded: guild_id=%s authors=%s messages=%s",
+            guild.id,
+            len(DISCORD_CLIENT.USER_MESSAGES[guild.id]),
+            message_count,
+        )
 
     print("---------------------------------------------------\n")
 
