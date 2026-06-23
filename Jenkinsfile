@@ -192,7 +192,7 @@ pipeline {
             --env-file "${ENV_FILE}" \
             -w /app \
             "${deps_image}" \
-            sh -lc 'tar -xf - -C /app && python --version && python -m compileall -q bot.py api cogs common func util test && python -m unittest discover -s test'
+            sh -c 'tar -xf - -C /app && /opt/venv/bin/python --version && /opt/venv/bin/python -m compileall -q bot.py api cogs common func util test && /opt/venv/bin/python -m unittest discover -s test'
         '''
       }
     }
@@ -223,7 +223,7 @@ pipeline {
             --env-file "${ENV_FILE}" \
             -w /app \
             "${deps_image}" \
-            sh -lc 'tar -xf - -C /app && python scripts/migrate_db.py'
+            sh -c 'tar -xf - -C /app && /opt/venv/bin/python scripts/migrate_db.py'
         '''
       }
     }

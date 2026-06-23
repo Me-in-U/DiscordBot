@@ -61,6 +61,15 @@ class DeploymentContractTests(unittest.TestCase):
 
         self.assertGreaterEqual(text.count("sha256sum requirements.txt Dockerfile.deps"), 2)
 
+    def test_jenkins_uses_dependency_venv_python_inside_docker(self):
+        text = Path("Jenkinsfile").read_text(encoding="utf-8")
+
+        self.assertNotIn("sh -lc '", text)
+        self.assertIn("/opt/venv/bin/python --version", text)
+        self.assertIn("/opt/venv/bin/python -m compileall", text)
+        self.assertIn("/opt/venv/bin/python -m unittest discover -s test", text)
+        self.assertIn("/opt/venv/bin/python scripts/migrate_db.py", text)
+
     def test_jenkins_runs_database_migration_before_deploy(self):
         text = Path("Jenkinsfile").read_text(encoding="utf-8")
 
