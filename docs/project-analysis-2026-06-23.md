@@ -14,8 +14,8 @@
 6. Top 5 리스크는 `music.py`, `youtube_summary.py`, `loop.py` 같은 대형 파일이 변경 위험을 키우는 점이다.
 7. 권장 처리 순서는 Jenkins 테스트 게이트, `on_ready` guard, YouTube temp workspace, 민감 로그 제거, 문서 최신화다.
 8. 현재 작업트리에서는 위 1-4번 리스크의 1차 보강과 대형 파일 일부 분리가 구현되었다.
-9. 현재 최신 검증은 `compileall` 통과, unittest 465개 통과다.
-10. 이번 패치로 music panel store helper가 `util/music/` 카테고리 패키지로 이동되었고, 다음 후보는 music favorites helper의 `util/music/` 패키지 이동이다.
+9. 현재 최신 검증은 `compileall` 통과, unittest 466개 통과다.
+10. 이번 패치로 music favorites helper가 `util/music/` 카테고리 패키지로 이동되었고, 다음 후보는 music views helper의 `util/music/` 패키지 이동이다.
 
 ## 기준선
 
@@ -31,7 +31,7 @@
 
 이 문서의 진단은 기준 커밋 `34aab00` 상태를 대상으로 한다. 이후 현재 작업트리에서는 아래 항목이 구현되었다.
 
-최신 검증 결과: `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` 465개 통과.
+최신 검증 결과: `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` 466개 통과.
 
 | 상태 | 항목 | 구현 근거 |
 | --- | --- | --- |
@@ -126,25 +126,25 @@
 | 완료 | music extractor helper 1차 분리 | `util/music/extractor.py`로 yt-dlp 포맷 후보 우선순위/선택 로직 이동 |
 | 완료 | music View/Modal 1차 분리 | `util/music_views.py`로 검색 결과, 즐겨찾기 관리, helper/control View, search/seek modal 이동, `cogs.music` import 호환 유지 |
 | 완료 | music panel store 1차 분리 | `util/music/panel_store.py`로 panel message id 로드/저장/삭제 DB 접근 이동 |
-| 완료 | music favorite snapshot helper 분리 | `util/music_favorites.py`로 현재 재생 player -> 즐겨찾기 snapshot 변환 이동, `MusicCog`는 호환 wrapper만 유지 |
-| 완료 | music favorite 저장 payload/action 분리 | `util/music_favorites.py`로 검색 결과 entry와 현재 재생 snapshot을 저장 payload로 정규화하고, `MusicCog`는 DB upsert, 패널 refresh, Discord 응답만 담당하도록 축소 |
-| 완료 | music favorite play action facade 분리 | `util/music_favorites.py`의 `build_music_favorite_play_action()`으로 빈 슬롯 사용자 문구와 즐겨찾기 재생 URL/prefix를 이동하고, `MusicCog`는 DB 조회, Discord 응답, 재생 호출만 담당하도록 축소 |
-| 완료 | music favorite manager selection action 분리 | `util/music_favorites.py`의 `build_music_favorite_manager_selection_action()`으로 슬롯 선택값 검증, 상태 문구, Select option default 판정을 이동하고, `MusicFavoriteSlotSelect`는 결과 적용과 Discord edit만 담당하도록 축소 |
-| 완료 | music favorite modal/search submit action 분리 | `util/music_favorites.py`의 search modal/submit action helper로 modal 슬롯 검증과 검색어 정규화를 이동하고, `FavoriteSearchModal`과 manager 검색 버튼은 helper 결과 전달만 담당하도록 축소 |
-| 완료 | music favorite current save button action 분리 | `util/music_favorites.py`의 `build_music_favorite_current_save_button_action()`으로 현재곡 저장 버튼 disabled 판정과 선택 슬롯 검증을 이동하고, `MusicFavoriteManageView`는 버튼 생성/Discord callback 연결만 담당하도록 축소 |
-| 완료 | music favorite current track save action 분리 | `util/music_favorites.py`의 `build_music_favorite_current_track_save_action()`으로 현재 재생곡 없음 메시지와 저장 payload 생성을 이동하고, `MusicCog`는 defer, 응답 전송, DB 저장 호출만 담당하도록 축소 |
-| 완료 | music favorite search request action 분리 | `util/music_favorites.py`의 `build_music_favorite_search_request_action()`으로 즐겨찾기 검색 저장 요청의 슬롯 검증, 검색어 정규화, 빈 검색어 사용자 메시지를 이동하고, `MusicCog`는 yt-dlp 검색과 결과 응답만 담당하도록 축소 |
-| 완료 | music favorite manager open action 분리 | `util/music_favorites.py`의 `build_music_favorite_manager_open_action()`으로 관리자 View 초기 payload, 현재곡 snapshot, 초기 상태 문구 생성을 이동하고, `MusicCog`는 favorites 로드, View 생성, Discord 응답만 담당하도록 축소 |
-| 완료 | music favorite play request action 분리 | `util/music_favorites.py`의 `build_music_favorite_play_request_action()`으로 즐겨찾기 재생 요청의 슬롯 검증을 이동하고, `MusicCog`는 DB 조회, 결과 action 생성, Discord 응답/재생 호출만 담당하도록 축소 |
-| 완료 | music favorite save entry action 분리 | `util/music_favorites.py`의 `build_music_favorite_search_entry_save_action()`으로 검색 결과 즐겨찾기 저장 action payload 생성을 이동하고, `MusicCog`는 action payload를 공통 저장 경로로 전달하도록 축소 |
-| 완료 | music favorite save side effect action 분리 | `util/music_favorites.py`의 `save_music_favorite_payload()`로 즐겨찾기 DB 저장 side effect와 저장 완료 사용자 메시지 결과 생성을 이동하고, `MusicCog`는 favorites reload, 패널 refresh, Discord 응답만 담당하도록 축소 |
-| 완료 | music favorite save response action 분리 | `util/music_favorites.py`의 `build_music_favorite_save_response_action()`으로 저장 결과 이후 favorites reload, 패널 refresh, 사용자 응답 정책을 action으로 이동하고, `MusicCog`는 action flag에 따라 Discord side effect만 실행하도록 축소 |
-| 완료 | music favorite panel refresh action 분리 | `util/music_favorites.py`의 `build_music_favorite_panel_refresh_action()`으로 패널 갱신 skip 조건과 playing/helper 패널 모드 선택을 이동하고, `MusicCog`는 action 결과에 따라 View/Embed 생성과 메시지 편집만 담당하도록 축소 |
-| 완료 | music favorite cache load action 분리 | `util/music_favorites.py`의 `build_music_favorite_cache_load_action()`으로 즐겨찾기 캐시 hit/refresh bypass 판단을 이동하고, `MusicCog`는 action 결과에 따라 cache hit 반환 또는 DB 조회만 담당하도록 축소 |
-| 완료 | music favorite cache store action 분리 | `util/music_favorites.py`의 `build_music_favorite_cache_store_action()`으로 DB 로드 결과의 cache 저장 payload 생성을 이동하고, `MusicCog`는 action 결과를 캐시에 반영하도록 축소 |
-| 완료 | music favorite load failure action 분리 | `util/music_favorites.py`의 `build_music_favorite_load_failure_action()`으로 즐겨찾기 DB/row 로드 실패 fallback payload 생성을 이동하고, `MusicCog`는 warning 로그와 action 결과 반영만 담당하도록 축소 |
-| 완료 | music favorite cache hit result action 분리 | `util/music_favorites.py`의 `build_music_favorite_cache_hit_result_action()`으로 cache hit 반환 payload 생성을 이동하고, `MusicCog`는 action 결과 반환만 담당하도록 축소 |
-| 완료 | music favorite cache apply helper 분리 | `util/music_favorites.py`의 `apply_music_favorite_cache_store_action()`으로 cache 저장 side effect와 반환값 생성을 이동하고, `MusicCog`는 helper 호출만 담당하도록 축소 |
+| 완료 | music favorite snapshot helper 분리 | `util/music/favorites.py`로 현재 재생 player -> 즐겨찾기 snapshot 변환 이동, `MusicCog`는 호환 wrapper만 유지 |
+| 완료 | music favorite 저장 payload/action 분리 | `util/music/favorites.py`로 검색 결과 entry와 현재 재생 snapshot을 저장 payload로 정규화하고, `MusicCog`는 DB upsert, 패널 refresh, Discord 응답만 담당하도록 축소 |
+| 완료 | music favorite play action facade 분리 | `util/music/favorites.py`의 `build_music_favorite_play_action()`으로 빈 슬롯 사용자 문구와 즐겨찾기 재생 URL/prefix를 이동하고, `MusicCog`는 DB 조회, Discord 응답, 재생 호출만 담당하도록 축소 |
+| 완료 | music favorite manager selection action 분리 | `util/music/favorites.py`의 `build_music_favorite_manager_selection_action()`으로 슬롯 선택값 검증, 상태 문구, Select option default 판정을 이동하고, `MusicFavoriteSlotSelect`는 결과 적용과 Discord edit만 담당하도록 축소 |
+| 완료 | music favorite modal/search submit action 분리 | `util/music/favorites.py`의 search modal/submit action helper로 modal 슬롯 검증과 검색어 정규화를 이동하고, `FavoriteSearchModal`과 manager 검색 버튼은 helper 결과 전달만 담당하도록 축소 |
+| 완료 | music favorite current save button action 분리 | `util/music/favorites.py`의 `build_music_favorite_current_save_button_action()`으로 현재곡 저장 버튼 disabled 판정과 선택 슬롯 검증을 이동하고, `MusicFavoriteManageView`는 버튼 생성/Discord callback 연결만 담당하도록 축소 |
+| 완료 | music favorite current track save action 분리 | `util/music/favorites.py`의 `build_music_favorite_current_track_save_action()`으로 현재 재생곡 없음 메시지와 저장 payload 생성을 이동하고, `MusicCog`는 defer, 응답 전송, DB 저장 호출만 담당하도록 축소 |
+| 완료 | music favorite search request action 분리 | `util/music/favorites.py`의 `build_music_favorite_search_request_action()`으로 즐겨찾기 검색 저장 요청의 슬롯 검증, 검색어 정규화, 빈 검색어 사용자 메시지를 이동하고, `MusicCog`는 yt-dlp 검색과 결과 응답만 담당하도록 축소 |
+| 완료 | music favorite manager open action 분리 | `util/music/favorites.py`의 `build_music_favorite_manager_open_action()`으로 관리자 View 초기 payload, 현재곡 snapshot, 초기 상태 문구 생성을 이동하고, `MusicCog`는 favorites 로드, View 생성, Discord 응답만 담당하도록 축소 |
+| 완료 | music favorite play request action 분리 | `util/music/favorites.py`의 `build_music_favorite_play_request_action()`으로 즐겨찾기 재생 요청의 슬롯 검증을 이동하고, `MusicCog`는 DB 조회, 결과 action 생성, Discord 응답/재생 호출만 담당하도록 축소 |
+| 완료 | music favorite save entry action 분리 | `util/music/favorites.py`의 `build_music_favorite_search_entry_save_action()`으로 검색 결과 즐겨찾기 저장 action payload 생성을 이동하고, `MusicCog`는 action payload를 공통 저장 경로로 전달하도록 축소 |
+| 완료 | music favorite save side effect action 분리 | `util/music/favorites.py`의 `save_music_favorite_payload()`로 즐겨찾기 DB 저장 side effect와 저장 완료 사용자 메시지 결과 생성을 이동하고, `MusicCog`는 favorites reload, 패널 refresh, Discord 응답만 담당하도록 축소 |
+| 완료 | music favorite save response action 분리 | `util/music/favorites.py`의 `build_music_favorite_save_response_action()`으로 저장 결과 이후 favorites reload, 패널 refresh, 사용자 응답 정책을 action으로 이동하고, `MusicCog`는 action flag에 따라 Discord side effect만 실행하도록 축소 |
+| 완료 | music favorite panel refresh action 분리 | `util/music/favorites.py`의 `build_music_favorite_panel_refresh_action()`으로 패널 갱신 skip 조건과 playing/helper 패널 모드 선택을 이동하고, `MusicCog`는 action 결과에 따라 View/Embed 생성과 메시지 편집만 담당하도록 축소 |
+| 완료 | music favorite cache load action 분리 | `util/music/favorites.py`의 `build_music_favorite_cache_load_action()`으로 즐겨찾기 캐시 hit/refresh bypass 판단을 이동하고, `MusicCog`는 action 결과에 따라 cache hit 반환 또는 DB 조회만 담당하도록 축소 |
+| 완료 | music favorite cache store action 분리 | `util/music/favorites.py`의 `build_music_favorite_cache_store_action()`으로 DB 로드 결과의 cache 저장 payload 생성을 이동하고, `MusicCog`는 action 결과를 캐시에 반영하도록 축소 |
+| 완료 | music favorite load failure action 분리 | `util/music/favorites.py`의 `build_music_favorite_load_failure_action()`으로 즐겨찾기 DB/row 로드 실패 fallback payload 생성을 이동하고, `MusicCog`는 warning 로그와 action 결과 반영만 담당하도록 축소 |
+| 완료 | music favorite cache hit result action 분리 | `util/music/favorites.py`의 `build_music_favorite_cache_hit_result_action()`으로 cache hit 반환 payload 생성을 이동하고, `MusicCog`는 action 결과 반환만 담당하도록 축소 |
+| 완료 | music favorite cache apply helper 분리 | `util/music/favorites.py`의 `apply_music_favorite_cache_store_action()`으로 cache 저장 side effect와 반환값 생성을 이동하고, `MusicCog`는 helper 호출만 담당하도록 축소 |
 | 완료 | music favorite current player wrapper 제거 | `MusicCog._current_player_as_favorite()` 호환 wrapper를 제거하고, 현재곡 즐겨찾기 저장 경로가 `current_player_to_music_favorite()`를 직접 호출하도록 축소 |
 | 완료 | music state helper 1차 분리 | `util/music/state.py`로 `GuildMusicState`와 playback/idle reset/start/finish 상태 전이 이동 |
 | 완료 | music voice helper 1차 분리 | `util/music/voice.py`로 음성 연결, 채널 이동, 활성 상태 판단, 같은 음성 채널 guard, 연결 transition debug 이동 |
@@ -152,6 +152,7 @@
 | 완료 | music state helper 패키지 이동 | `util/music_state.py`를 `util/music/state.py`로 이동하고, `cogs.music`/music util/test import를 새 카테고리 패키지 경로로 통일했으며 root helper 제거를 경로 계약 테스트로 고정 |
 | 완료 | music voice helper 패키지 이동 | `util/music_voice.py`를 `util/music/voice.py`로 이동하고, `cogs.music`/test import를 새 카테고리 패키지 경로로 통일했으며 root helper 제거를 경로 계약 테스트로 고정 |
 | 완료 | music panel store helper 패키지 이동 | `util/music_panel_store.py`를 `util/music/panel_store.py`로 이동하고, `cogs.music`/test import를 새 카테고리 패키지 경로로 통일했으며 root helper 제거를 경로 계약 테스트로 고정 |
+| 완료 | music favorites helper 패키지 이동 | `util/music_favorites.py`를 `util/music/favorites.py`로 이동하고, `cogs.music`/music views/test import를 새 카테고리 패키지 경로로 통일했으며 root helper 제거를 경로 계약 테스트로 고정 |
 | 완료 | music source preparation helper 분리 | `util/music/playback.py`로 `YTDLSource.from_url` 호출, 준비 실패 사용자 메시지 매핑, prepared playback payload 생성 이동 |
 | 완료 | music playback side effect helper 분리 | `MusicCog._start_prepared_playback()`로 prepared player 이후 state/control view/voice/updater/panel edit sequence 단일화 |
 | 완료 | music seek/queue continuation 준비 경로 보강 | seek, loop fallback refresh, 다음 대기열 곡 준비가 `prepare_music_player()`를 통과하도록 정리 |
@@ -166,7 +167,7 @@
 | 완료 | MapleStory sender 1차 분리 | `util/maplestory_sender.py`로 embed/message build, 채널 resolve, Discord send helper 이동, 기존 `util.maplestory_events` 공개 import 호환 유지 |
 | 완료 | YouTube notification state 1차 분리 | `util/youtube_notification_state.py`로 notified ID 정규화, YouTube datetime 파싱, pending live 재검사 판단 이동 |
 
-이번 패치로 music panel store helper의 `util/music/` 패키지 이동이 완료되었다. 다음 작은 후보는 music favorites helper의 `util/music/` 패키지 이동이다.
+이번 패치로 music favorites helper의 `util/music/` 패키지 이동이 완료되었다. 다음 작은 후보는 music views helper의 `util/music/` 패키지 이동이다.
 
 ## 현재 구조 요약
 
@@ -590,7 +591,7 @@
 | Docker Python | 기준 커밋 `Dockerfile.deps` -> `FROM python:3.12-slim`, 현재 작업트리 -> `FROM python:3.11-slim` | 로컬/운영 Python minor version 불일치가 해소됨 |
 | 테스트 기준선 | `python -m unittest discover -s test` -> 154개 통과 | 현재 회귀 테스트 기준 |
 | 컴파일 기준선 | `python -m compileall -q bot.py api cogs common func util test` 통과 | 문법/import 기본 검증 |
-| 작업트리 최신 검증 | `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` -> 465개 통과 | 구현 진행 후 회귀 확인 |
+| 작업트리 최신 검증 | `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` -> 466개 통과 | 구현 진행 후 회귀 확인 |
 | 파일 수 | PowerShell 파일 집계 -> Python 파일 96개 | 분석 규모 |
 | 대형 파일 기준선 | 기준 커밋 line count: `music.py` 2663, `youtube_summary.py` 1072, `loop.py` 954, `maplestory_events.py` 875 | 분리 우선 후보였던 초기 상태 |
 | 대형 파일 현재 | Python read line count: `music.py` 1706, `youtube_summary.py` 191, `loop.py` 309, `maplestory_events.py` 251 | 분리 진행 후에도 `music.py`는 command/action facade 축소 여지가 큼 |
@@ -607,7 +608,7 @@
 | music extractor helper 분리 | `util/music/extractor.py` 47줄, `cogs/music.py` 현재 1706줄, extractor 대상 테스트 11개 통과, `test_music*.py` 216개 통과 | yt-dlp 포맷 후보 우선순위, keyword search URL 결정, entries selection 로직을 music Cog 본문에서 분리하고, root `util/music_extractor.py` 제거를 테스트로 고정 |
 | music View/Modal 분리 | `util/music_views.py` 424줄 추출, `cogs/music.py` 현재 1706줄, views 대상 테스트 3개 통과 | 검색 결과/즐겨찾기/control/helper View와 search/seek modal을 music Cog 본문에서 분리 |
 | music panel store 분리 | `util/music/panel_store.py` 44줄 추출, `cogs/music.py` 현재 1706줄, panel store 대상 테스트 5개 통과, `test_music*.py` 225개 통과 | panel message id 로드/저장/삭제 DB 접근을 music Cog 본문에서 분리하고, root `util/music_panel_store.py` 제거를 테스트로 고정 |
-| music favorite snapshot/payload/play/play-request/save-entry/save-side-effect/save-response/panel-refresh/cache-load/cache-hit/cache-store/cache-apply/load-failure/manager/modal/current-button/current-track/search-request/manager-open/current-player-wrapper helper 분리 | `util/music_favorites.py` 현재 634줄, `cogs/music.py` 현재 1706줄, favorite 대상 테스트 47개 및 command surface 대상 테스트 50개 통과 | 현재 재생 player를 즐겨찾기 snapshot으로 바꾸고, 검색 결과 entry와 현재 재생 snapshot을 저장 payload/action으로 정규화하며, 저장 DB side effect와 완료 메시지 결과 생성을 util helper로 이동하고, 저장 결과 이후 favorites reload, 패널 refresh, 사용자 응답 정책과 패널 refresh skip/playing/helper 모드 선택, 캐시 hit/refresh bypass 판단, cache hit 반환 payload, cache 저장 payload 생성, cache 저장 side effect/반환값, 로드 실패 fallback payload 생성을 action/helper로 고정하고 현재곡 저장 wrapper를 제거했으며, 빈 슬롯/재생 URL action 판단, 즐겨찾기 재생 URL voice guard/playback state/player preparation, 즐겨찾기 재생 요청 슬롯 검증, 검색 결과 저장 action payload 생성, manager 슬롯 선택/관리자 open 상태 계산, favorite 검색 modal/submit 정규화, 현재곡 저장 버튼 disabled/slot 판정, 현재 재생곡 없음 메시지/저장 payload 생성, 검색 저장 요청 슬롯/검색어 검증을 music Cog/View 본문에서 분리 |
+| music favorite snapshot/payload/play/play-request/save-entry/save-side-effect/save-response/panel-refresh/cache-load/cache-hit/cache-store/cache-apply/load-failure/manager/modal/current-button/current-track/search-request/manager-open/current-player-wrapper helper 분리 | `util/music/favorites.py` 현재 517줄, `cogs/music.py` 현재 1706줄, favorite 대상 테스트 48개 및 command surface 대상 테스트 50개 통과, `test_music*.py` 226개 통과 | 현재 재생 player를 즐겨찾기 snapshot으로 바꾸고, 검색 결과 entry와 현재 재생 snapshot을 저장 payload/action으로 정규화하며, 저장 DB side effect와 완료 메시지 결과 생성을 util helper로 이동하고, 저장 결과 이후 favorites reload, 패널 refresh, 사용자 응답 정책과 패널 refresh skip/playing/helper 모드 선택, 캐시 hit/refresh bypass 판단, cache hit 반환 payload, cache 저장 payload 생성, cache 저장 side effect/반환값, 로드 실패 fallback payload 생성을 action/helper로 고정하고 현재곡 저장 wrapper를 제거했으며, 빈 슬롯/재생 URL action 판단, 즐겨찾기 재생 URL voice guard/playback state/player preparation, 즐겨찾기 재생 요청 슬롯 검증, 검색 결과 저장 action payload 생성, manager 슬롯 선택/관리자 open 상태 계산, favorite 검색 modal/submit 정규화, 현재곡 저장 버튼 disabled/slot 판정, 현재 재생곡 없음 메시지/저장 payload 생성, 검색 저장 요청 슬롯/검색어 검증을 music Cog/View 본문에서 분리하고, root `util/music_favorites.py` 제거를 테스트로 고정 |
 | music state helper 분리 | `util/music/state.py` 55줄 추출, `cogs/music.py` 현재 1706줄, state 대상 테스트 6개 통과, `test_music*.py` 223개 통과 | `GuildMusicState`와 playback/idle reset/playback start/track finish 상태 전이를 music Cog 본문에서 분리하고, root `util/music_state.py` 제거를 테스트로 고정 |
 | music voice helper 분리 | `util/music/voice.py` 78줄 추출, `cogs/music.py` 현재 1706줄, voice 대상 테스트 12개 통과, `test_music*.py` 224개 통과 | 음성 연결, 채널 이동, 재생/일시정지 활성 상태 판단, 같은 음성 채널 guard, 연결 transition debug를 music Cog 본문에서 분리하고, root `util/music_voice.py` 제거를 테스트로 고정 |
 | music source preparation/playback payload helper 분리 | `util/music/playback.py` 113줄, `cogs/music.py` 현재 1706줄, playback 대상 테스트 9개 통과, `test_music*.py` 219개 통과 | 일반 재생, 즐겨찾기 재생, seek, loop fallback refresh, 다음 대기열 곡 준비의 `YTDLSource.from_url` 호출과 FFmpeg/스트림 준비 실패 매핑, loop/skip replay source 재사용, prepared player의 source/확인 메시지 payload와 prepared playback side effect sequence를 단일화하고, root `util/music_playback.py` 제거를 테스트로 고정 |

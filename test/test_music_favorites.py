@@ -1,8 +1,9 @@
 import unittest
+from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 from cogs.music import GuildMusicState, MusicCog, MusicControlView, MusicHelperView
-from util.music_favorites import (
+from util.music.favorites import (
     MusicFavorite,
     MusicFavoriteCacheHitResultAction,
     MusicFavoriteCacheLoadAction,
@@ -47,8 +48,15 @@ from util.music_favorites import (
     validate_music_favorite_slot,
 )
 
+MUSIC_FAVORITES_PATH = Path("util/music/favorites.py")
+LEGACY_MUSIC_FAVORITES_PATH = Path("util/music_favorites.py")
+
 
 class MusicFavoriteTests(unittest.IsolatedAsyncioTestCase):
+    def test_music_favorites_helper_lives_under_music_package(self):
+        self.assertTrue(MUSIC_FAVORITES_PATH.exists())
+        self.assertFalse(LEGACY_MUSIC_FAVORITES_PATH.exists())
+
     def test_favorite_button_label_truncates_long_title(self):
         favorite = MusicFavorite(
             guild_id=1,
@@ -268,7 +276,7 @@ class MusicFavoriteTests(unittest.IsolatedAsyncioTestCase):
         )
 
         with patch(
-            "util.music_favorites.upsert_music_favorite",
+            "util.music.favorites.upsert_music_favorite",
             new=AsyncMock(),
         ) as upsert_music_favorite_mock:
             result = await save_music_favorite_payload(payload)

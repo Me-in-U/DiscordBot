@@ -16,7 +16,7 @@ from util.music.logging import (
     build_music_play_command_debug_message,
     make_music_debug_logger,
 )
-from util.music_favorites import (
+from util.music.favorites import (
     MusicFavorite,
     MusicFavoriteSavePayload,
     apply_music_favorite_cache_store_action,

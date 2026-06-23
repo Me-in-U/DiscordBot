@@ -2,7 +2,7 @@ import unittest
 import warnings
 from types import SimpleNamespace
 
-from util.music_favorites import MusicFavorite
+from util.music.favorites import MusicFavorite
 
 with warnings.catch_warnings():
     warnings.filterwarnings(

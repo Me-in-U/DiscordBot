@@ -5,7 +5,7 @@ from typing import Any
 import discord
 from discord.ui import Button, View
 
-from util.music_favorites import (
+from util.music.favorites import (
     MUSIC_FAVORITE_SLOT_MAX,
     MusicFavorite,
     build_music_favorite_button_label,
