@@ -68,7 +68,7 @@ from util.music_state import (
     reset_music_playback_state,
     start_music_playback_state,
 )
-from util.music_progress import (
+from util.music.progress import (
     make_progress_bar as build_music_progress_bar,
     make_timeline_line as build_music_timeline_line,
 )

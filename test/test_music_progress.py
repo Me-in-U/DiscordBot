@@ -1,24 +1,33 @@
 import unittest
 import warnings
+from pathlib import Path
+
+
+MUSIC_PROGRESS_PATH = Path("util/music/progress.py")
+LEGACY_MUSIC_PROGRESS_PATH = Path("util/music_progress.py")
 
 
 class MusicProgressHelperTests(unittest.TestCase):
+    def test_progress_helper_lives_under_music_package(self):
+        self.assertTrue(MUSIC_PROGRESS_PATH.exists())
+        self.assertFalse(LEGACY_MUSIC_PROGRESS_PATH.exists())
+
     def test_format_music_time_uses_mmss(self):
-        from util.music_progress import format_music_time
+        from util.music.progress import format_music_time
 
         self.assertEqual(format_music_time(0), "00:00")
         self.assertEqual(format_music_time(83), "01:23")
         self.assertEqual(format_music_time(3605), "60:05")
 
     def test_make_progress_bar_clamps_elapsed_to_valid_range(self):
-        from util.music_progress import make_progress_bar
+        from util.music.progress import make_progress_bar
 
         self.assertEqual(make_progress_bar(-5, 100, length=5), ("▱" * 5, 0))
         self.assertEqual(make_progress_bar(50, 100, length=5), ("▰▰▱▱▱", 2))
         self.assertEqual(make_progress_bar(150, 100, length=5), ("▰" * 5, 5))
 
     def test_make_timeline_line_uses_same_filled_count_as_progress_bar(self):
-        from util.music_progress import H_BAR, make_timeline_line
+        from util.music.progress import H_BAR, make_timeline_line
 
         self.assertEqual(
             make_timeline_line(30, 120, length=4),
@@ -29,7 +38,7 @@ class MusicProgressHelperTests(unittest.TestCase):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", DeprecationWarning)
             from cogs.music import MusicCog
-        from util.music_progress import make_progress_bar, make_timeline_line
+        from util.music.progress import make_progress_bar, make_timeline_line
 
         cog = MusicCog.__new__(MusicCog)
 

@@ -14,8 +14,8 @@
 6. Top 5 리스크는 `music.py`, `youtube_summary.py`, `loop.py` 같은 대형 파일이 변경 위험을 키우는 점이다.
 7. 권장 처리 순서는 Jenkins 테스트 게이트, `on_ready` guard, YouTube temp workspace, 민감 로그 제거, 문서 최신화다.
 8. 현재 작업트리에서는 위 1-4번 리스크의 1차 보강과 대형 파일 일부 분리가 구현되었다.
-9. 현재 최신 검증은 `compileall` 통과, unittest 452개 통과다.
-10. 이번 패치로 music play command debug logging helper 분리가 `util/music/` 카테고리 패키지에 구현되었고, 다음 후보는 music progress helper의 `util/music/` 패키지 이동이다.
+9. 현재 최신 검증은 `compileall` 통과, unittest 453개 통과다.
+10. 이번 패치로 music progress helper가 `util/music/` 카테고리 패키지로 이동되었고, 다음 후보는 music embed helper의 `util/music/` 패키지 이동이다.
 
 ## 기준선
 
@@ -31,7 +31,7 @@
 
 이 문서의 진단은 기준 커밋 `34aab00` 상태를 대상으로 한다. 이후 현재 작업트리에서는 아래 항목이 구현되었다.
 
-최신 검증 결과: `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` 452개 통과.
+최신 검증 결과: `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` 453개 통과.
 
 | 상태 | 항목 | 구현 근거 |
 | --- | --- | --- |
@@ -119,7 +119,7 @@
 | 완료 | music 메타데이터/즐겨찾기 broad exception 경로 구체화 | 패널 ID/즐겨찾기 로드는 DB/row 변환 예외만 warning 로그로 fallback하고, 대기열 메타데이터 추출은 `DownloadError`/I/O/값 변환 오류만 debug 로그로 회수하도록 정리 |
 | 완료 | music 재생 제어/임베드 broad exception 경로 구체화 | `_resume`, `_seek`, 반복 재생 소스 준비, 기본/재생 임베드 생성 실패를 domain/Discord/값 변환 예외로 좁히고, 남은 lifecycle broad catch는 logger stack 로그를 남기도록 정리 |
 | 완료 | music 상태성 `print`/logger 정리 | `cogs/music.py`의 direct `print()`를 제거하고 debug/status 출력이 `logger.debug/info`를 통과하도록 AST 정책 테스트로 고정 |
-| 완료 | music progress helper 1차 분리 | `util/music_progress.py`로 시간 포맷, 진행바, timeline helper 이동, `MusicCog` 공개 메서드는 호환 wrapper 유지 |
+| 완료 | music progress helper 1차 분리 | `util/music/progress.py`로 시간 포맷, 진행바, timeline helper 이동, `MusicCog` 공개 메서드는 호환 wrapper 유지 |
 | 완료 | music search helper 1차 분리 | `util/music_search.py`로 HTTP URL 판별, 검색 결과 URL 정규화, YouTube watch entry filtering, 검색 결과 표시 문자열 생성 이동 |
 | 완료 | music embed helper 1차 분리 | `util/music_embeds.py`로 기본 패널/재생 중 embed 생성 이동, `MusicCog` 공개 wrapper 유지 |
 | 완료 | music extractor helper 1차 분리 | `util/music_extractor.py`로 yt-dlp 포맷 후보 우선순위/선택 로직 이동 |
@@ -162,7 +162,7 @@
 | 완료 | MapleStory sender 1차 분리 | `util/maplestory_sender.py`로 embed/message build, 채널 resolve, Discord send helper 이동, 기존 `util.maplestory_events` 공개 import 호환 유지 |
 | 완료 | YouTube notification state 1차 분리 | `util/youtube_notification_state.py`로 notified ID 정규화, YouTube datetime 파싱, pending live 재검사 판단 이동 |
 
-이번 패치로 music play command debug logging helper 분리가 완료되었다. 다음 작은 후보는 music progress helper의 `util/music/` 패키지 이동이다.
+이번 패치로 music progress helper의 `util/music/` 패키지 이동이 완료되었다. 다음 작은 후보는 music embed helper의 `util/music/` 패키지 이동이다.
 
 ## 현재 구조 요약
 
@@ -586,7 +586,7 @@
 | Docker Python | 기준 커밋 `Dockerfile.deps` -> `FROM python:3.12-slim`, 현재 작업트리 -> `FROM python:3.11-slim` | 로컬/운영 Python minor version 불일치가 해소됨 |
 | 테스트 기준선 | `python -m unittest discover -s test` -> 154개 통과 | 현재 회귀 테스트 기준 |
 | 컴파일 기준선 | `python -m compileall -q bot.py api cogs common func util test` 통과 | 문법/import 기본 검증 |
-| 작업트리 최신 검증 | `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` -> 452개 통과 | 구현 진행 후 회귀 확인 |
+| 작업트리 최신 검증 | `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` -> 453개 통과 | 구현 진행 후 회귀 확인 |
 | 파일 수 | PowerShell 파일 집계 -> Python 파일 96개 | 분석 규모 |
 | 대형 파일 기준선 | 기준 커밋 line count: `music.py` 2663, `youtube_summary.py` 1072, `loop.py` 954, `maplestory_events.py` 875 | 분리 우선 후보였던 초기 상태 |
 | 대형 파일 현재 | Python read line count: `music.py` 1856, `youtube_summary.py` 191, `loop.py` 309, `maplestory_events.py` 251 | 분리 진행 후에도 `music.py`는 command/action facade 축소 여지가 큼 |
@@ -597,7 +597,7 @@
 | music play command branch dispatch helper 분리 | `cogs/music.py` 현재 1856줄, command surface 대상 테스트 50개 통과 | `_dispatch_music_play_command_branch()`가 `/재생` 명령의 검색어/URL 분기 선택, 검색 branch 위임, URL branch `skip_defer` 전달을 담당하고, `_play()`는 debug 로그와 branch dispatch helper 호출만 담당하도록 고정 |
 | music play command debug logging helper 분리 | `util/music/logging.py` 35줄 추가, `cogs/music.py` 현재 1856줄, logging 대상 테스트 4개 추가, command surface 대상 테스트 50개 통과 | 새 music util은 `util/music/` 카테고리 패키지에 배치하고, `log_music_debug()`/`make_music_debug_logger()`가 music debug prefix와 sink 실패 회수를 담당하며, `build_music_play_command_debug_message()`가 `/재생` debug 메시지 조립을 담당하도록 고정 |
 | music queue/error response 경로 통일 | `QUEUE_ADDED_MESSAGE`, `_send_auto_delete()`, `_send_ephemeral_response()`, `_send_channel_auto_delete()`, cleanup helper, command surface 대상 테스트 36개 통과 | `_play`와 `_play_from_search_pick`의 대기열 추가 응답, search pick 음성 연결 실패 응답, `_play` URL 음성 연결/준비 실패 응답, 제어 명령 guard/재생 없음/성공/단순 오류 응답, 즐겨찾기 저장/관리/대기열 표시/재생 시작 확인/검색 결과/패널 안내/입력 검증/채널 경고/cleanup/metadata/playback-control/lifecycle/logging/queue-action/playback-action/skip-seek-action/search-action/url-play-action/search-pick-action 경로가 helper 또는 구체 예외 정책을 통과하도록 고정 |
-| music progress helper 분리 | `util/music_progress.py` 39줄 추출, `cogs/music.py` 현재 1856줄, progress 대상 테스트 4개 통과 | 시간/진행률 UI helper를 music Cog 본문에서 분리 |
+| music progress helper 분리 | `util/music/progress.py` 39줄, `cogs/music.py` 현재 1856줄, progress 대상 테스트 5개 통과, `test_music*.py` 213개 통과 | 시간/진행률 UI helper를 music Cog 본문에서 분리하고, root `util/music_progress.py` 제거를 테스트로 고정 |
 | music search helper/action/yt-dlp executor/response/flow/play-branch helper 분리 | `util/music_search.py` 138줄 추출, `cogs/music.py` 현재 1856줄, search 대상 테스트 12개 및 command surface 대상 테스트 50개 통과 | HTTP URL 판별, 검색 결과 URL 정규화, watch entry filtering, 검색 결과 embed title/description 조립, `/재생` 검색과 즐겨찾기 검색의 빈 결과 메시지/표시 payload action, `ytsearch10:` query 조립과 yt-dlp executor scheduling, 검색 결과 없음/Embed/View/ephemeral response sequence, 검색 실행과 action mapping flow, `/재생` 키워드 검색 분기 위임 helper를 music Cog 검색 분기에서 분리 |
 | music embed helper 분리 | `util/music_embeds.py` 98줄 추출, `cogs/music.py` 현재 1856줄, embed 대상 테스트 3개 통과 | 기본 패널/재생 중 embed 생성 UI 책임을 music Cog 본문에서 분리 |
 | music extractor helper 분리 | `util/music_extractor.py` 61줄 추출, `cogs/music.py` 현재 1856줄, extractor 대상 테스트 10개 통과 | yt-dlp 포맷 후보 우선순위, keyword search URL 결정, entries selection 로직을 music Cog 본문에서 분리 |
