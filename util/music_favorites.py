@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -62,6 +63,40 @@ def build_music_favorite_button_label(
     if favorite is None:
         return f"{slot} 빈칸"
     return f"{slot} {shorten_music_favorite_title(favorite.title)}"
+
+
+def current_player_to_music_favorite(
+    guild_id: int,
+    player: object | None,
+    *,
+    slot: int = 1,
+) -> MusicFavorite | None:
+    if player is None:
+        return None
+
+    raw_data = getattr(player, "data", {})
+    data: Mapping[str, Any] = raw_data if isinstance(raw_data, Mapping) else {}
+    url = (getattr(player, "webpage_url", None) or data.get("webpage_url") or "")
+    clean_url = str(url).strip()
+    if not clean_url:
+        return None
+
+    raw_title = getattr(player, "title", None) or data.get("title") or ""
+    clean_title = str(raw_title).strip() or "(제목 정보 없음)"
+    try:
+        duration = int(data.get("duration") or 0)
+    except (TypeError, ValueError):
+        duration = 0
+
+    return MusicFavorite(
+        guild_id=int(guild_id),
+        slot=validate_music_favorite_slot(slot),
+        title=clean_title,
+        url=clean_url,
+        duration=duration,
+        uploader=data.get("uploader"),
+        thumbnail=data.get("thumbnail"),
+    )
 
 
 async def list_music_favorites(guild_id: int) -> list[MusicFavorite]:

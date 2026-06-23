@@ -4,6 +4,7 @@ from cogs.music import GuildMusicState, MusicCog, MusicControlView, MusicHelperV
 from util.music_favorites import (
     MusicFavorite,
     build_music_favorite_button_label,
+    current_player_to_music_favorite,
     validate_music_favorite_slot,
 )
 
@@ -26,6 +27,60 @@ class MusicFavoriteTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(validate_music_favorite_slot(5), 5)
         with self.assertRaises(ValueError):
             validate_music_favorite_slot(6)
+
+    def test_current_player_is_converted_to_favorite_snapshot(self):
+        player = _Player(
+            title="재생 중인 노래",
+            webpage_url="https://youtube.com/watch?v=abc",
+            data={
+                "duration": 123,
+                "uploader": "업로더",
+                "thumbnail": "https://example.com/thumb.jpg",
+            },
+        )
+
+        favorite = current_player_to_music_favorite(10, player)
+
+        self.assertEqual(
+            favorite,
+            MusicFavorite(
+                guild_id=10,
+                slot=1,
+                title="재생 중인 노래",
+                url="https://youtube.com/watch?v=abc",
+                duration=123,
+                uploader="업로더",
+                thumbnail="https://example.com/thumb.jpg",
+            ),
+        )
+
+    def test_current_player_without_url_is_not_favorite_snapshot(self):
+        player = _Player(
+            title="URL 없는 노래",
+            webpage_url=None,
+            data={"title": "URL 없는 노래"},
+        )
+
+        self.assertIsNone(current_player_to_music_favorite(10, player))
+
+    def test_current_player_snapshot_uses_safe_defaults(self):
+        player = _Player(
+            title=None,
+            webpage_url=None,
+            data={
+                "title": "",
+                "webpage_url": "https://youtube.com/watch?v=fallback",
+                "duration": "not-a-number",
+            },
+        )
+
+        favorite = current_player_to_music_favorite(10, player)
+
+        self.assertIsNotNone(favorite)
+        assert favorite is not None
+        self.assertEqual(favorite.title, "(제목 정보 없음)")
+        self.assertEqual(favorite.url, "https://youtube.com/watch?v=fallback")
+        self.assertEqual(favorite.duration, 0)
 
     async def test_default_music_view_shows_search_manage_and_five_favorite_slots(self):
         favorite = MusicFavorite(
@@ -101,6 +156,13 @@ class _Cog:
 
 class _Bot:
     pass
+
+
+class _Player:
+    def __init__(self, *, title, webpage_url, data):
+        self.title = title
+        self.webpage_url = webpage_url
+        self.data = data
 
 
 class _Guild:
