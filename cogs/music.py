@@ -19,6 +19,7 @@ from util.music_favorites import (
     build_music_favorite_cache_load_action,
     build_music_favorite_cache_store_action,
     build_music_favorite_current_track_save_action,
+    build_music_favorite_load_failure_action,
     build_music_favorite_manager_open_action,
     build_music_favorite_panel_refresh_action,
     build_music_favorite_play_action,
@@ -200,12 +201,15 @@ class MusicCog(commands.Cog):
         try:
             favorites = await list_music_favorites(cache_action.guild_id)
         except (aiomysql.Error, TypeError, ValueError, KeyError):
+            failure_action = build_music_favorite_load_failure_action(
+                guild_id=cache_action.guild_id,
+            )
             logger.warning(
                 "음악 즐겨찾기 로드 실패: guild_id=%s",
-                cache_action.guild_id,
+                failure_action.guild_id,
                 exc_info=True,
             )
-            favorites = []
+            favorites = failure_action.favorites
         store_action = build_music_favorite_cache_store_action(
             guild_id=cache_action.guild_id,
             favorites=favorites,

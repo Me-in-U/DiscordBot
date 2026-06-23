@@ -6,6 +6,7 @@ from util.music_favorites import (
     MusicFavorite,
     MusicFavoriteCacheLoadAction,
     MusicFavoriteCacheStoreAction,
+    MusicFavoriteLoadFailureAction,
     MusicFavoriteManagerOpenAction,
     MusicFavoriteManagerSelectionAction,
     MusicFavoritePanelRefreshAction,
@@ -21,6 +22,7 @@ from util.music_favorites import (
     MusicFavoriteCurrentSaveButtonAction,
     build_music_favorite_cache_load_action,
     build_music_favorite_cache_store_action,
+    build_music_favorite_load_failure_action,
     build_music_favorite_current_save_button_action,
     build_music_favorite_current_track_save_action,
     build_music_favorite_search_entry_save_action,
@@ -416,6 +418,17 @@ class MusicFavoriteTests(unittest.IsolatedAsyncioTestCase):
             MusicFavoriteCacheStoreAction(
                 guild_id=10,
                 favorites=[favorite],
+            ),
+        )
+
+    def test_music_favorite_load_failure_action_returns_empty_fallback(self):
+        result = build_music_favorite_load_failure_action(guild_id="10")
+
+        self.assertEqual(
+            result,
+            MusicFavoriteLoadFailureAction(
+                guild_id=10,
+                favorites=[],
             ),
         )
 
