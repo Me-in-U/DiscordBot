@@ -37,7 +37,7 @@ from util.music_favorites import (
     list_music_favorites,
     save_music_favorite_payload,
 )
-from util.music_embeds import (
+from util.music.embeds import (
     PANEL_TITLE,
     UNKNOWN,
     make_default_music_embed,

@@ -1,9 +1,15 @@
 import collections
 import unittest
 import warnings
+from pathlib import Path
 from types import SimpleNamespace
 
 from util.music_queue import QueuedTrack
+
+
+MUSIC_EMBEDS_PATH = Path("util/music/embeds.py")
+LEGACY_MUSIC_EMBEDS_PATH = Path("util/music_embeds.py")
+
 
 with warnings.catch_warnings():
     warnings.filterwarnings(
@@ -11,7 +17,7 @@ with warnings.catch_warnings():
         message="'audioop' is deprecated and slated for removal in Python 3.13",
         category=DeprecationWarning,
     )
-    from util.music_embeds import make_default_music_embed, make_playing_music_embed
+    from util.music.embeds import make_default_music_embed, make_playing_music_embed
 
 
 class _Avatar:
@@ -33,6 +39,10 @@ class _Player:
 
 
 class MusicEmbedHelperTests(unittest.TestCase):
+    def test_embed_helper_lives_under_music_package(self):
+        self.assertTrue(MUSIC_EMBEDS_PATH.exists())
+        self.assertFalse(LEGACY_MUSIC_EMBEDS_PATH.exists())
+
     def test_default_embed_contains_music_panel_help_and_footer_icon(self):
         embed = make_default_music_embed(bot_avatar_url="https://example.com/bot.png")
         data = embed.to_dict()
