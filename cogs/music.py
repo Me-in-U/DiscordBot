@@ -19,6 +19,7 @@ from util.music_favorites import (
     build_music_favorite_current_track_save_action,
     build_music_favorite_manager_open_action,
     build_music_favorite_play_action,
+    build_music_favorite_play_request_action,
     build_music_favorite_search_request_action,
     current_player_to_music_favorite,
     get_music_favorite,
@@ -412,9 +413,12 @@ class MusicCog(commands.Cog):
         interaction: discord.Interaction,
         slot: int,
     ) -> None:
-        slot = build_music_favorite_play_action(slot=slot, favorite=None).slot
-        favorite = await get_music_favorite(interaction.guild.id, slot)
-        play_result = build_music_favorite_play_action(slot=slot, favorite=favorite)
+        play_request = build_music_favorite_play_request_action(slot)
+        favorite = await get_music_favorite(interaction.guild.id, play_request.slot)
+        play_result = build_music_favorite_play_action(
+            slot=play_request.slot,
+            favorite=favorite,
+        )
         if not play_result.should_play:
             await self._send_ephemeral_response(
                 interaction,

@@ -6,6 +6,7 @@ from util.music_favorites import (
     MusicFavoriteManagerOpenAction,
     MusicFavoriteManagerSelectionAction,
     MusicFavoritePlayActionResult,
+    MusicFavoritePlayRequestAction,
     MusicFavoriteSearchModalAction,
     MusicFavoriteSearchRequestAction,
     MusicFavoriteSearchSubmitAction,
@@ -17,6 +18,7 @@ from util.music_favorites import (
     build_music_favorite_manager_selection_action,
     build_music_favorite_button_label,
     build_music_favorite_play_action,
+    build_music_favorite_play_request_action,
     build_music_favorite_search_modal_action,
     build_music_favorite_search_request_action,
     build_music_favorite_search_submit_action,
@@ -229,6 +231,15 @@ class MusicFavoriteTests(unittest.IsolatedAsyncioTestCase):
     def test_music_favorite_play_action_validates_slot(self):
         with self.assertRaisesRegex(ValueError, "즐겨찾기 번호는 1~5"):
             build_music_favorite_play_action(slot=0, favorite=None)
+
+    def test_music_favorite_play_request_action_normalizes_slot(self):
+        result = build_music_favorite_play_request_action("4")
+
+        self.assertEqual(result, MusicFavoritePlayRequestAction(slot=4))
+
+    def test_music_favorite_play_request_action_validates_slot(self):
+        with self.assertRaisesRegex(ValueError, "즐겨찾기 번호는 1~5"):
+            build_music_favorite_play_request_action(6)
 
     def test_music_favorite_manager_selection_action_normalizes_slot(self):
         result = build_music_favorite_manager_selection_action("3")

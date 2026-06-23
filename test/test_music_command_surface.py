@@ -486,11 +486,14 @@ class MusicCommandSurfaceTests(unittest.TestCase):
             _function_node(tree, "_play_music_favorite"),
         )
 
+        self.assertIn("build_music_favorite_play_request_action", play_favorite_source)
         self.assertIn("build_music_favorite_play_action", play_favorite_source)
+        self.assertIn("play_request.slot", play_favorite_source)
         self.assertIn("play_result.should_play", play_favorite_source)
         self.assertIn("play_result.user_message", play_favorite_source)
         self.assertIn("play_result.url", play_favorite_source)
         self.assertIn("play_result.success_prefix", play_favorite_source)
+        self.assertNotIn("favorite=None).slot", play_favorite_source)
         self.assertNotIn("즐겨찾기가 비어있습니다", play_favorite_source)
         self.assertNotIn("⭐ 즐겨찾기 재생", play_favorite_source)
 

@@ -53,6 +53,11 @@ class MusicFavoriteCurrentTrackSaveAction:
 
 
 @dataclass(frozen=True, slots=True)
+class MusicFavoritePlayRequestAction:
+    slot: int
+
+
+@dataclass(frozen=True, slots=True)
 class MusicFavoritePlayActionResult:
     slot: int
     should_play: bool
@@ -146,6 +151,12 @@ def build_music_favorite_button_label(
     if favorite is None:
         return f"{slot} 빈칸"
     return f"{slot} {shorten_music_favorite_title(favorite.title)}"
+
+
+def build_music_favorite_play_request_action(
+    slot: int | str,
+) -> MusicFavoritePlayRequestAction:
+    return MusicFavoritePlayRequestAction(slot=validate_music_favorite_slot(slot))
 
 
 def build_music_favorite_play_action(
