@@ -1,6 +1,7 @@
 import unittest
+from pathlib import Path
 
-from util.music_playback_actions import (
+from util.music.playback_actions import (
     begin_play_url_now_playback_action,
     begin_url_play_action,
     begin_stop_playback_action,
@@ -17,7 +18,15 @@ from util.music_playback_actions import (
 from util.music_state import GuildMusicState
 
 
+MUSIC_PLAYBACK_ACTIONS_PATH = Path("util/music/playback_actions.py")
+LEGACY_MUSIC_PLAYBACK_ACTIONS_PATH = Path("util/music_playback_actions.py")
+
+
 class MusicPlaybackActionTests(unittest.TestCase):
+    def test_music_playback_actions_live_under_music_package(self):
+        self.assertTrue(MUSIC_PLAYBACK_ACTIONS_PATH.exists())
+        self.assertFalse(LEGACY_MUSIC_PLAYBACK_ACTIONS_PATH.exists())
+
     def test_pause_playback_action_sets_paused_at_and_returns_elapsed(self):
         state = GuildMusicState(start_ts=100.2)
 
