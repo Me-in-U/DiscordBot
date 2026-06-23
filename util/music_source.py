@@ -13,7 +13,7 @@ import aiohttp
 import discord
 import yt_dlp as youtube_dl
 
-from util.music_extractor import (
+from util.music.extractor import (
     resolve_search_result_url,
     select_best_audio_format,
     select_yt_dlp_entry,

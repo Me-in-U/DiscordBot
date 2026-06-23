@@ -1,9 +1,18 @@
 import unittest
+from pathlib import Path
+
+
+MUSIC_EXTRACTOR_PATH = Path("util/music/extractor.py")
+LEGACY_MUSIC_EXTRACTOR_PATH = Path("util/music_extractor.py")
 
 
 class MusicExtractorHelperTests(unittest.TestCase):
+    def test_extractor_helper_lives_under_music_package(self):
+        self.assertTrue(MUSIC_EXTRACTOR_PATH.exists())
+        self.assertFalse(LEGACY_MUSIC_EXTRACTOR_PATH.exists())
+
     def test_resolve_search_result_url_prefers_webpage_url(self):
-        from util.music_extractor import resolve_search_result_url
+        from util.music.extractor import resolve_search_result_url
 
         info = {
             "entries": [
@@ -21,7 +30,7 @@ class MusicExtractorHelperTests(unittest.TestCase):
         )
 
     def test_resolve_search_result_url_uses_url_then_watch_id_fallback(self):
-        from util.music_extractor import resolve_search_result_url
+        from util.music.extractor import resolve_search_result_url
 
         self.assertEqual(
             resolve_search_result_url({"entries": [{"url": "https://example.com/u"}]}),
@@ -33,7 +42,7 @@ class MusicExtractorHelperTests(unittest.TestCase):
         )
 
     def test_resolve_search_result_url_raises_for_missing_result_or_url(self):
-        from util.music_extractor import resolve_search_result_url
+        from util.music.extractor import resolve_search_result_url
 
         with self.assertRaisesRegex(ValueError, "검색 결과가 없습니다."):
             resolve_search_result_url({"entries": []})
@@ -42,7 +51,7 @@ class MusicExtractorHelperTests(unittest.TestCase):
             resolve_search_result_url({"entries": [{"title": "no url"}]})
 
     def test_select_yt_dlp_entry_prefers_entry_with_formats(self):
-        from util.music_extractor import select_yt_dlp_entry
+        from util.music.extractor import select_yt_dlp_entry
 
         entry_without_formats = {"title": "first"}
         entry_with_formats = {"title": "second", "formats": [{"url": "audio"}]}
@@ -55,7 +64,7 @@ class MusicExtractorHelperTests(unittest.TestCase):
         )
 
     def test_select_yt_dlp_entry_falls_back_to_first_non_empty_entry(self):
-        from util.music_extractor import select_yt_dlp_entry
+        from util.music.extractor import select_yt_dlp_entry
 
         first_entry = {"title": "first"}
         second_entry = {"title": "second"}
@@ -66,7 +75,7 @@ class MusicExtractorHelperTests(unittest.TestCase):
         )
 
     def test_select_yt_dlp_entry_returns_original_when_no_entries(self):
-        from util.music_extractor import select_yt_dlp_entry
+        from util.music.extractor import select_yt_dlp_entry
 
         original_without_entries = {"title": "single"}
         original_with_empty_entries = {"entries": []}
@@ -81,7 +90,7 @@ class MusicExtractorHelperTests(unittest.TestCase):
         )
 
     def test_select_best_audio_format_prefers_strict_audio_candidates(self):
-        from util.music_extractor import select_best_audio_format
+        from util.music.extractor import select_best_audio_format
 
         formats = [
             {"url": "https://example.com/video", "vcodec": "avc1", "abr": 320},
@@ -104,7 +113,7 @@ class MusicExtractorHelperTests(unittest.TestCase):
         self.assertEqual(best["url"], "https://example.com/strict-high")
 
     def test_select_best_audio_format_uses_loose_audio_when_strict_is_absent(self):
-        from util.music_extractor import select_best_audio_format
+        from util.music.extractor import select_best_audio_format
 
         formats = [
             {"url": "https://example.com/video", "vcodec": "avc1", "abr": 320},
@@ -121,7 +130,7 @@ class MusicExtractorHelperTests(unittest.TestCase):
         self.assertEqual(best["url"], "https://example.com/loose")
 
     def test_select_best_audio_format_falls_back_to_highest_rate_candidate(self):
-        from util.music_extractor import select_best_audio_format
+        from util.music.extractor import select_best_audio_format
 
         formats = [
             {"url": "https://example.com/low", "vcodec": "avc1", "tbr": 120},
@@ -133,6 +142,6 @@ class MusicExtractorHelperTests(unittest.TestCase):
         self.assertEqual(best["url"], "https://example.com/high")
 
     def test_select_best_audio_format_returns_none_for_empty_formats(self):
-        from util.music_extractor import select_best_audio_format
+        from util.music.extractor import select_best_audio_format
 
         self.assertIsNone(select_best_audio_format([]))
