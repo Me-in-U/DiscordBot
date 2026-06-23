@@ -234,13 +234,6 @@ class MusicCog(commands.Cog):
         favorites = await self._load_music_favorites(guild_id)
         return MusicControlView(self, state, favorites)
 
-    def _current_player_as_favorite(
-        self,
-        guild_id: int,
-        player: Optional["YTDLSource"],
-    ) -> MusicFavorite | None:
-        return current_player_to_music_favorite(guild_id, player)
-
     async def _fill_queue_meta(self, track: "QueuedTrack"):
         """대기열 트랙의 가벼운 메타데이터를 채운다(재생에 영향 없음)."""
         try:
@@ -396,7 +389,7 @@ class MusicCog(commands.Cog):
         await interaction.response.defer(thinking=True, ephemeral=True)
         guild_id = interaction.guild.id
         state = self._get_state(guild_id)
-        favorite = self._current_player_as_favorite(guild_id, state.player)
+        favorite = current_player_to_music_favorite(guild_id, state.player)
         current_action = build_music_favorite_current_track_save_action(
             current_track=favorite,
             slot=slot,

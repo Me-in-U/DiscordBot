@@ -530,10 +530,12 @@ class MusicCommandSurfaceTests(unittest.TestCase):
             source_text,
             _function_node(tree, "_save_current_track_as_favorite"),
         )
+        self.assertIn("current_player_to_music_favorite", current_source)
         self.assertIn("build_music_favorite_current_track_save_action", current_source)
         self.assertIn("current_action.user_message", current_source)
         self.assertIn("current_action.payload", current_source)
         self.assertIn("updated_by=interaction.user.id", current_source)
+        self.assertNotIn("_current_player_as_favorite", source_text)
         self.assertNotIn("music_favorite_to_save_payload", current_source)
         self.assertNotIn("if favorite is None", current_source)
         self.assertNotIn("현재 재생 중인 곡 정보", current_source)
