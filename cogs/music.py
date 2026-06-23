@@ -20,11 +20,11 @@ from util.music_favorites import (
     build_music_favorite_manager_open_action,
     build_music_favorite_play_action,
     build_music_favorite_play_request_action,
+    build_music_favorite_search_entry_save_action,
     build_music_favorite_search_request_action,
     current_player_to_music_favorite,
     get_music_favorite,
     list_music_favorites,
-    search_entry_to_music_favorite_save_payload,
     upsert_music_favorite,
 )
 from util.music_embeds import (
@@ -357,7 +357,7 @@ class MusicCog(commands.Cog):
         slot: int,
         entry: dict,
     ) -> None:
-        payload = search_entry_to_music_favorite_save_payload(
+        save_action = build_music_favorite_search_entry_save_action(
             guild_id=interaction.guild.id,
             slot=slot,
             entry=entry,
@@ -365,7 +365,7 @@ class MusicCog(commands.Cog):
         )
         await self._save_music_favorite(
             interaction,
-            payload,
+            save_action.payload,
         )
 
     async def _save_current_track_as_favorite(

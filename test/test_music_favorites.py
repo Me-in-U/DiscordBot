@@ -8,12 +8,14 @@ from util.music_favorites import (
     MusicFavoritePlayActionResult,
     MusicFavoritePlayRequestAction,
     MusicFavoriteSearchModalAction,
+    MusicFavoriteSearchEntrySaveAction,
     MusicFavoriteSearchRequestAction,
     MusicFavoriteSearchSubmitAction,
     MusicFavoriteSavePayload,
     MusicFavoriteCurrentSaveButtonAction,
     build_music_favorite_current_save_button_action,
     build_music_favorite_current_track_save_action,
+    build_music_favorite_search_entry_save_action,
     build_music_favorite_manager_open_action,
     build_music_favorite_manager_selection_action,
     build_music_favorite_button_label,
@@ -168,6 +170,47 @@ class MusicFavoriteTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(payload.uploader, "채널명")
         self.assertEqual(payload.thumbnail, "https://example.com/high.jpg")
         self.assertEqual(payload.updated_by, 99)
+
+    def test_music_favorite_search_entry_save_action_builds_payload(self):
+        entry = {
+            "title": "검색 결과",
+            "webpage_url": "/watch?v=abc123",
+            "duration": "42",
+            "channel": "채널명",
+            "thumbnails": [{"url": "https://example.com/thumb.jpg"}],
+        }
+
+        result = build_music_favorite_search_entry_save_action(
+            guild_id="10",
+            slot="3",
+            entry=entry,
+            updated_by=99,
+        )
+
+        self.assertEqual(
+            result,
+            MusicFavoriteSearchEntrySaveAction(
+                payload=MusicFavoriteSavePayload(
+                    guild_id=10,
+                    slot=3,
+                    title="검색 결과",
+                    url="https://www.youtube.com/watch?v=abc123",
+                    duration=42,
+                    uploader="채널명",
+                    thumbnail="https://example.com/thumb.jpg",
+                    updated_by=99,
+                ),
+            ),
+        )
+
+    def test_music_favorite_search_entry_save_action_validates_slot(self):
+        with self.assertRaisesRegex(ValueError, "즐겨찾기 번호는 1~5"):
+            build_music_favorite_search_entry_save_action(
+                guild_id=10,
+                slot=7,
+                entry={"webpage_url": "https://youtube.com/watch?v=abc"},
+                updated_by=99,
+            )
 
     def test_music_favorite_to_save_payload_overrides_slot_and_updater(self):
         favorite = MusicFavorite(

@@ -42,6 +42,11 @@ class MusicFavoriteSavePayload:
 
 
 @dataclass(frozen=True, slots=True)
+class MusicFavoriteSearchEntrySaveAction:
+    payload: MusicFavoriteSavePayload
+
+
+@dataclass(frozen=True, slots=True)
 class MusicFavoriteCurrentTrackSaveAction:
     slot: int
     payload: MusicFavoriteSavePayload | None = None
@@ -310,8 +315,8 @@ def current_player_to_music_favorite(
 
 def build_music_favorite_save_payload(
     *,
-    guild_id: int,
-    slot: int,
+    guild_id: int | str,
+    slot: int | str,
     title: str | None,
     url: str | None,
     duration: Any = 0,
@@ -338,8 +343,8 @@ def build_music_favorite_save_payload(
 
 def search_entry_to_music_favorite_save_payload(
     *,
-    guild_id: int,
-    slot: int,
+    guild_id: int | str,
+    slot: int | str,
     entry: dict[str, Any],
     updated_by: int | None = None,
 ) -> MusicFavoriteSavePayload:
@@ -352,6 +357,23 @@ def search_entry_to_music_favorite_save_payload(
         uploader=entry.get("uploader") or entry.get("channel") or None,
         thumbnail=_search_entry_thumbnail(entry),
         updated_by=updated_by,
+    )
+
+
+def build_music_favorite_search_entry_save_action(
+    *,
+    guild_id: int | str,
+    slot: int | str,
+    entry: dict[str, Any],
+    updated_by: int | None = None,
+) -> MusicFavoriteSearchEntrySaveAction:
+    return MusicFavoriteSearchEntrySaveAction(
+        payload=search_entry_to_music_favorite_save_payload(
+            guild_id=guild_id,
+            slot=slot,
+            entry=entry,
+            updated_by=updated_by,
+        )
     )
 
 

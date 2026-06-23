@@ -513,8 +513,10 @@ class MusicCommandSurfaceTests(unittest.TestCase):
             source_text,
             _function_node(tree, "_save_search_entry_as_favorite"),
         )
-        self.assertIn("search_entry_to_music_favorite_save_payload", search_source)
+        self.assertIn("build_music_favorite_search_entry_save_action", search_source)
+        self.assertIn("save_action.payload", search_source)
         self.assertIn("updated_by=interaction.user.id", search_source)
+        self.assertNotIn("search_entry_to_music_favorite_save_payload", search_source)
         self.assertNotIn("normalize_search_entry_url", search_source)
         self.assertNotIn("entry.get", search_source)
         self.assertNotIn("thumbnails", search_source)
