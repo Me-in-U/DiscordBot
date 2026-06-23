@@ -1183,6 +1183,31 @@ class MusicCog(commands.Cog):
             return False
         return True
 
+    async def _dispatch_music_url_immediate_playback(
+        self,
+        interaction: discord.Interaction,
+        *,
+        guild_id: int,
+        state: GuildMusicState,
+        voice_client: Any,
+        url: str,
+    ) -> None:
+        should_start_now = await self._should_start_music_url_immediate_playback(
+            interaction,
+            state,
+            voice_client,
+            url,
+        )
+        if not should_start_now:
+            return
+
+        await self._start_music_url_immediate_playback(
+            interaction,
+            guild_id,
+            state=state,
+            url=url,
+        )
+
     async def _play_music_url_branch(
         self,
         interaction: discord.Interaction,
@@ -1201,20 +1226,11 @@ class MusicCog(commands.Cog):
 
         # ! 이미 재생(또는 일시정지) 중이면 URL만 큐에 추가
         state = self._get_state(interaction.guild.id)
-        should_start_now = await self._should_start_music_url_immediate_playback(
+        await self._dispatch_music_url_immediate_playback(
             interaction,
-            state,
-            voice_client,
-            url,
-        )
-        if not should_start_now:
-            return
-
-        # ! 재생 중이 아니면 지금 URL로 바로 준비 후 재생
-        await self._start_music_url_immediate_playback(
-            interaction,
-            guild_id,
+            guild_id=guild_id,
             state=state,
+            voice_client=voice_client,
             url=url,
         )
 

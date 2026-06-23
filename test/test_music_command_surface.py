@@ -237,8 +237,10 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         )
 
         self.assertIn("_ensure_music_url_voice_client", play_source)
-        self.assertIn("_should_start_music_url_immediate_playback", play_source)
-        self.assertIn("_start_music_url_immediate_playback", play_source)
+        self.assertIn("_dispatch_music_url_immediate_playback", play_source)
+        self.assertNotIn("_should_start_music_url_immediate_playback", play_source)
+        self.assertNotIn("_start_music_url_immediate_playback", play_source)
+        self.assertNotIn("should_start_now", play_source)
         self.assertNotIn("begin_url_play_action", play_source)
         self.assertNotIn("url_play_result.should_prepare", play_source)
         self.assertNotIn("_send_music_url_queued_response", play_source)
@@ -264,6 +266,15 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         self.assertIn("url_play_result.user_message", queued_response_source)
         self.assertIn("_fill_queue_meta", queued_response_source)
         self.assertIn("_spawn_bg", queued_response_source)
+
+        dispatch_source = ast.get_source_segment(
+            source_text,
+            _function_node(tree, "_dispatch_music_url_immediate_playback"),
+        )
+        self.assertIn("_should_start_music_url_immediate_playback", dispatch_source)
+        self.assertIn("_start_music_url_immediate_playback", dispatch_source)
+        self.assertIn("if not should_start_now:", dispatch_source)
+        self.assertIn("return", dispatch_source)
 
         play_command_source = ast.get_source_segment(
             source_text,
@@ -590,7 +601,7 @@ class MusicCommandSurfaceTests(unittest.TestCase):
             source_text,
             _function_node(tree, "_play_music_url_branch"),
         )
-        self.assertIn("_start_music_url_immediate_playback", play_url_source)
+        self.assertIn("_dispatch_music_url_immediate_playback", play_url_source)
         self.assertNotIn("playback_start.confirmation_message", play_url_source)
 
     def test_search_result_responses_use_shared_response_helper(self):
