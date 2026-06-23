@@ -50,6 +50,16 @@ class MusicFavoritePlayActionResult:
     success_prefix: str | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class MusicFavoriteManagerSelectionAction:
+    selected_slot: int
+    selected_value: str
+    status_text: str
+
+    def is_default_value(self, value: object) -> bool:
+        return str(value) == self.selected_value
+
+
 def validate_music_favorite_slot(slot: int) -> int:
     slot = int(slot)
     if slot < MUSIC_FAVORITE_SLOT_MIN or slot > MUSIC_FAVORITE_SLOT_MAX:
@@ -109,6 +119,17 @@ def build_music_favorite_play_action(
         should_play=True,
         url=favorite.url,
         success_prefix="⭐ 즐겨찾기 재생",
+    )
+
+
+def build_music_favorite_manager_selection_action(
+    selected_slot: int | str,
+) -> MusicFavoriteManagerSelectionAction:
+    slot = validate_music_favorite_slot(int(selected_slot))
+    return MusicFavoriteManagerSelectionAction(
+        selected_slot=slot,
+        selected_value=str(slot),
+        status_text=f"저장/수정할 즐겨찾기 슬롯: **{slot}번**",
     )
 
 

@@ -792,6 +792,25 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         self.assertIn("_play_music_favorite", source)
         self.assertIn("_save_current_track_as_favorite", source)
 
+    def test_music_favorite_manager_selection_delegates_to_action_helper(self):
+        source_text = MUSIC_VIEWS_PATH.read_text(encoding="utf-8")
+        callback_source = source_text[
+            source_text.index("class MusicFavoriteSlotSelect"):
+            source_text.index("class MusicFavoriteManageView")
+        ]
+        status_source = source_text[
+            source_text.index("class MusicFavoriteManageView"):
+            source_text.index("class MusicHelperView")
+        ]
+
+        self.assertIn("build_music_favorite_manager_selection_action", callback_source)
+        self.assertIn("selection.selected_slot", callback_source)
+        self.assertIn("selection.status_text", callback_source)
+        self.assertIn("selection.is_default_value", callback_source)
+        self.assertNotIn("int(self.values[0])", callback_source)
+        self.assertNotIn("option.value == self.values[0]", callback_source)
+        self.assertIn("build_music_favorite_manager_selection_action", status_source)
+
 
 if __name__ == "__main__":
     unittest.main()

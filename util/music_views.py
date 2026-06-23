@@ -9,6 +9,7 @@ from util.music_favorites import (
     MUSIC_FAVORITE_SLOT_MAX,
     MusicFavorite,
     build_music_favorite_button_label,
+    build_music_favorite_manager_selection_action,
     validate_music_favorite_slot,
 )
 from util.music_queue import parse_seek_seconds
@@ -143,11 +144,12 @@ class MusicFavoriteSlotSelect(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
-        self.manager_view.selected_slot = int(self.values[0])
+        selection = build_music_favorite_manager_selection_action(self.values[0])
+        self.manager_view.selected_slot = selection.selected_slot
         for option in self.options:
-            option.default = option.value == self.values[0]
+            option.default = selection.is_default_value(option.value)
         await interaction.response.edit_message(
-            content=self.manager_view.status_text(),
+            content=selection.status_text,
             view=self.manager_view,
         )
 
@@ -188,7 +190,9 @@ class MusicFavoriteManageView(View):
         self.add_item(current_btn)
 
     def status_text(self) -> str:
-        return f"저장/수정할 즐겨찾기 슬롯: **{self.selected_slot}번**"
+        return build_music_favorite_manager_selection_action(
+            self.selected_slot
+        ).status_text
 
     async def _on_search(self, interaction: discord.Interaction):
         await interaction.response.send_modal(

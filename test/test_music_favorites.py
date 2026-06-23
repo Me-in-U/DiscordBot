@@ -3,8 +3,10 @@ import unittest
 from cogs.music import GuildMusicState, MusicCog, MusicControlView, MusicHelperView
 from util.music_favorites import (
     MusicFavorite,
+    MusicFavoriteManagerSelectionAction,
     MusicFavoritePlayActionResult,
     MusicFavoriteSavePayload,
+    build_music_favorite_manager_selection_action,
     build_music_favorite_button_label,
     build_music_favorite_play_action,
     build_music_favorite_save_payload,
@@ -216,6 +218,28 @@ class MusicFavoriteTests(unittest.IsolatedAsyncioTestCase):
     def test_music_favorite_play_action_validates_slot(self):
         with self.assertRaisesRegex(ValueError, "즐겨찾기 번호는 1~5"):
             build_music_favorite_play_action(slot=0, favorite=None)
+
+    def test_music_favorite_manager_selection_action_normalizes_slot(self):
+        result = build_music_favorite_manager_selection_action("3")
+
+        self.assertEqual(
+            result,
+            MusicFavoriteManagerSelectionAction(
+                selected_slot=3,
+                selected_value="3",
+                status_text="저장/수정할 즐겨찾기 슬롯: **3번**",
+            ),
+        )
+
+    def test_music_favorite_manager_selection_action_marks_default_option(self):
+        result = build_music_favorite_manager_selection_action(4)
+
+        self.assertFalse(result.is_default_value("3"))
+        self.assertTrue(result.is_default_value("4"))
+
+    def test_music_favorite_manager_selection_action_validates_slot(self):
+        with self.assertRaisesRegex(ValueError, "즐겨찾기 번호는 1~5"):
+            build_music_favorite_manager_selection_action("6")
 
     async def test_default_music_view_shows_search_manage_and_five_favorite_slots(self):
         favorite = MusicFavorite(
