@@ -4,6 +4,7 @@ from pathlib import Path
 
 
 MUSIC_PATH = Path("cogs/music.py")
+MUSIC_LOGGING_PATH = Path("util/music/logging.py")
 MUSIC_VIEWS_PATH = Path("util/music_views.py")
 MUSIC_STATE_PATH = Path("util/music_state.py")
 MUSIC_QUEUE_ACTIONS_PATH = Path("util/music_queue_actions.py")
@@ -316,6 +317,30 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         self.assertIn("_play_music_url_branch", play_branch_source)
         self.assertIn("skip_defer=skip_defer", play_branch_source)
         self.assertIn("return", play_branch_source)
+
+    def test_play_command_delegates_debug_message_to_music_logging_helper(self):
+        source_text = MUSIC_PATH.read_text(encoding="utf-8")
+        tree = ast.parse(source_text)
+
+        self.assertIn("from util.music.logging import", source_text)
+        self.assertIn("make_music_debug_logger(logger)", source_text)
+        self.assertNotIn("def dbg(", source_text)
+
+        play_source = ast.get_source_segment(
+            source_text,
+            _function_node(tree, "_play"),
+        )
+        self.assertIn("build_music_play_command_debug_message", play_source)
+        self.assertIn("url=url", play_source)
+        self.assertIn("guild_id=interaction.guild.id", play_source)
+        self.assertIn("user_id=interaction.user.id", play_source)
+        self.assertNotIn('f"_play: called', play_source)
+        self.assertNotIn("guild={interaction.guild.id}", play_source)
+
+        logging_source = MUSIC_LOGGING_PATH.read_text(encoding="utf-8")
+        self.assertIn("def build_music_play_command_debug_message", logging_source)
+        self.assertIn("def make_music_debug_logger", logging_source)
+        self.assertIn("def log_music_debug", logging_source)
 
     def test_play_url_queue_decision_helper_handles_queued_response(self):
         source_text = MUSIC_PATH.read_text(encoding="utf-8")
@@ -1064,9 +1089,15 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         ]
         self.assertEqual(print_calls, [])
 
+        self.assertIn("from util.music.logging import", source_text)
+        self.assertIn("make_music_debug_logger(logger)", source_text)
+        self.assertNotIn("def dbg(", source_text)
+
+        logging_source = MUSIC_LOGGING_PATH.read_text(encoding="utf-8")
+        logging_tree = ast.parse(logging_source)
         dbg_source = ast.get_source_segment(
-            source_text,
-            _any_function_node(tree, "dbg"),
+            logging_source,
+            _any_function_node(logging_tree, "log_music_debug"),
         )
         self.assertIn("logger.debug", dbg_source)
         self.assertNotIn("print(", dbg_source)

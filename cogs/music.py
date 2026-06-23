@@ -12,6 +12,10 @@ from discord import Embed, Message, Object, TextChannel, app_commands
 from discord.ext import commands
 from discord.utils import utcnow
 from util.channel_settings import get_channel
+from util.music.logging import (
+    build_music_play_command_debug_message,
+    make_music_debug_logger,
+)
 from util.music_favorites import (
     MusicFavorite,
     MusicFavoriteSavePayload,
@@ -131,12 +135,7 @@ MUSIC_CHANNEL_TYPE = "music"
 MAX_QUEUE_DISPLAY = 10
 IDLE_DISCONNECT_SECONDS = 300
 MSG_NO_PLAYING = "❌ 재생 중인 음악이 없습니다."
-# 간단한 디버그 로깅 헬퍼
-def dbg(msg: str):
-    try:
-        logger.debug("[MUSIC] %s", msg)
-    except (OSError, RuntimeError):
-        logger.debug("music debug 출력 실패", exc_info=True)
+dbg = make_music_debug_logger(logger)
 
 
 class MusicCog(commands.Cog):
@@ -1276,7 +1275,11 @@ class MusicCog(commands.Cog):
         skip_defer: bool = False,
     ) -> None:
         dbg(
-            f"_play: called url={url} guild={interaction.guild.id} user={interaction.user.id}"
+            build_music_play_command_debug_message(
+                url=url,
+                guild_id=interaction.guild.id,
+                user_id=interaction.user.id,
+            )
         )
         await self._dispatch_music_play_command_branch(
             interaction,
