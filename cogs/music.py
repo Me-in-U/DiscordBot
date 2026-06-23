@@ -939,18 +939,10 @@ class MusicCog(commands.Cog):
 
     # ?완
     # !노래 재생 or 대기열
-    async def _play_url_now(
+    async def _ensure_play_url_now_voice_client(
         self,
         interaction: discord.Interaction,
-        url: str,
-        *,
-        success_prefix: str = "▶ 재생",
-    ) -> None:
-        if not interaction.response.is_done():
-            await interaction.response.defer(thinking=True, ephemeral=True)
-
-        guild_id = interaction.guild.id
-        state = self._get_state(guild_id)
+    ) -> Any | None:
         user_channel = get_interaction_voice_channel(interaction)
         voice_result = await ensure_music_voice_client(
             voice_client=interaction.guild.voice_client,
@@ -963,16 +955,33 @@ class MusicCog(commands.Cog):
                 interaction,
                 voice_result.error_message,
             )
-            return
+            return None
         voice_client = voice_result.voice_client
         if voice_client is None:
-            return
+            return None
         if transition_log := describe_voice_transition(
             voice_result,
             action="_play_url_now",
             user_channel=user_channel,
         ):
             dbg(transition_log)
+        return voice_client
+
+    async def _play_url_now(
+        self,
+        interaction: discord.Interaction,
+        url: str,
+        *,
+        success_prefix: str = "▶ 재생",
+    ) -> None:
+        if not interaction.response.is_done():
+            await interaction.response.defer(thinking=True, ephemeral=True)
+
+        guild_id = interaction.guild.id
+        state = self._get_state(guild_id)
+        voice_client = await self._ensure_play_url_now_voice_client(interaction)
+        if voice_client is None:
+            return
 
         try:
             player = await prepare_music_player(

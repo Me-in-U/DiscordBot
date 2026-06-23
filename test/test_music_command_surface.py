@@ -340,6 +340,31 @@ class MusicCommandSurfaceTests(unittest.TestCase):
             function_source,
         )
 
+    def test_play_url_now_voice_guard_delegates_to_helper(self):
+        source_text = MUSIC_PATH.read_text(encoding="utf-8")
+        tree = ast.parse(source_text)
+        play_url_now_source = ast.get_source_segment(
+            source_text,
+            _function_node(tree, "_play_url_now"),
+        )
+        helper_source = ast.get_source_segment(
+            source_text,
+            _function_node(tree, "_ensure_play_url_now_voice_client"),
+        )
+
+        self.assertIn("_ensure_play_url_now_voice_client", play_url_now_source)
+        self.assertNotIn("ensure_music_voice_client", play_url_now_source)
+        self.assertNotIn("get_interaction_voice_channel", play_url_now_source)
+        self.assertNotIn("voice_result.error_message", play_url_now_source)
+        self.assertNotIn("describe_voice_transition", play_url_now_source)
+        self.assertIn("await self._send_auto_delete(", helper_source)
+        self.assertIn("voice_result.error_message", helper_source)
+        self.assertIn("get_interaction_voice_channel", helper_source)
+        self.assertIn("ensure_music_voice_client", helper_source)
+        self.assertIn("describe_voice_transition", helper_source)
+        self.assertIn("action=\"_play_url_now\"", helper_source)
+        self.assertIn("음악을 제어할 수 있습니다", helper_source)
+
     def test_play_url_preparation_error_uses_shared_auto_delete_response(self):
         source_text = MUSIC_PATH.read_text(encoding="utf-8")
         tree = ast.parse(source_text)
