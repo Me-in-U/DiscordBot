@@ -413,7 +413,7 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         self.assertIn("favorite_slot=favorite_slot", response_helper_source)
         self.assertIn("_send_ephemeral_response", response_helper_source)
 
-        for function_name in ("_play", "_search_music_for_favorite_slot"):
+        for function_name in ("_play_music_search_branch", "_search_music_for_favorite_slot"):
             function_source = ast.get_source_segment(
                 source_text,
                 _function_node(tree, function_name),
@@ -429,11 +429,19 @@ class MusicCommandSurfaceTests(unittest.TestCase):
                 self.assertNotIn("interaction.followup.send", function_source)
                 self.assertNotIn("except Exception", function_source)
 
+        play_source = ast.get_source_segment(source_text, _function_node(tree, "_play"))
+        self.assertIn("_play_music_search_branch", play_source)
+        self.assertNotIn("Embed(", play_source)
+        self.assertNotIn("SearchResultView", play_source)
+        self.assertNotIn("search_result.user_message", play_source)
+        self.assertNotIn("search_result.embed_title", play_source)
+        self.assertNotIn("search_result.embed_description", play_source)
+
     def test_play_and_favorite_search_delegate_result_mapping_to_search_action_helper(self):
         source_text = MUSIC_PATH.read_text(encoding="utf-8")
         tree = ast.parse(source_text)
 
-        for function_name in ("_play", "_search_music_for_favorite_slot"):
+        for function_name in ("_play_music_search_branch", "_search_music_for_favorite_slot"):
             function_source = ast.get_source_segment(
                 source_text,
                 _function_node(tree, function_name),
@@ -452,6 +460,11 @@ class MusicCommandSurfaceTests(unittest.TestCase):
                 self.assertNotIn("filter_youtube_watch_entries", function_source)
                 self.assertNotIn("build_search_results_display", function_source)
                 self.assertNotIn("description = \"\\n\".join", function_source)
+
+        play_source = ast.get_source_segment(source_text, _function_node(tree, "_play"))
+        self.assertIn("_play_music_search_branch", play_source)
+        self.assertNotIn("build_music_search_flow", play_source)
+        self.assertNotIn("_send_music_search_response", play_source)
 
     def test_favorite_search_request_delegates_input_mapping_to_helper(self):
         source_text = MUSIC_PATH.read_text(encoding="utf-8")

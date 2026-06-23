@@ -261,6 +261,18 @@ class MusicCog(commands.Cog):
         )
         await self._send_ephemeral_response(interaction, embed=embed, view=view)
 
+    async def _play_music_search_branch(
+        self,
+        interaction: discord.Interaction,
+        query: str,
+    ) -> None:
+        search_result = await build_music_search_flow(
+            query,
+            search_ytdl,
+            executor=YTDL_EXECUTOR,
+        )
+        await self._send_music_search_response(interaction, search_result)
+
     async def _fill_queue_meta(self, track: "QueuedTrack"):
         """대기열 트랙의 가벼운 메타데이터를 채운다(재생에 영향 없음)."""
         try:
@@ -1010,13 +1022,7 @@ class MusicCog(commands.Cog):
         )
         # ? 검색어 처리
         if not is_http_url(url):
-            # ytsearch로 상위 10개까지 뽑되
-            search_result = await build_music_search_flow(
-                url,
-                search_ytdl,
-                executor=YTDL_EXECUTOR,
-            )
-            await self._send_music_search_response(interaction, search_result)
+            await self._play_music_search_branch(interaction, url)
             # 검색 모드에서는 여기서 종료 (선택은 SelectView가 처리)
             return
 
