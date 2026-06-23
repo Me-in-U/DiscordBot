@@ -1,9 +1,18 @@
 import unittest
+from pathlib import Path
+
+
+MUSIC_PANEL_STORE_PATH = Path("util/music/panel_store.py")
+LEGACY_MUSIC_PANEL_STORE_PATH = Path("util/music_panel_store.py")
 
 
 class MusicPanelStoreTests(unittest.IsolatedAsyncioTestCase):
+    def test_music_panel_store_helper_lives_under_music_package(self):
+        self.assertTrue(MUSIC_PANEL_STORE_PATH.exists())
+        self.assertFalse(LEGACY_MUSIC_PANEL_STORE_PATH.exists())
+
     def test_rows_to_music_panel_ids_normalizes_keys_and_values(self):
-        from util.music_panel_store import rows_to_music_panel_ids
+        from util.music.panel_store import rows_to_music_panel_ids
 
         rows = [
             {"guild_id": 123, "message_id": "456"},
@@ -13,7 +22,7 @@ class MusicPanelStoreTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(rows_to_music_panel_ids(rows), {"123": 456, "789": 111})
 
     async def test_load_music_panel_ids_uses_panel_messages_query(self):
-        from util.music_panel_store import load_music_panel_ids
+        from util.music.panel_store import load_music_panel_ids
 
         calls: list[str] = []
 
@@ -27,7 +36,7 @@ class MusicPanelStoreTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(calls, ["SELECT guild_id, message_id FROM panel_messages"])
 
     async def test_save_music_panel_id_updates_cache_and_persists_upsert(self):
-        from util.music_panel_store import save_music_panel_id
+        from util.music.panel_store import save_music_panel_id
 
         cache = {}
         calls = []
@@ -42,7 +51,7 @@ class MusicPanelStoreTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("ON DUPLICATE KEY UPDATE message_id = %s", calls[0][0])
 
     async def test_delete_music_panel_id_updates_cache_and_persists_delete(self):
-        from util.music_panel_store import delete_music_panel_id
+        from util.music.panel_store import delete_music_panel_id
 
         cache = {"123": 456}
         calls = []

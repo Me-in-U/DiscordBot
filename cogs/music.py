@@ -77,7 +77,7 @@ from util.music.search import (
     build_music_search_flow,
     is_http_url,
 )
-from util.music_panel_store import (
+from util.music.panel_store import (
     delete_music_panel_id,
     load_music_panel_ids,
     save_music_panel_id,
