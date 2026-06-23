@@ -21,6 +21,7 @@ from util.music_favorites import (
     MusicFavoriteSaveResult,
     MusicFavoriteSavePayload,
     MusicFavoriteCurrentSaveButtonAction,
+    apply_music_favorite_cache_store_action,
     build_music_favorite_cache_hit_result_action,
     build_music_favorite_cache_load_action,
     build_music_favorite_cache_store_action,
@@ -445,6 +446,24 @@ class MusicFavoriteTests(unittest.IsolatedAsyncioTestCase):
                 favorites=[favorite],
             ),
         )
+
+    def test_apply_music_favorite_cache_store_action_updates_cache(self):
+        favorite = MusicFavorite(
+            guild_id=10,
+            slot=1,
+            title="loaded",
+            url="https://example.com/watch?v=1",
+        )
+        cache: dict[int, list[MusicFavorite]] = {}
+        store_action = MusicFavoriteCacheStoreAction(
+            guild_id=10,
+            favorites=[favorite],
+        )
+
+        result = apply_music_favorite_cache_store_action(cache, store_action)
+
+        self.assertEqual(result, [favorite])
+        self.assertEqual(cache, {10: [favorite]})
 
     def test_music_favorite_load_failure_action_returns_empty_fallback(self):
         result = build_music_favorite_load_failure_action(guild_id="10")

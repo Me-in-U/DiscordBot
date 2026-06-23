@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, MutableMapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -207,6 +207,14 @@ def build_music_favorite_cache_store_action(
         guild_id=int(guild_id),
         favorites=favorites,
     )
+
+
+def apply_music_favorite_cache_store_action(
+    cache: MutableMapping[int, list[MusicFavorite]],
+    store_action: MusicFavoriteCacheStoreAction,
+) -> list[MusicFavorite]:
+    cache[store_action.guild_id] = store_action.favorites
+    return store_action.favorites
 
 
 def build_music_favorite_load_failure_action(

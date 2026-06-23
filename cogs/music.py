@@ -16,6 +16,7 @@ from util.channel_settings import get_channel
 from util.music_favorites import (
     MusicFavorite,
     MusicFavoriteSavePayload,
+    apply_music_favorite_cache_store_action,
     build_music_favorite_cache_hit_result_action,
     build_music_favorite_cache_load_action,
     build_music_favorite_cache_store_action,
@@ -216,8 +217,10 @@ class MusicCog(commands.Cog):
             guild_id=cache_action.guild_id,
             favorites=favorites,
         )
-        self._favorite_cache[store_action.guild_id] = store_action.favorites
-        return favorites
+        return apply_music_favorite_cache_store_action(
+            self._favorite_cache,
+            store_action,
+        )
 
     async def _build_helper_view(self, guild_id: int) -> MusicHelperView:
         favorites = await self._load_music_favorites(guild_id)
