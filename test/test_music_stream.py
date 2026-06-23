@@ -1,13 +1,22 @@
 import unittest
+from pathlib import Path
 
-from util.music_stream import (
+from util.music.stream import (
     build_stream_info_from_player_response,
     extract_initial_player_response,
     select_initial_audio_format,
 )
 
 
+MUSIC_STREAM_PATH = Path("util/music/stream.py")
+LEGACY_MUSIC_STREAM_PATH = Path("util/music_stream.py")
+
+
 class MusicStreamTests(unittest.TestCase):
+    def test_stream_helper_lives_under_music_package(self):
+        self.assertTrue(MUSIC_STREAM_PATH.exists())
+        self.assertFalse(LEGACY_MUSIC_STREAM_PATH.exists())
+
     def test_extract_initial_player_response_reads_embedded_json(self):
         html = (
             "<script>var ytInitialPlayerResponse = "

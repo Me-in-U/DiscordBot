@@ -18,7 +18,7 @@ from util.music.extractor import (
     select_best_audio_format,
     select_yt_dlp_entry,
 )
-from util.music_stream import (
+from util.music.stream import (
     build_stream_info_from_player_response,
     extract_initial_player_response,
     select_initial_audio_format,
