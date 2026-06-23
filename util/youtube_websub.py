@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from enum import StrEnum
 import re
 from typing import Any
-from urllib.parse import urlencode
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from xml.etree import ElementTree
 
 
@@ -47,6 +47,42 @@ class YouTubeVideoLiveStatus:
 
 def build_youtube_feed_topic_url(channel_id: str) -> str:
     return f"{YOUTUBE_FEED_BASE_URL}?{urlencode({'channel_id': channel_id})}"
+
+
+def build_youtube_websub_callback_url(callback_url: str, verify_token: str) -> str:
+    if not callback_url or not verify_token:
+        return callback_url
+
+    split = urlsplit(callback_url)
+    query_items = dict(parse_qsl(split.query, keep_blank_values=True))
+    query_items.setdefault("token", verify_token)
+    return urlunsplit(
+        (
+            split.scheme,
+            split.netloc,
+            split.path,
+            urlencode(query_items),
+            split.fragment,
+        )
+    )
+
+
+def build_youtube_websub_request_data(
+    *,
+    channel_id: str,
+    callback_url: str,
+    mode: str,
+    lease_seconds: int,
+) -> dict[str, str]:
+    data = {
+        "hub.mode": mode,
+        "hub.topic": build_youtube_feed_topic_url(channel_id),
+        "hub.callback": callback_url,
+        "hub.verify": "async",
+    }
+    if mode == "subscribe":
+        data["hub.lease_seconds"] = str(lease_seconds)
+    return data
 
 
 def build_youtube_live_notification_message(video_id: str) -> str:

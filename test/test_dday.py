@@ -151,21 +151,22 @@ class DdaySchemaAndCommandTests(unittest.TestCase):
         self.assertEqual(renames["title"], "제목")
         self.assertEqual(renames["show_after"], "지난날짜표시")
 
-    def test_loop_refreshes_dday_and_sunday_maple_after_celebration(self):
-        loop_source = LOOP_PATH.read_text(encoding="utf-8")
-        tree = ast.parse(loop_source, filename=str(LOOP_PATH))
-        new_day_clear = next(
+    def test_daily_refresh_runner_refreshes_dday_and_sunday_maple_after_celebration(self):
+        runner_path = Path("util/daily_refresh_runner.py")
+        runner_source = runner_path.read_text(encoding="utf-8")
+        tree = ast.parse(runner_source, filename=str(runner_path))
+        run_daily_refreshes = next(
             node
             for node in ast.walk(tree)
-            if isinstance(node, ast.AsyncFunctionDef) and node.name == "new_day_clear"
+            if isinstance(node, ast.AsyncFunctionDef) and node.name == "run_daily_refreshes"
         )
-        source = ast.get_source_segment(loop_source, new_day_clear)
+        source = ast.get_source_segment(runner_source, run_daily_refreshes)
         self.assertIsNotNone(source)
 
-        celebration_index = source.index("refresh_celebration_messages")
-        dday_index = source.index("refresh_dday_messages")
-        sunday_maple_index = source.index("refresh_sunday_maple_messages")
-        reload_index = source.index("self.bot.USER_MESSAGES")
+        celebration_index = source.index("refresh_celebration")
+        dday_index = source.index("refresh_dday")
+        sunday_maple_index = source.index("refresh_sunday_maple")
+        reload_index = source.index("bot.USER_MESSAGES")
 
         self.assertLess(celebration_index, dday_index)
         self.assertLess(dday_index, sunday_maple_index)

@@ -5,6 +5,8 @@ import util.youtube_websub as youtube_websub
 
 from util.youtube_websub import (
     YouTubeVideoStatus,
+    build_youtube_websub_callback_url,
+    build_youtube_websub_request_data,
     build_youtube_upload_notification_message,
     build_youtube_feed_topic_url,
     classify_video_item,
@@ -36,6 +38,9 @@ SAMPLE_ATOM = """<?xml version="1.0" encoding="UTF-8"?>
 """
 
 LOOP_PATH = Path("cogs/loop.py")
+VIDEO_CANDIDATE_RUNNER_PATH = Path("util/youtube_video_candidate_runner.py")
+VIDEO_STATUS_PATH = Path("util/youtube_video_status.py")
+COMMUNITY_POLLING_PATH = Path("util/youtube_community_polling.py")
 
 
 class YouTubeWebSubTests(unittest.TestCase):
@@ -53,6 +58,49 @@ class YouTubeWebSubTests(unittest.TestCase):
             build_youtube_feed_topic_url("UC_TEST"),
             "https://www.youtube.com/feeds/videos.xml?channel_id=UC_TEST",
         )
+
+    def test_builds_websub_callback_url_with_verify_token(self):
+        self.assertEqual(
+            build_youtube_websub_callback_url(
+                "https://bot.example/youtube/websub?existing=1",
+                "verify-token",
+            ),
+            "https://bot.example/youtube/websub?existing=1&token=verify-token",
+        )
+        self.assertEqual(
+            build_youtube_websub_callback_url(
+                "https://bot.example/youtube/websub?token=already",
+                "verify-token",
+            ),
+            "https://bot.example/youtube/websub?token=already",
+        )
+
+    def test_builds_websub_request_data_for_subscribe_and_unsubscribe(self):
+        subscribe_data = build_youtube_websub_request_data(
+            channel_id="UC_TEST",
+            callback_url="https://bot.example/youtube/websub?token=verify-token",
+            mode="subscribe",
+            lease_seconds=604800,
+        )
+        self.assertEqual(subscribe_data["hub.mode"], "subscribe")
+        self.assertEqual(
+            subscribe_data["hub.topic"],
+            "https://www.youtube.com/feeds/videos.xml?channel_id=UC_TEST",
+        )
+        self.assertEqual(
+            subscribe_data["hub.callback"],
+            "https://bot.example/youtube/websub?token=verify-token",
+        )
+        self.assertEqual(subscribe_data["hub.lease_seconds"], "604800")
+
+        unsubscribe_data = build_youtube_websub_request_data(
+            channel_id="UC_TEST",
+            callback_url="https://bot.example/youtube/websub?token=verify-token",
+            mode="unsubscribe",
+            lease_seconds=604800,
+        )
+        self.assertEqual(unsubscribe_data["hub.mode"], "unsubscribe")
+        self.assertNotIn("hub.lease_seconds", unsubscribe_data)
 
     def test_builds_live_notification_message_as_masked_link_header(self):
         build_message = getattr(
@@ -187,18 +235,29 @@ class YouTubeWebSubTests(unittest.TestCase):
         self.assertEqual(status.status, YouTubeVideoStatus.UPLOAD)
 
     def test_loop_fetches_content_details_and_skips_shorts(self):
-        source = LOOP_PATH.read_text(encoding="utf-8")
+        status_source = VIDEO_STATUS_PATH.read_text(encoding="utf-8")
+        runner_source = VIDEO_CANDIDATE_RUNNER_PATH.read_text(encoding="utf-8")
 
-        self.assertIn("snippet,liveStreamingDetails,status,contentDetails", source)
-        self.assertIn("shorts_skipped", source)
+        self.assertIn(
+            "snippet,liveStreamingDetails,status,contentDetails",
+            status_source,
+        )
+        self.assertIn("shorts_skipped", runner_source)
 
     def test_loop_defines_ten_minute_community_post_check(self):
         source = LOOP_PATH.read_text(encoding="utf-8")
+        community_polling_source = COMMUNITY_POLLING_PATH.read_text(encoding="utf-8")
+        community_notification_source = Path(
+            "util/youtube_community_notification.py"
+        ).read_text(encoding="utf-8")
 
         self.assertIn("@tasks.loop(minutes=10)", source)
         self.assertIn("youtube_community_check", source)
-        self.assertIn("community_alert_enabled", source)
-        self.assertIn("update_youtube_community_notification_state", source)
+        self.assertIn("community_alert_enabled", community_polling_source)
+        self.assertIn(
+            "update_youtube_community_notification_state",
+            community_notification_source,
+        )
 
     def test_upload_alert_respects_enabled_at_cutoff(self):
         self.assertFalse(
