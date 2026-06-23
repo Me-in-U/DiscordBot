@@ -49,6 +49,18 @@ class DeploymentContractTests(unittest.TestCase):
         self.assertIn("python -m unittest discover -s test", text)
         self.assertIn("docker run --rm", text)
 
+    def test_jenkins_streams_workspace_into_docker_instead_of_bind_mounting(self):
+        text = Path("Jenkinsfile").read_text(encoding="utf-8")
+
+        self.assertNotIn('-v "$PWD:/app"', text)
+        self.assertGreaterEqual(text.count("tar -cf -"), 2)
+        self.assertGreaterEqual(text.count("tar -xf - -C /app"), 2)
+
+    def test_jenkins_deps_image_cache_key_includes_dockerfile_deps(self):
+        text = Path("Jenkinsfile").read_text(encoding="utf-8")
+
+        self.assertGreaterEqual(text.count("sha256sum requirements.txt Dockerfile.deps"), 2)
+
     def test_jenkins_runs_database_migration_before_deploy(self):
         text = Path("Jenkinsfile").read_text(encoding="utf-8")
 

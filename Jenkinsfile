@@ -170,20 +170,29 @@ pipeline {
           set -e
           git show --check --pretty=format: --no-ext-diff HEAD
 
-          requirements_hash="$(sha256sum requirements.txt | awk '{print $1}')"
-          deps_image="${DEPS_IMAGE_REPOSITORY:-bot-discord-bot-deps}:${requirements_hash}"
+          deps_hash="$(sha256sum requirements.txt Dockerfile.deps | sha256sum | awk '{print $1}')"
+          deps_image="${DEPS_IMAGE_REPOSITORY:-bot-discord-bot-deps}:${deps_hash}"
 
           echo "[INFO] Verifying with dependency image: ${deps_image}"
           if ! docker image inspect "${deps_image}" >/dev/null 2>&1; then
             docker build -f Dockerfile.deps -t "${deps_image}" .
           fi
 
-          docker run --rm \
+          tar -cf - \
+            --exclude='.git' \
+            --exclude='.deploy-logs' \
+            --exclude='__pycache__' \
+            --exclude='.pytest_cache' \
+            --exclude='.mypy_cache' \
+            --exclude='.venv' \
+            --exclude='venv' \
+            --exclude='.env' \
+            --exclude='.env.deploy' \
+            . | docker run --rm -i \
             --env-file "${ENV_FILE}" \
-            -v "$PWD:/app" \
             -w /app \
             "${deps_image}" \
-            sh -lc 'python --version && python -m compileall -q bot.py api cogs common func util test && python -m unittest discover -s test'
+            sh -lc 'tar -xf - -C /app && python --version && python -m compileall -q bot.py api cogs common func util test && python -m unittest discover -s test'
         '''
       }
     }
@@ -192,20 +201,29 @@ pipeline {
       steps {
         sh '''
           set -e
-          requirements_hash="$(sha256sum requirements.txt | awk '{print $1}')"
-          deps_image="${DEPS_IMAGE_REPOSITORY:-bot-discord-bot-deps}:${requirements_hash}"
+          deps_hash="$(sha256sum requirements.txt Dockerfile.deps | sha256sum | awk '{print $1}')"
+          deps_image="${DEPS_IMAGE_REPOSITORY:-bot-discord-bot-deps}:${deps_hash}"
 
           echo "[INFO] Running DB migrations with dependency image: ${deps_image}"
           if ! docker image inspect "${deps_image}" >/dev/null 2>&1; then
             docker build -f Dockerfile.deps -t "${deps_image}" .
           fi
 
-          docker run --rm \
+          tar -cf - \
+            --exclude='.git' \
+            --exclude='.deploy-logs' \
+            --exclude='__pycache__' \
+            --exclude='.pytest_cache' \
+            --exclude='.mypy_cache' \
+            --exclude='.venv' \
+            --exclude='venv' \
+            --exclude='.env' \
+            --exclude='.env.deploy' \
+            . | docker run --rm -i \
             --env-file "${ENV_FILE}" \
-            -v "$PWD:/app" \
             -w /app \
             "${deps_image}" \
-            sh -lc 'python scripts/migrate_db.py'
+            sh -lc 'tar -xf - -C /app && python scripts/migrate_db.py'
         '''
       }
     }
