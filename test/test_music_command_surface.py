@@ -466,6 +466,28 @@ class MusicCommandSurfaceTests(unittest.TestCase):
             helper_source,
         )
 
+    def test_music_url_immediate_playback_start_delegates_to_helper(self):
+        source_text = MUSIC_PATH.read_text(encoding="utf-8")
+        tree = ast.parse(source_text)
+        function_source = ast.get_source_segment(
+            source_text,
+            _function_node(tree, "_start_music_url_immediate_playback"),
+        )
+        helper_source = ast.get_source_segment(
+            source_text,
+            _function_node(tree, "_start_music_url_prepared_playback"),
+        )
+
+        self.assertIn("_start_music_url_prepared_playback", function_source)
+        self.assertNotIn("build_prepared_playback_start", function_source)
+        self.assertNotIn("_start_prepared_playback", function_source)
+        self.assertNotIn("playback_start.confirmation_message", function_source)
+        self.assertIn("build_prepared_playback_start", helper_source)
+        self.assertIn("_start_prepared_playback", helper_source)
+        self.assertIn("playback_start.confirmation_message", helper_source)
+        self.assertIn("dbg(\"_play: playback started and updater restarted\")", helper_source)
+        self.assertIn("self._send_auto_delete(", helper_source)
+
     def test_control_voice_guard_errors_use_shared_auto_delete_response(self):
         source_text = MUSIC_PATH.read_text(encoding="utf-8")
         tree = ast.parse(source_text)
@@ -543,7 +565,7 @@ class MusicCommandSurfaceTests(unittest.TestCase):
 
         for function_name in (
             "_start_play_url_now_prepared_playback",
-            "_start_music_url_immediate_playback",
+            "_start_music_url_prepared_playback",
         ):
             function_source = ast.get_source_segment(
                 source_text,

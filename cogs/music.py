@@ -1054,6 +1054,27 @@ class MusicCog(commands.Cog):
             )
             return None
 
+    async def _start_music_url_prepared_playback(
+        self,
+        interaction: discord.Interaction,
+        *,
+        guild_id: int,
+        state: GuildMusicState,
+        player: Any,
+    ) -> None:
+        playback_start = build_prepared_playback_start(player)
+        await self._start_prepared_playback(
+            guild_id=guild_id,
+            state=state,
+            player=player,
+            playback_start=playback_start,
+        )
+        dbg("_play: playback started and updater restarted")
+        await self._send_auto_delete(
+            interaction,
+            playback_start.confirmation_message,
+        )
+
     async def _play_url_now(
         self,
         interaction: discord.Interaction,
@@ -1095,17 +1116,11 @@ class MusicCog(commands.Cog):
         if player is None:
             return
 
-        playback_start = build_prepared_playback_start(player)
-        await self._start_prepared_playback(
+        await self._start_music_url_prepared_playback(
+            interaction,
             guild_id=guild_id,
             state=state,
             player=player,
-            playback_start=playback_start,
-        )
-        dbg("_play: playback started and updater restarted")
-        await self._send_auto_delete(
-            interaction,
-            playback_start.confirmation_message,
         )
 
     async def _send_music_url_queued_response(
