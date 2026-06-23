@@ -223,7 +223,7 @@ pipeline {
             --env-file "${ENV_FILE}" \
             -w /app \
             "${deps_image}" \
-            sh -c 'tar -xf - -C /app && /opt/venv/bin/python scripts/migrate_db.py'
+            sh -c 'tar -xf - -C /app && /opt/venv/bin/python -m scripts.migrate_db'
         '''
       }
     }

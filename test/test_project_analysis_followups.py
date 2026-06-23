@@ -68,7 +68,7 @@ class DeploymentContractTests(unittest.TestCase):
         self.assertIn("/opt/venv/bin/python --version", text)
         self.assertIn("/opt/venv/bin/python -m compileall", text)
         self.assertIn("/opt/venv/bin/python -m unittest discover -s test", text)
-        self.assertIn("/opt/venv/bin/python scripts/migrate_db.py", text)
+        self.assertIn("/opt/venv/bin/python -m scripts.migrate_db", text)
 
     def test_jenkins_runs_database_migration_before_deploy(self):
         text = Path("Jenkinsfile").read_text(encoding="utf-8")
@@ -78,7 +78,8 @@ class DeploymentContractTests(unittest.TestCase):
             text.index("stage('Migrate Database')"),
             text.index("stage('Deploy')"),
         )
-        self.assertIn("python scripts/migrate_db.py", text)
+        self.assertNotIn("python scripts/migrate_db.py", text)
+        self.assertIn("python -m scripts.migrate_db", text)
 
     def test_readme_and_agents_document_current_test_contract(self):
         readme = Path("README.md").read_text(encoding="utf-8")
