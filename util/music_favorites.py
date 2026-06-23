@@ -33,6 +33,12 @@ class MusicFavoriteCacheLoadAction:
 
 
 @dataclass(frozen=True, slots=True)
+class MusicFavoriteCacheHitResultAction:
+    guild_id: int
+    favorites: list[MusicFavorite]
+
+
+@dataclass(frozen=True, slots=True)
 class MusicFavoriteCacheStoreAction:
     guild_id: int
     favorites: list[MusicFavorite]
@@ -180,6 +186,15 @@ def build_music_favorite_cache_load_action(
     return MusicFavoriteCacheLoadAction(
         guild_id=normalized_guild_id,
         should_use_cache=False,
+    )
+
+
+def build_music_favorite_cache_hit_result_action(
+    cache_action: MusicFavoriteCacheLoadAction,
+) -> MusicFavoriteCacheHitResultAction:
+    return MusicFavoriteCacheHitResultAction(
+        guild_id=cache_action.guild_id,
+        favorites=cache_action.cached_favorites or [],
     )
 
 

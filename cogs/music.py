@@ -16,6 +16,7 @@ from util.channel_settings import get_channel
 from util.music_favorites import (
     MusicFavorite,
     MusicFavoriteSavePayload,
+    build_music_favorite_cache_hit_result_action,
     build_music_favorite_cache_load_action,
     build_music_favorite_cache_store_action,
     build_music_favorite_current_track_save_action,
@@ -197,7 +198,8 @@ class MusicCog(commands.Cog):
             refresh=refresh,
         )
         if cache_action.should_use_cache:
-            return cache_action.cached_favorites or []
+            hit_action = build_music_favorite_cache_hit_result_action(cache_action)
+            return hit_action.favorites
         try:
             favorites = await list_music_favorites(cache_action.guild_id)
         except (aiomysql.Error, TypeError, ValueError, KeyError):

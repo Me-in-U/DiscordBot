@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, patch
 from cogs.music import GuildMusicState, MusicCog, MusicControlView, MusicHelperView
 from util.music_favorites import (
     MusicFavorite,
+    MusicFavoriteCacheHitResultAction,
     MusicFavoriteCacheLoadAction,
     MusicFavoriteCacheStoreAction,
     MusicFavoriteLoadFailureAction,
@@ -20,6 +21,7 @@ from util.music_favorites import (
     MusicFavoriteSaveResult,
     MusicFavoriteSavePayload,
     MusicFavoriteCurrentSaveButtonAction,
+    build_music_favorite_cache_hit_result_action,
     build_music_favorite_cache_load_action,
     build_music_favorite_cache_store_action,
     build_music_favorite_load_failure_action,
@@ -397,6 +399,29 @@ class MusicFavoriteTests(unittest.IsolatedAsyncioTestCase):
                 guild_id=10,
                 should_use_cache=False,
                 cached_favorites=None,
+            ),
+        )
+
+    def test_music_favorite_cache_hit_result_action_returns_cached_favorites(self):
+        favorite = MusicFavorite(
+            guild_id=10,
+            slot=1,
+            title="cached",
+            url="https://example.com/watch?v=1",
+        )
+        cache_action = MusicFavoriteCacheLoadAction(
+            guild_id=10,
+            should_use_cache=True,
+            cached_favorites=[favorite],
+        )
+
+        result = build_music_favorite_cache_hit_result_action(cache_action)
+
+        self.assertEqual(
+            result,
+            MusicFavoriteCacheHitResultAction(
+                guild_id=10,
+                favorites=[favorite],
             ),
         )
 
