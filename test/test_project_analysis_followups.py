@@ -1,4 +1,6 @@
 import os
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -174,6 +176,34 @@ class DbMigrationContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("asyncio.run", source)
         self.assertIn("run_schema_migrations", source)
         self.assertIn("close_db_pool", source)
+
+    def test_migration_script_bootstraps_repo_root_for_direct_path_execution(self):
+        script_path = Path("scripts/migrate_db.py").resolve()
+        repo_root = Path.cwd().resolve()
+        script_dir = script_path.parent
+        code = "\n".join(
+            [
+                "import os",
+                "import runpy",
+                "import sys",
+                f"script_path = {str(script_path)!r}",
+                f"repo_root = {str(repo_root)!r}",
+                f"script_dir = {str(script_dir)!r}",
+                'sys.path = [p for p in sys.path if p not in ("", repo_root, script_dir)]',
+                "sys.path.insert(0, script_dir)",
+                "os.chdir(os.path.dirname(repo_root))",
+                'runpy.run_path(script_path, run_name="__not_main__")',
+            ]
+        )
+
+        result = subprocess.run(
+            [sys.executable, "-c", code],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_status_api_exposes_schema_version_in_health_payload(self):
         source = Path("cogs/status_api.py").read_text(encoding="utf-8")
