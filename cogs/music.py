@@ -1030,6 +1030,30 @@ class MusicCog(commands.Cog):
             voice_client.stop()
         return replacing
 
+    async def _prepare_music_url_immediate_player(
+        self,
+        interaction: discord.Interaction,
+        url: str,
+    ) -> Any | None:
+        try:
+            player = await prepare_music_player(
+                YTDLSource.from_url,
+                url,
+                loop=self.bot.loop,
+                requester=interaction.user,
+                include_ffmpeg_guidance=True,
+            )
+            dbg(f"_play: prepared player title={getattr(player,'title',None)}")
+            return player
+        except MusicPlayerPreparationError as exc:
+            dbg(f"_play: {exc.failure.debug_message}")
+            await self._send_auto_delete(
+                interaction,
+                exc.failure.user_message,
+                delay=exc.failure.delete_after,
+            )
+            return None
+
     async def _play_url_now(
         self,
         interaction: discord.Interaction,
@@ -1067,22 +1091,8 @@ class MusicCog(commands.Cog):
         state: GuildMusicState,
         url: str,
     ) -> None:
-        try:
-            player = await prepare_music_player(
-                YTDLSource.from_url,
-                url,
-                loop=self.bot.loop,
-                requester=interaction.user,
-                include_ffmpeg_guidance=True,
-            )
-            dbg(f"_play: prepared player title={getattr(player,'title',None)}")
-        except MusicPlayerPreparationError as exc:
-            dbg(f"_play: {exc.failure.debug_message}")
-            await self._send_auto_delete(
-                interaction,
-                exc.failure.user_message,
-                delay=exc.failure.delete_after,
-            )
+        player = await self._prepare_music_url_immediate_player(interaction, url)
+        if player is None:
             return
 
         playback_start = build_prepared_playback_start(player)

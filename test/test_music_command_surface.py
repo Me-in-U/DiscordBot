@@ -444,14 +444,26 @@ class MusicCommandSurfaceTests(unittest.TestCase):
             source_text,
             _function_node(tree, "_start_music_url_immediate_playback"),
         )
+        helper_source = ast.get_source_segment(
+            source_text,
+            _function_node(tree, "_prepare_music_url_immediate_player"),
+        )
 
-        self.assertIn("MusicPlayerPreparationError", function_source)
-        self.assertIn("exc.failure.user_message", function_source)
-        self.assertIn("exc.failure.delete_after", function_source)
+        self.assertIn("_prepare_music_url_immediate_player", function_source)
+        self.assertNotIn("prepare_music_player", function_source)
+        self.assertNotIn("MusicPlayerPreparationError", function_source)
+        self.assertNotIn("include_ffmpeg_guidance=True", function_source)
+        self.assertIn("prepare_music_player", helper_source)
+        self.assertIn("YTDLSource.from_url", helper_source)
+        self.assertIn("include_ffmpeg_guidance=True", helper_source)
+        self.assertIn("MusicPlayerPreparationError", helper_source)
+        self.assertIn("exc.failure.user_message", helper_source)
+        self.assertIn("exc.failure.delete_after", helper_source)
+        self.assertIn("return None", helper_source)
         self.assertNotIn(
             "msg = await interaction.followup.send(\n"
             "                exc.failure.user_message",
-            function_source,
+            helper_source,
         )
 
     def test_control_voice_guard_errors_use_shared_auto_delete_response(self):
