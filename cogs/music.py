@@ -70,9 +70,8 @@ from util.music_progress import (
 )
 from util.music_search import (
     MusicSearchActionResult,
-    build_music_search_action,
+    build_music_search_flow,
     is_http_url,
-    run_music_search_query,
 )
 from util.music_panel_store import (
     delete_music_panel_id,
@@ -315,14 +314,10 @@ class MusicCog(commands.Cog):
             )
             return
 
-        info = await run_music_search_query(
+        search_result = await build_music_search_flow(
             favorite_search_action.query,
             search_ytdl,
             executor=YTDL_EXECUTOR,
-        )
-        search_result = build_music_search_action(
-            query=favorite_search_action.query,
-            info=info,
             favorite_slot=favorite_search_action.slot,
         )
         await self._send_music_search_response(
@@ -1016,15 +1011,11 @@ class MusicCog(commands.Cog):
         # ? 검색어 처리
         if not is_http_url(url):
             # ytsearch로 상위 10개까지 뽑되
-            info = await run_music_search_query(
+            search_result = await build_music_search_flow(
                 url,
                 search_ytdl,
                 executor=YTDL_EXECUTOR,
             )
-            dbg(
-                f"_play: search info keys={list(info.keys()) if isinstance(info,dict) else type(info)}"
-            )
-            search_result = build_music_search_action(url, info)
             await self._send_music_search_response(interaction, search_result)
             # 검색 모드에서는 여기서 종료 (선택은 SelectView가 처리)
             return

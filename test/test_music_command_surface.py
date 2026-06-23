@@ -439,8 +439,9 @@ class MusicCommandSurfaceTests(unittest.TestCase):
                 _function_node(tree, function_name),
             )
             with self.subTest(function_name=function_name):
-                self.assertIn("build_music_search_action", function_source)
-                self.assertIn("run_music_search_query", function_source)
+                self.assertIn("build_music_search_flow", function_source)
+                self.assertNotIn("build_music_search_action", function_source)
+                self.assertNotIn("run_music_search_query", function_source)
                 self.assertIn("_send_music_search_response", function_source)
                 self.assertNotIn("run_in_executor", function_source)
                 self.assertNotIn("search_ytdl.extract_info", function_source)

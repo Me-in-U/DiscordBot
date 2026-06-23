@@ -117,3 +117,22 @@ async def run_music_search_query(
         executor,
         _extract,
     )
+
+
+async def build_music_search_flow(
+    query: str,
+    extractor: Any,
+    *,
+    executor: Executor | None = None,
+    favorite_slot: int | None = None,
+) -> MusicSearchActionResult:
+    info = await run_music_search_query(
+        query,
+        extractor,
+        executor=executor,
+    )
+    return build_music_search_action(
+        query,
+        info,
+        favorite_slot=favorite_slot,
+    )

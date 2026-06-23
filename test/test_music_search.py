@@ -146,3 +146,40 @@ class MusicSearchExecutorTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result, {"entries": []})
         self.assertEqual(ytdlp.calls, [("ytsearch10:lofi", False)])
+
+
+class MusicSearchFlowTests(unittest.IsolatedAsyncioTestCase):
+    async def test_build_music_search_flow_runs_search_and_maps_play_results(self):
+        from util.music_search import build_music_search_flow
+
+        def extractor(search: str):
+            return {
+                "entries": [
+                    {"url": "https://www.youtube.com/watch?v=1", "title": search},
+                    {"url": "https://youtu.be/2", "title": "ignored"},
+                ]
+            }
+
+        result = await build_music_search_flow("lofi", extractor)
+
+        self.assertIsNone(result.user_message)
+        self.assertEqual([video["title"] for video in result.videos], ["ytsearch10:lofi"])
+        self.assertEqual(result.embed_title, "🔍 `lofi` 검색 결과")
+        self.assertEqual(result.embed_description, "1. ytsearch10:lofi")
+
+    async def test_build_music_search_flow_preserves_favorite_slot_mapping(self):
+        from util.music_search import build_music_search_flow
+
+        class FakeYtdlp:
+            def extract_info(self, search: str, *, download: bool):
+                return {
+                    "entries": [
+                        {"url": "https://www.youtube.com/watch?v=1", "title": search}
+                    ]
+                }
+
+        result = await build_music_search_flow("lofi", FakeYtdlp(), favorite_slot=2)
+
+        self.assertIsNone(result.user_message)
+        self.assertEqual(result.embed_title, "⭐ 2번 즐겨찾기에 저장할 음악 선택")
+        self.assertEqual(result.embed_description, "1. ytsearch10:lofi")
