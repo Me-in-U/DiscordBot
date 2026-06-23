@@ -458,9 +458,14 @@ class MusicCommandSurfaceTests(unittest.TestCase):
             source_text,
             _function_node(tree, "_open_music_favorite_manager"),
         )
+        self.assertIn("build_music_favorite_manager_open_action", manager_source)
         self.assertIn("_send_ephemeral_response", manager_source)
-        self.assertIn("view.status_text()", manager_source)
+        self.assertIn("manager_action.status_text", manager_source)
+        self.assertIn("manager_action.current_track", manager_source)
+        self.assertIn("manager_action.favorites", manager_source)
         self.assertIn("view=view", manager_source)
+        self.assertNotIn("_current_player_as_favorite", manager_source)
+        self.assertNotIn("view.status_text()", manager_source)
         self.assertNotIn("interaction.followup.send", manager_source)
         self.assertNotIn("interaction.response.send_message", manager_source)
 

@@ -3,6 +3,7 @@ import unittest
 from cogs.music import GuildMusicState, MusicCog, MusicControlView, MusicHelperView
 from util.music_favorites import (
     MusicFavorite,
+    MusicFavoriteManagerOpenAction,
     MusicFavoriteManagerSelectionAction,
     MusicFavoritePlayActionResult,
     MusicFavoriteSearchModalAction,
@@ -12,6 +13,7 @@ from util.music_favorites import (
     MusicFavoriteCurrentSaveButtonAction,
     build_music_favorite_current_save_button_action,
     build_music_favorite_current_track_save_action,
+    build_music_favorite_manager_open_action,
     build_music_favorite_manager_selection_action,
     build_music_favorite_button_label,
     build_music_favorite_play_action,
@@ -249,6 +251,53 @@ class MusicFavoriteTests(unittest.IsolatedAsyncioTestCase):
     def test_music_favorite_manager_selection_action_validates_slot(self):
         with self.assertRaisesRegex(ValueError, "즐겨찾기 번호는 1~5"):
             build_music_favorite_manager_selection_action("6")
+
+    def test_music_favorite_manager_open_action_builds_initial_payload(self):
+        favorite = MusicFavorite(
+            guild_id=10,
+            slot=2,
+            title="저장곡",
+            url="https://youtube.com/watch?v=saved",
+        )
+        player = _Player(
+            title="현재곡",
+            webpage_url="https://youtube.com/watch?v=now",
+            data={"duration": 99},
+        )
+
+        result = build_music_favorite_manager_open_action(
+            guild_id="10",
+            favorites=[favorite],
+            player=player,
+        )
+
+        self.assertEqual(
+            result,
+            MusicFavoriteManagerOpenAction(
+                guild_id=10,
+                favorites=[favorite],
+                current_track=MusicFavorite(
+                    guild_id=10,
+                    slot=1,
+                    title="현재곡",
+                    url="https://youtube.com/watch?v=now",
+                    duration=99,
+                ),
+                status_text="저장/수정할 즐겨찾기 슬롯: **1번**",
+            ),
+        )
+
+    def test_music_favorite_manager_open_action_handles_missing_player(self):
+        result = build_music_favorite_manager_open_action(
+            guild_id=10,
+            favorites=[],
+            player=None,
+        )
+
+        self.assertEqual(result.guild_id, 10)
+        self.assertEqual(result.favorites, [])
+        self.assertIsNone(result.current_track)
+        self.assertEqual(result.status_text, "저장/수정할 즐겨찾기 슬롯: **1번**")
 
     def test_music_favorite_search_modal_action_validates_slot(self):
         result = build_music_favorite_search_modal_action("4")

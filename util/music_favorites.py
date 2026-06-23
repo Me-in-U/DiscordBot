@@ -72,6 +72,14 @@ class MusicFavoriteManagerSelectionAction:
 
 
 @dataclass(frozen=True, slots=True)
+class MusicFavoriteManagerOpenAction:
+    guild_id: int
+    favorites: list[MusicFavorite]
+    current_track: MusicFavorite | None
+    status_text: str
+
+
+@dataclass(frozen=True, slots=True)
 class MusicFavoriteSearchModalAction:
     slot: int
 
@@ -169,6 +177,22 @@ def build_music_favorite_manager_selection_action(
         selected_slot=slot,
         selected_value=str(slot),
         status_text=f"저장/수정할 즐겨찾기 슬롯: **{slot}번**",
+    )
+
+
+def build_music_favorite_manager_open_action(
+    *,
+    guild_id: int | str,
+    favorites: list[MusicFavorite],
+    player: object | None,
+) -> MusicFavoriteManagerOpenAction:
+    guild_id = int(guild_id)
+    selection = build_music_favorite_manager_selection_action(1)
+    return MusicFavoriteManagerOpenAction(
+        guild_id=guild_id,
+        favorites=list(favorites),
+        current_track=current_player_to_music_favorite(guild_id, player),
+        status_text=selection.status_text,
     )
 
 

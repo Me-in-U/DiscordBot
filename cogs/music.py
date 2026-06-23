@@ -17,6 +17,7 @@ from util.music_favorites import (
     MusicFavorite,
     MusicFavoriteSavePayload,
     build_music_favorite_current_track_save_action,
+    build_music_favorite_manager_open_action,
     build_music_favorite_play_action,
     build_music_favorite_search_request_action,
     current_player_to_music_favorite,
@@ -262,16 +263,20 @@ class MusicCog(commands.Cog):
         guild_id = interaction.guild.id
         favorites = await self._load_music_favorites(guild_id, refresh=True)
         state = self._get_state(guild_id)
-        current_track = self._current_player_as_favorite(guild_id, state.player)
-        view = MusicFavoriteManageView(
-            self,
+        manager_action = build_music_favorite_manager_open_action(
             guild_id=guild_id,
             favorites=favorites,
-            current_track=current_track,
+            player=state.player,
+        )
+        view = MusicFavoriteManageView(
+            self,
+            guild_id=manager_action.guild_id,
+            favorites=manager_action.favorites,
+            current_track=manager_action.current_track,
         )
         await self._send_ephemeral_response(
             interaction,
-            view.status_text(),
+            manager_action.status_text,
             view=view,
         )
 
