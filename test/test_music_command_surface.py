@@ -6,6 +6,7 @@ from pathlib import Path
 MUSIC_PATH = Path("cogs/music.py")
 MUSIC_VIEWS_PATH = Path("util/music_views.py")
 MUSIC_STATE_PATH = Path("util/music_state.py")
+MUSIC_QUEUE_ACTIONS_PATH = Path("util/music_queue_actions.py")
 HELP_PATH = Path("cogs/custom_help.py")
 CHANNEL_SETTINGS_PATH = Path("cogs/channel_settings.py")
 DB_PATH = Path("util/db.py")
@@ -199,9 +200,13 @@ class MusicCommandSurfaceTests(unittest.TestCase):
 
     def test_queue_added_paths_use_shared_auto_delete_response(self):
         source_text = MUSIC_PATH.read_text(encoding="utf-8")
+        queue_actions_text = MUSIC_QUEUE_ACTIONS_PATH.read_text(encoding="utf-8")
         tree = ast.parse(source_text)
 
-        self.assertIn('MSG_QUEUE_ADDED = "▶ **대기열에 추가되었습니다.**"', source_text)
+        self.assertIn(
+            'QUEUE_ADDED_MESSAGE = "▶ **대기열에 추가되었습니다.**"',
+            queue_actions_text,
+        )
         play_source = ast.get_source_segment(source_text, _function_node(tree, "_play"))
         self.assertIn("_send_auto_delete", play_source)
         self.assertIn("url_play_result.user_message", play_source)
@@ -213,7 +218,7 @@ class MusicCommandSurfaceTests(unittest.TestCase):
             _function_node(tree, "_play_from_search_pick"),
         )
         self.assertIn("_send_auto_delete", search_pick_source)
-        self.assertIn("MSG_QUEUE_ADDED", search_pick_source)
+        self.assertIn("search_pick_result.user_message", search_pick_source)
         self.assertNotIn('"▶ **대기열에 추가되었습니다.**"', search_pick_source)
 
     def test_play_url_command_delegates_queue_decision_to_action_helper(self):
@@ -227,6 +232,24 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         self.assertIn("url_play_result.user_message", play_source)
         self.assertNotIn("enqueue_url_track", play_source)
         self.assertNotIn("state.queue", play_source)
+
+    def test_search_pick_command_delegates_queue_decision_to_action_helper(self):
+        source_text = MUSIC_PATH.read_text(encoding="utf-8")
+        tree = ast.parse(source_text)
+        function_node = _function_node(tree, "_play_from_search_pick")
+        function_source = ast.get_source_segment(source_text, function_node)
+        call_names = {
+            node.func.id
+            for node in ast.walk(function_node)
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+        }
+
+        self.assertIn("begin_search_pick_queue_action", function_source)
+        self.assertIn("search_pick_result.should_play_now", function_source)
+        self.assertIn("search_pick_result.queued_track", function_source)
+        self.assertIn("search_pick_result.user_message", function_source)
+        self.assertNotIn("enqueue_search_entry_track", call_names)
+        self.assertNotIn("normalize_search_entry_url", call_names)
 
     def test_search_pick_voice_error_uses_shared_auto_delete_response(self):
         source_text = MUSIC_PATH.read_text(encoding="utf-8")

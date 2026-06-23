@@ -30,7 +30,6 @@ from util.music_embeds import (
 from util.music_queue import (
     QueuedTrack,
     build_queue_display,
-    enqueue_search_entry_track,
     _track_title,
     build_queue_preview,
     move_queue_track,
@@ -39,6 +38,7 @@ from util.music_queue import (
     shuffle_queue,
 )
 from util.music_queue_actions import (
+    begin_search_pick_queue_action,
     clear_queue_action,
     move_queue_action,
     remove_queue_action,
@@ -115,7 +115,6 @@ MUSIC_CHANNEL_TYPE = "music"
 MAX_QUEUE_DISPLAY = 10
 IDLE_DISCONNECT_SECONDS = 300
 MSG_NO_PLAYING = "❌ 재생 중인 음악이 없습니다."
-MSG_QUEUE_ADDED = "▶ **대기열에 추가되었습니다.**"
 # 간단한 디버그 로깅 헬퍼
 def dbg(msg: str):
     try:
@@ -422,30 +421,33 @@ class MusicCog(commands.Cog):
         self, interaction: discord.Interaction, entry: dict
     ):
         """검색 버튼 선택 시, 가능한 메타를 최대한 채워서 바로 재생/대기열 추가"""
-        # yt 검색 결과는 url이 상대 경로일 수 있어 보정
-        url = normalize_search_entry_url(entry)
-
-        # 이미 재생 중이면 대기열에 메타 포함 추가
         voice_client = interaction.guild.voice_client
         state = self._get_state(interaction.guild.id)
-        if voice_client and (voice_client.is_playing() or voice_client.is_paused()):
+        is_active = bool(
+            voice_client and (voice_client.is_playing() or voice_client.is_paused())
+        )
+        if is_active:
             error = same_voice_channel_error(interaction, voice_client)
             if error:
                 await self._send_auto_delete(interaction, error)
                 return
-            track = enqueue_search_entry_track(
-                state.queue,
-                entry,
-                url=url,
-                requester=interaction.user,
+
+        search_pick_result = begin_search_pick_queue_action(
+            state.queue,
+            entry,
+            requester=interaction.user,
+            is_active=is_active,
+        )
+        if not search_pick_result.should_play_now:
+            if search_pick_result.queued_track is not None:
+                self._spawn_bg(self._fill_queue_meta(search_pick_result.queued_track))
+            await self._send_auto_delete(
+                interaction,
+                search_pick_result.user_message,
             )
-            # 보강 메타 필요시 백그라운드로 채우기
-            self._spawn_bg(self._fill_queue_meta(track))
-            await self._send_auto_delete(interaction, MSG_QUEUE_ADDED)
             return
 
-        # 재생 중이 아니면 기존 _play 경로로 위임
-        await self._play(interaction, url, skip_defer=True)
+        await self._play(interaction, search_pick_result.url, skip_defer=True)
 
     # !길드의 State 리턴
     def _get_state(self, guild_id: int) -> GuildMusicState:

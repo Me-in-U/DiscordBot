@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from util.music_queue import enqueue_url_track
+from util.music_queue_actions import QUEUE_ADDED_MESSAGE
 from util.music_state import GuildMusicState
 
 
@@ -67,7 +68,7 @@ def begin_url_play_action(
     track = enqueue_url_track(state.queue, url, requester)
     return UrlPlayActionResult(
         should_prepare=False,
-        user_message="▶ **대기열에 추가되었습니다.**",
+        user_message=QUEUE_ADDED_MESSAGE,
         queued_track=track,
         queue_size=len(state.queue),
     )
