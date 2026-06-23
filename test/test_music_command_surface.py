@@ -659,6 +659,15 @@ class MusicCommandSurfaceTests(unittest.TestCase):
                 self.assertIn("logger.warning", function_source)
                 self.assertNotIn("except Exception", function_source)
 
+        favorite_loader = ast.get_source_segment(
+            source_text,
+            _function_node(tree, "_load_music_favorites"),
+        )
+        self.assertIn("build_music_favorite_cache_load_action", favorite_loader)
+        self.assertIn("cache_action.should_use_cache", favorite_loader)
+        self.assertIn("cache_action.cached_favorites", favorite_loader)
+        self.assertNotIn("guild_id in self._favorite_cache", favorite_loader)
+
     def test_queue_metadata_loader_uses_specific_extraction_exceptions(self):
         source_text = MUSIC_PATH.read_text(encoding="utf-8")
         tree = ast.parse(source_text)

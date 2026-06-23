@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, patch
 from cogs.music import GuildMusicState, MusicCog, MusicControlView, MusicHelperView
 from util.music_favorites import (
     MusicFavorite,
+    MusicFavoriteCacheLoadAction,
     MusicFavoriteManagerOpenAction,
     MusicFavoriteManagerSelectionAction,
     MusicFavoritePanelRefreshAction,
@@ -17,6 +18,7 @@ from util.music_favorites import (
     MusicFavoriteSaveResult,
     MusicFavoriteSavePayload,
     MusicFavoriteCurrentSaveButtonAction,
+    build_music_favorite_cache_load_action,
     build_music_favorite_current_save_button_action,
     build_music_favorite_current_track_save_action,
     build_music_favorite_search_entry_save_action,
@@ -345,6 +347,52 @@ class MusicFavoriteTests(unittest.IsolatedAsyncioTestCase):
                 guild_id=10,
                 should_refresh=True,
                 should_use_playing_panel=False,
+            ),
+        )
+
+    def test_music_favorite_cache_load_action_uses_cache_hit(self):
+        favorite = MusicFavorite(
+            guild_id=10,
+            slot=1,
+            title="cached",
+            url="https://example.com/watch?v=1",
+        )
+
+        result = build_music_favorite_cache_load_action(
+            guild_id="10",
+            cache={10: [favorite]},
+            refresh=False,
+        )
+
+        self.assertEqual(
+            result,
+            MusicFavoriteCacheLoadAction(
+                guild_id=10,
+                should_use_cache=True,
+                cached_favorites=[favorite],
+            ),
+        )
+
+    def test_music_favorite_cache_load_action_bypasses_cache_when_refreshing(self):
+        favorite = MusicFavorite(
+            guild_id=10,
+            slot=1,
+            title="cached",
+            url="https://example.com/watch?v=1",
+        )
+
+        result = build_music_favorite_cache_load_action(
+            guild_id=10,
+            cache={10: [favorite]},
+            refresh=True,
+        )
+
+        self.assertEqual(
+            result,
+            MusicFavoriteCacheLoadAction(
+                guild_id=10,
+                should_use_cache=False,
+                cached_favorites=None,
             ),
         )
 

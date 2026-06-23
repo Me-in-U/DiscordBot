@@ -26,6 +26,13 @@ class MusicFavorite:
 
 
 @dataclass(frozen=True, slots=True)
+class MusicFavoriteCacheLoadAction:
+    guild_id: int
+    should_use_cache: bool
+    cached_favorites: list[MusicFavorite] | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class MusicFavoriteSavePayload:
     guild_id: int
     slot: int
@@ -143,6 +150,25 @@ def validate_music_favorite_slot(slot: int) -> int:
     if slot < MUSIC_FAVORITE_SLOT_MIN or slot > MUSIC_FAVORITE_SLOT_MAX:
         raise ValueError("즐겨찾기 번호는 1~5 사이여야 합니다.")
     return slot
+
+
+def build_music_favorite_cache_load_action(
+    *,
+    guild_id: int | str,
+    cache: Mapping[int, list[MusicFavorite]],
+    refresh: bool = False,
+) -> MusicFavoriteCacheLoadAction:
+    normalized_guild_id = int(guild_id)
+    if not refresh and normalized_guild_id in cache:
+        return MusicFavoriteCacheLoadAction(
+            guild_id=normalized_guild_id,
+            should_use_cache=True,
+            cached_favorites=cache[normalized_guild_id],
+        )
+    return MusicFavoriteCacheLoadAction(
+        guild_id=normalized_guild_id,
+        should_use_cache=False,
+    )
 
 
 def row_to_music_favorite(row: dict[str, Any]) -> MusicFavorite:

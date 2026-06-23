@@ -16,6 +16,7 @@ from util.channel_settings import get_channel
 from util.music_favorites import (
     MusicFavorite,
     MusicFavoriteSavePayload,
+    build_music_favorite_cache_load_action,
     build_music_favorite_current_track_save_action,
     build_music_favorite_manager_open_action,
     build_music_favorite_panel_refresh_action,
@@ -188,14 +189,23 @@ class MusicCog(commands.Cog):
         *,
         refresh: bool = False,
     ) -> list[MusicFavorite]:
-        if not refresh and guild_id in self._favorite_cache:
-            return self._favorite_cache[guild_id]
+        cache_action = build_music_favorite_cache_load_action(
+            guild_id=guild_id,
+            cache=self._favorite_cache,
+            refresh=refresh,
+        )
+        if cache_action.should_use_cache:
+            return cache_action.cached_favorites or []
         try:
-            favorites = await list_music_favorites(guild_id)
+            favorites = await list_music_favorites(cache_action.guild_id)
         except (aiomysql.Error, TypeError, ValueError, KeyError):
-            logger.warning("음악 즐겨찾기 로드 실패: guild_id=%s", guild_id, exc_info=True)
+            logger.warning(
+                "음악 즐겨찾기 로드 실패: guild_id=%s",
+                cache_action.guild_id,
+                exc_info=True,
+            )
             favorites = []
-        self._favorite_cache[guild_id] = favorites
+        self._favorite_cache[cache_action.guild_id] = favorites
         return favorites
 
     async def _build_helper_view(self, guild_id: int) -> MusicHelperView:
