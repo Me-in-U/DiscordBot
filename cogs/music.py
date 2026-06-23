@@ -61,7 +61,7 @@ from util.music.queue_actions import (
     remove_queue_action,
     shuffle_queue_action,
 )
-from util.music_state import (
+from util.music.state import (
     GuildMusicState,
     finish_music_track_state,
     reset_music_idle_state,

@@ -1,7 +1,8 @@
 import unittest
+from pathlib import Path
 
 from util.music.queue import QueuedTrack
-from util.music_state import (
+from util.music.state import (
     GuildMusicState,
     finish_music_track_state,
     reset_music_idle_state,
@@ -9,8 +10,15 @@ from util.music_state import (
     start_music_playback_state,
 )
 
+MUSIC_STATE_PATH = Path("util/music/state.py")
+LEGACY_MUSIC_STATE_PATH = Path("util/music_state.py")
+
 
 class MusicStateTests(unittest.TestCase):
+    def test_music_state_helper_lives_under_music_package(self):
+        self.assertTrue(MUSIC_STATE_PATH.exists())
+        self.assertFalse(LEGACY_MUSIC_STATE_PATH.exists())
+
     def test_guild_music_state_uses_independent_queues_and_default_flags(self):
         first = GuildMusicState()
         second = GuildMusicState()

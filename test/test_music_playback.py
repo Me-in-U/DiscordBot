@@ -8,7 +8,7 @@ from util.music.playback import (
     prepare_music_player,
     prepare_replay_source,
 )
-from util.music_state import GuildMusicState
+from util.music.state import GuildMusicState
 
 
 MUSIC_PLAYBACK_PATH = Path("util/music/playback.py")

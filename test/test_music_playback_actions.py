@@ -15,7 +15,7 @@ from util.music.playback_actions import (
     toggle_loop_action,
     validate_seek_playback_action,
 )
-from util.music_state import GuildMusicState
+from util.music.state import GuildMusicState
 
 
 MUSIC_PLAYBACK_ACTIONS_PATH = Path("util/music/playback_actions.py")

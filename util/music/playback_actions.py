@@ -5,7 +5,7 @@ from typing import Any
 
 from util.music.queue import enqueue_url_track
 from util.music.queue_actions import QUEUE_ADDED_MESSAGE
-from util.music_state import GuildMusicState
+from util.music.state import GuildMusicState
 
 
 @dataclass(frozen=True)
