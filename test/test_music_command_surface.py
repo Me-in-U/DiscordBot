@@ -228,7 +228,7 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         self.assertIn("search_pick_result.user_message", search_pick_source)
         self.assertNotIn('"▶ **대기열에 추가되었습니다.**"', search_pick_source)
 
-    def test_play_url_command_delegates_queue_decision_to_action_helper(self):
+    def test_play_url_command_delegates_queue_decision_to_helper(self):
         source_text = MUSIC_PATH.read_text(encoding="utf-8")
         tree = ast.parse(source_text)
         play_source = ast.get_source_segment(
@@ -236,12 +236,13 @@ class MusicCommandSurfaceTests(unittest.TestCase):
             _function_node(tree, "_play_music_url_branch"),
         )
 
-        self.assertIn("begin_url_play_action", play_source)
         self.assertIn("_ensure_music_url_voice_client", play_source)
-        self.assertIn("url_play_result.should_prepare", play_source)
-        self.assertIn("_send_music_url_queued_response", play_source)
+        self.assertIn("_should_start_music_url_immediate_playback", play_source)
         self.assertIn("_start_music_url_immediate_playback", play_source)
-        self.assertIn("is_voice_client_active(voice_client)", play_source)
+        self.assertNotIn("begin_url_play_action", play_source)
+        self.assertNotIn("url_play_result.should_prepare", play_source)
+        self.assertNotIn("_send_music_url_queued_response", play_source)
+        self.assertNotIn("is_voice_client_active(voice_client)", play_source)
         self.assertNotIn("enqueue_url_track", play_source)
         self.assertNotIn("state.queue", play_source)
         self.assertNotIn("ensure_music_voice_client", play_source)
@@ -270,6 +271,23 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         )
         self.assertIn("_play_music_url_branch", play_command_source)
         self.assertNotIn("begin_url_play_action", play_command_source)
+
+    def test_play_url_queue_decision_helper_handles_queued_response(self):
+        source_text = MUSIC_PATH.read_text(encoding="utf-8")
+        tree = ast.parse(source_text)
+        decision_source = ast.get_source_segment(
+            source_text,
+            _function_node(tree, "_should_start_music_url_immediate_playback"),
+        )
+
+        self.assertIn("begin_url_play_action", decision_source)
+        self.assertIn("is_voice_client_active(voice_client)", decision_source)
+        self.assertIn("url_play_result.should_prepare", decision_source)
+        self.assertIn("_send_music_url_queued_response", decision_source)
+        self.assertIn("return False", decision_source)
+        self.assertIn("return True", decision_source)
+        self.assertNotIn("prepare_music_player", decision_source)
+        self.assertNotIn("build_prepared_playback_start", decision_source)
 
     def test_search_pick_command_delegates_queue_decision_to_action_helper(self):
         source_text = MUSIC_PATH.read_text(encoding="utf-8")
