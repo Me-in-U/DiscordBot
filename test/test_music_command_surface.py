@@ -207,11 +207,18 @@ class MusicCommandSurfaceTests(unittest.TestCase):
             'QUEUE_ADDED_MESSAGE = "▶ **대기열에 추가되었습니다.**"',
             queue_actions_text,
         )
+        play_url_source = ast.get_source_segment(
+            source_text,
+            _function_node(tree, "_play_music_url_branch"),
+        )
+        self.assertIn("_send_auto_delete", play_url_source)
+        self.assertIn("url_play_result.user_message", play_url_source)
+        self.assertNotIn("MSG_QUEUE_ADDED", play_url_source)
+        self.assertNotIn('"▶ **대기열에 추가되었습니다.**"', play_url_source)
+
         play_source = ast.get_source_segment(source_text, _function_node(tree, "_play"))
-        self.assertIn("_send_auto_delete", play_source)
-        self.assertIn("url_play_result.user_message", play_source)
-        self.assertNotIn("MSG_QUEUE_ADDED", play_source)
-        self.assertNotIn('"▶ **대기열에 추가되었습니다.**"', play_source)
+        self.assertIn("_play_music_url_branch", play_source)
+        self.assertNotIn("url_play_result.user_message", play_source)
 
         search_pick_source = ast.get_source_segment(
             source_text,
@@ -224,7 +231,10 @@ class MusicCommandSurfaceTests(unittest.TestCase):
     def test_play_url_command_delegates_queue_decision_to_action_helper(self):
         source_text = MUSIC_PATH.read_text(encoding="utf-8")
         tree = ast.parse(source_text)
-        play_source = ast.get_source_segment(source_text, _function_node(tree, "_play"))
+        play_source = ast.get_source_segment(
+            source_text,
+            _function_node(tree, "_play_music_url_branch"),
+        )
 
         self.assertIn("begin_url_play_action", play_source)
         self.assertIn("url_play_result.should_prepare", play_source)
@@ -232,6 +242,13 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         self.assertIn("url_play_result.user_message", play_source)
         self.assertNotIn("enqueue_url_track", play_source)
         self.assertNotIn("state.queue", play_source)
+
+        play_command_source = ast.get_source_segment(
+            source_text,
+            _function_node(tree, "_play"),
+        )
+        self.assertIn("_play_music_url_branch", play_command_source)
+        self.assertNotIn("begin_url_play_action", play_command_source)
 
     def test_search_pick_command_delegates_queue_decision_to_action_helper(self):
         source_text = MUSIC_PATH.read_text(encoding="utf-8")
@@ -270,7 +287,7 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         tree = ast.parse(source_text)
         function_source = ast.get_source_segment(
             source_text,
-            _function_node(tree, "_play"),
+            _function_node(tree, "_play_music_url_branch"),
         )
 
         self.assertIn("await self._send_auto_delete(", function_source)
@@ -286,7 +303,7 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         tree = ast.parse(source_text)
         function_source = ast.get_source_segment(
             source_text,
-            _function_node(tree, "_play"),
+            _function_node(tree, "_play_music_url_branch"),
         )
 
         self.assertIn("MusicPlayerPreparationError", function_source)
@@ -373,7 +390,7 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         source_text = MUSIC_PATH.read_text(encoding="utf-8")
         tree = ast.parse(source_text)
 
-        for function_name in ("_play_url_now", "_play"):
+        for function_name in ("_play_url_now", "_play_music_url_branch"):
             function_source = ast.get_source_segment(
                 source_text,
                 _function_node(tree, function_name),
@@ -388,6 +405,10 @@ class MusicCommandSurfaceTests(unittest.TestCase):
                 )
                 self.assertNotIn("msg = await interaction.followup.send", function_source)
                 self.assertNotIn("self._auto_delete(", function_source)
+
+        play_source = ast.get_source_segment(source_text, _function_node(tree, "_play"))
+        self.assertIn("_play_music_url_branch", play_source)
+        self.assertNotIn("playback_start.confirmation_message", play_source)
 
     def test_search_result_responses_use_shared_response_helper(self):
         source_text = MUSIC_PATH.read_text(encoding="utf-8")

@@ -1016,17 +1016,13 @@ class MusicCog(commands.Cog):
             playback_start.confirmation_message,
         )
 
-    async def _play(self, interaction, url: str, skip_defer: bool = False):
-        dbg(
-            f"_play: called url={url} guild={interaction.guild.id} user={interaction.user.id}"
-        )
-        # ? 검색어 처리
-        if not is_http_url(url):
-            await self._play_music_search_branch(interaction, url)
-            # 검색 모드에서는 여기서 종료 (선택은 SelectView가 처리)
-            return
-
-        # ? URL 재생
+    async def _play_music_url_branch(
+        self,
+        interaction: discord.Interaction,
+        url: str,
+        *,
+        skip_defer: bool = False,
+    ) -> None:
         if not skip_defer:
             await interaction.response.defer(thinking=True, ephemeral=True)
 
@@ -1103,6 +1099,23 @@ class MusicCog(commands.Cog):
         await self._send_auto_delete(
             interaction,
             playback_start.confirmation_message,
+        )
+
+    async def _play(self, interaction, url: str, skip_defer: bool = False):
+        dbg(
+            f"_play: called url={url} guild={interaction.guild.id} user={interaction.user.id}"
+        )
+        # ? 검색어 처리
+        if not is_http_url(url):
+            await self._play_music_search_branch(interaction, url)
+            # 검색 모드에서는 여기서 종료 (선택은 SelectView가 처리)
+            return
+
+        # ? URL 재생
+        await self._play_music_url_branch(
+            interaction,
+            url,
+            skip_defer=skip_defer,
         )
 
     async def _pause(self, interaction):
