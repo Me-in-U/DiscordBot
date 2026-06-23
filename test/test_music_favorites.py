@@ -8,6 +8,8 @@ from util.music_favorites import (
     MusicFavoriteSearchModalAction,
     MusicFavoriteSearchSubmitAction,
     MusicFavoriteSavePayload,
+    MusicFavoriteCurrentSaveButtonAction,
+    build_music_favorite_current_save_button_action,
     build_music_favorite_manager_selection_action,
     build_music_favorite_button_label,
     build_music_favorite_play_action,
@@ -269,6 +271,42 @@ class MusicFavoriteTests(unittest.IsolatedAsyncioTestCase):
     def test_music_favorite_search_submit_action_validates_slot(self):
         with self.assertRaisesRegex(ValueError, "즐겨찾기 번호는 1~5"):
             build_music_favorite_search_submit_action(slot=7, query_value="lofi")
+
+    def test_music_favorite_current_save_button_action_enables_for_current_track(self):
+        current_track = MusicFavorite(
+            guild_id=1,
+            slot=1,
+            title="현재곡",
+            url="https://youtube.com/watch?v=abc",
+        )
+
+        result = build_music_favorite_current_save_button_action(
+            selected_slot="3",
+            current_track=current_track,
+        )
+
+        self.assertEqual(
+            result,
+            MusicFavoriteCurrentSaveButtonAction(slot=3, disabled=False),
+        )
+
+    def test_music_favorite_current_save_button_action_disables_without_current_track(self):
+        result = build_music_favorite_current_save_button_action(
+            selected_slot=2,
+            current_track=None,
+        )
+
+        self.assertEqual(
+            result,
+            MusicFavoriteCurrentSaveButtonAction(slot=2, disabled=True),
+        )
+
+    def test_music_favorite_current_save_button_action_validates_slot(self):
+        with self.assertRaisesRegex(ValueError, "즐겨찾기 번호는 1~5"):
+            build_music_favorite_current_save_button_action(
+                selected_slot=9,
+                current_track=None,
+            )
 
     async def test_default_music_view_shows_search_manage_and_five_favorite_slots(self):
         favorite = MusicFavorite(

@@ -9,6 +9,7 @@ from util.music_favorites import (
     MUSIC_FAVORITE_SLOT_MAX,
     MusicFavorite,
     build_music_favorite_button_label,
+    build_music_favorite_current_save_button_action,
     build_music_favorite_manager_selection_action,
     build_music_favorite_search_modal_action,
     build_music_favorite_search_submit_action,
@@ -183,12 +184,16 @@ class MusicFavoriteManageView(View):
             custom_id="music_favorite_search",
             row=1,
         )
+        current_action = build_music_favorite_current_save_button_action(
+            selected_slot=self.selected_slot,
+            current_track=current_track,
+        )
         current_btn = Button(
             label="⭐ 현재곡 저장",
             style=discord.ButtonStyle.success,
             custom_id="music_favorite_current",
             row=1,
-            disabled=current_track is None,
+            disabled=current_action.disabled,
         )
         search_btn.callback = self._on_search
         current_btn.callback = self._on_current
@@ -207,9 +212,13 @@ class MusicFavoriteManageView(View):
         )
 
     async def _on_current(self, interaction: discord.Interaction):
+        current_action = build_music_favorite_current_save_button_action(
+            selected_slot=self.selected_slot,
+            current_track=self.current_track,
+        )
         await self.cog._save_current_track_as_favorite(
             interaction,
-            self.selected_slot,
+            current_action.slot,
         )
 
 

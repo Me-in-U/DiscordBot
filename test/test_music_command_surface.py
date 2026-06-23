@@ -830,6 +830,19 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         self.assertNotIn("str(self.query.value or \"\")", modal_source)
         self.assertIn("build_music_favorite_search_modal_action", manager_source)
 
+    def test_music_favorite_current_save_button_delegates_to_action_helper(self):
+        source_text = MUSIC_VIEWS_PATH.read_text(encoding="utf-8")
+        manager_source = source_text[
+            source_text.index("class MusicFavoriteManageView"):
+            source_text.index("class MusicHelperView")
+        ]
+
+        self.assertIn("build_music_favorite_current_save_button_action", manager_source)
+        self.assertIn("current_action.disabled", manager_source)
+        self.assertIn("current_action.slot", manager_source)
+        self.assertNotIn("disabled=current_track is None", manager_source)
+        self.assertNotIn("self.selected_slot,\n        )", manager_source)
+
 
 if __name__ == "__main__":
     unittest.main()

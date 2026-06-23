@@ -71,6 +71,12 @@ class MusicFavoriteSearchSubmitAction:
     query: str
 
 
+@dataclass(frozen=True, slots=True)
+class MusicFavoriteCurrentSaveButtonAction:
+    slot: int
+    disabled: bool
+
+
 def validate_music_favorite_slot(slot: int) -> int:
     slot = int(slot)
     if slot < MUSIC_FAVORITE_SLOT_MIN or slot > MUSIC_FAVORITE_SLOT_MAX:
@@ -158,6 +164,17 @@ def build_music_favorite_search_submit_action(
     return MusicFavoriteSearchSubmitAction(
         slot=validate_music_favorite_slot(slot),
         query=str(query_value or "").strip(),
+    )
+
+
+def build_music_favorite_current_save_button_action(
+    *,
+    selected_slot: int | str,
+    current_track: MusicFavorite | None,
+) -> MusicFavoriteCurrentSaveButtonAction:
+    return MusicFavoriteCurrentSaveButtonAction(
+        slot=validate_music_favorite_slot(selected_slot),
+        disabled=current_track is None,
     )
 
 
