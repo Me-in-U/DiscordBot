@@ -71,6 +71,7 @@ from util.music_progress import (
 from util.music_search import (
     build_music_search_action,
     is_http_url,
+    run_music_search_query,
 )
 from util.music_panel_store import (
     delete_music_panel_id,
@@ -287,12 +288,10 @@ class MusicCog(commands.Cog):
             )
             return
 
-        info = await asyncio.get_event_loop().run_in_executor(
-            None,
-            lambda: search_ytdl.extract_info(
-                f"ytsearch10:{favorite_search_action.query}",
-                download=False,
-            ),
+        info = await run_music_search_query(
+            favorite_search_action.query,
+            search_ytdl,
+            executor=YTDL_EXECUTOR,
         )
         search_result = build_music_search_action(
             query=favorite_search_action.query,
@@ -1003,9 +1002,10 @@ class MusicCog(commands.Cog):
         # ? 검색어 처리
         if not is_http_url(url):
             # ytsearch로 상위 10개까지 뽑되
-            info = await asyncio.get_event_loop().run_in_executor(
-                None,
-                lambda: search_ytdl.extract_info(f"ytsearch10:{url}", download=False),
+            info = await run_music_search_query(
+                url,
+                search_ytdl,
+                executor=YTDL_EXECUTOR,
             )
             dbg(
                 f"_play: search info keys={list(info.keys()) if isinstance(info,dict) else type(info)}"

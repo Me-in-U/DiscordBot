@@ -102,3 +102,47 @@ class MusicSearchHelperTests(unittest.TestCase):
         self.assertIsNone(result.user_message)
         self.assertEqual(result.embed_title, "⭐ 3번 즐겨찾기에 저장할 음악 선택")
         self.assertEqual(result.embed_description, "1. -")
+
+
+class MusicSearchExecutorTests(unittest.IsolatedAsyncioTestCase):
+    async def test_run_music_search_query_adds_ytdlp_search_prefix(self):
+        from util.music_search import run_music_search_query
+
+        seen_searches: list[str] = []
+
+        def extractor(search: str):
+            seen_searches.append(search)
+            return {"entries": [{"url": "https://www.youtube.com/watch?v=1"}]}
+
+        result = await run_music_search_query("lofi", extractor)
+
+        self.assertEqual(seen_searches, ["ytsearch10:lofi"])
+        self.assertEqual(
+            result,
+            {"entries": [{"url": "https://www.youtube.com/watch?v=1"}]},
+        )
+
+    async def test_run_music_search_query_preserves_extractor_result_type(self):
+        from util.music_search import run_music_search_query
+
+        result = await run_music_search_query("lofi", lambda search: None)
+
+        self.assertIsNone(result)
+
+    async def test_run_music_search_query_accepts_ytdlp_extractor_object(self):
+        from util.music_search import run_music_search_query
+
+        class FakeYtdlp:
+            def __init__(self):
+                self.calls: list[tuple[str, bool]] = []
+
+            def extract_info(self, search: str, *, download: bool):
+                self.calls.append((search, download))
+                return {"entries": []}
+
+        ytdlp = FakeYtdlp()
+
+        result = await run_music_search_query("lofi", ytdlp)
+
+        self.assertEqual(result, {"entries": []})
+        self.assertEqual(ytdlp.calls, [("ytsearch10:lofi", False)])

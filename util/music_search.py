@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Iterable
+from concurrent.futures import Executor
 from dataclasses import dataclass
 from typing import Any
 
@@ -95,4 +97,23 @@ def build_music_search_action(
         videos=videos,
         embed_title=display.title,
         embed_description=display.description,
+    )
+
+
+async def run_music_search_query(
+    query: str,
+    extractor: Any,
+    *,
+    executor: Executor | None = None,
+) -> Any:
+    def _extract() -> Any:
+        search = f"ytsearch10:{query}"
+        if callable(extractor):
+            return extractor(search)
+        return extractor.extract_info(search, download=False)
+
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(
+        executor,
+        _extract,
     )

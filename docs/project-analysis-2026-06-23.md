@@ -14,8 +14,8 @@
 6. Top 5 리스크는 `music.py`, `youtube_summary.py`, `loop.py` 같은 대형 파일이 변경 위험을 키우는 점이다.
 7. 권장 처리 순서는 Jenkins 테스트 게이트, `on_ready` guard, YouTube temp workspace, 민감 로그 제거, 문서 최신화다.
 8. 현재 작업트리에서는 위 1-4번 리스크의 1차 보강과 대형 파일 일부 분리가 구현되었다.
-9. 현재 최신 검증은 `compileall` 통과, unittest 433개 통과다.
-10. 이번 패치로 music queue metadata runner helper 분리가 구현되었고, 다음 후보는 music search yt-dlp executor helper 분리다.
+9. 현재 최신 검증은 `compileall` 통과, unittest 436개 통과다.
+10. 이번 패치로 music search yt-dlp executor helper 분리가 구현되었고, 다음 후보는 music search result response helper 분리다.
 
 ## 기준선
 
@@ -31,7 +31,7 @@
 
 이 문서의 진단은 기준 커밋 `34aab00` 상태를 대상으로 한다. 이후 현재 작업트리에서는 아래 항목이 구현되었다.
 
-최신 검증 결과: `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` 433개 통과.
+최신 검증 결과: `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` 436개 통과.
 
 | 상태 | 항목 | 구현 근거 |
 | --- | --- | --- |
@@ -80,6 +80,7 @@
 | 완료 | music playback command facade 분리 | `util/music_playback_actions.py`로 일시정지/다시재생/정지/반복의 상태 전이, elapsed 계산, 사용자 응답 문구를 이동하고 `MusicCog`는 voice 제어와 Discord 패널 갱신만 담당하도록 축소 |
 | 완료 | music skip/seek command facade 분리 | `util/music_playback_actions.py`로 스킵 loop 메시지, 구간 이동 길이 검증, seeking flag 시작/완료/실패 복구, 성공/실패 사용자 응답 문구를 이동하고 `MusicCog`는 voice stop/play와 Discord 패널 갱신만 담당하도록 축소 |
 | 완료 | music search result action facade 분리 | `util/music_search.py`로 `/재생` 검색과 즐겨찾기 검색의 결과 필터링, 빈 결과 메시지, embed title/description 조립을 이동하고 `MusicCog`는 yt-dlp 실행, View 생성, Discord 응답 전송만 담당하도록 축소 |
+| 완료 | music search yt-dlp executor helper 분리 | `util/music_search.py`의 `run_music_search_query()`로 `ytsearch10:` query 조립, yt-dlp `extract_info(download=False)` 호출, executor scheduling을 이동하고, `MusicCog`는 search action 결과 처리만 담당하도록 축소 |
 | 완료 | music URL play action facade 분리 | `util/music_playback_actions.py`로 URL 재생 시 active voice 여부에 따른 대기열 추가/즉시 준비 판단, queue track 반환, 사용자 응답 문구를 이동하고 `MusicCog`는 voice 연결, player 준비, metadata 보강 task, Discord 응답 전송만 담당하도록 축소 |
 | 완료 | music search-pick queue action facade 분리 | `util/music_queue_actions.py`의 `begin_search_pick_queue_action()`으로 검색 선택 URL 보정, active voice 큐 삽입, queue track 반환, 사용자 응답 문구를 이동하고 `MusicCog`는 voice guard, metadata 보강 task, Discord 응답 전송만 담당하도록 축소 |
 | 완료 | music queue added response 경로 통일 | `QUEUE_ADDED_MESSAGE` 상수와 `_send_auto_delete()`로 `_play`, `_play_from_search_pick` 대기열 추가 응답/auto-delete 반복 제거 |
@@ -141,7 +142,7 @@
 | 완료 | MapleStory sender 1차 분리 | `util/maplestory_sender.py`로 embed/message build, 채널 resolve, Discord send helper 이동, 기존 `util.maplestory_events` 공개 import 호환 유지 |
 | 완료 | YouTube notification state 1차 분리 | `util/youtube_notification_state.py`로 notified ID 정규화, YouTube datetime 파싱, pending live 재검사 판단 이동 |
 
-이번 패치로 music queue metadata runner helper 분리가 완료되었다. 다음 작은 후보는 music search yt-dlp executor helper 분리다.
+이번 패치로 music search yt-dlp executor helper 분리가 완료되었다. 다음 작은 후보는 music search result response helper 분리다.
 
 ## 현재 구조 요약
 
@@ -565,7 +566,7 @@
 | Docker Python | 기준 커밋 `Dockerfile.deps` -> `FROM python:3.12-slim`, 현재 작업트리 -> `FROM python:3.11-slim` | 로컬/운영 Python minor version 불일치가 해소됨 |
 | 테스트 기준선 | `python -m unittest discover -s test` -> 154개 통과 | 현재 회귀 테스트 기준 |
 | 컴파일 기준선 | `python -m compileall -q bot.py api cogs common func util test` 통과 | 문법/import 기본 검증 |
-| 작업트리 최신 검증 | `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` -> 433개 통과 | 구현 진행 후 회귀 확인 |
+| 작업트리 최신 검증 | `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` -> 436개 통과 | 구현 진행 후 회귀 확인 |
 | 파일 수 | PowerShell 파일 집계 -> Python 파일 96개 | 분석 규모 |
 | 대형 파일 기준선 | 기준 커밋 line count: `music.py` 2663, `youtube_summary.py` 1072, `loop.py` 954, `maplestory_events.py` 875 | 분리 우선 후보였던 초기 상태 |
 | 대형 파일 현재 | Python read line count: `music.py` 1682, `youtube_summary.py` 191, `loop.py` 309, `maplestory_events.py` 251 | 분리 진행 후에도 `music.py`는 command/action facade 축소 여지가 큼 |
@@ -574,7 +575,7 @@
 | music playback/skip/seek/URL action helper 분리 | `util/music_playback_actions.py` 136줄, `cogs/music.py` 현재 1682줄, playback action 대상 테스트 14개 통과 | 일시정지/다시재생/정지/반복/스킵/구간 이동에 더해 URL 재생의 active voice 대기열 추가/즉시 준비 판단, queue track 반환, 사용자 응답 문구를 command handler에서 분리 |
 | music queue/error response 경로 통일 | `QUEUE_ADDED_MESSAGE`, `_send_auto_delete()`, `_send_ephemeral_response()`, `_send_channel_auto_delete()`, cleanup helper, command surface 대상 테스트 36개 통과 | `_play`와 `_play_from_search_pick`의 대기열 추가 응답, search pick 음성 연결 실패 응답, `_play` URL 음성 연결/준비 실패 응답, 제어 명령 guard/재생 없음/성공/단순 오류 응답, 즐겨찾기 저장/관리/대기열 표시/재생 시작 확인/검색 결과/패널 안내/입력 검증/채널 경고/cleanup/metadata/playback-control/lifecycle/logging/queue-action/playback-action/skip-seek-action/search-action/url-play-action/search-pick-action 경로가 helper 또는 구체 예외 정책을 통과하도록 고정 |
 | music progress helper 분리 | `util/music_progress.py` 39줄 추출, `cogs/music.py` 현재 1682줄, progress 대상 테스트 4개 통과 | 시간/진행률 UI helper를 music Cog 본문에서 분리 |
-| music search helper/action 분리 | `util/music_search.py` 98줄 추출, `cogs/music.py` 현재 1682줄, search 대상 테스트 7개 통과 | HTTP URL 판별, 검색 결과 URL 정규화, watch entry filtering, 검색 결과 embed title/description 조립에 더해 `/재생` 검색과 즐겨찾기 검색의 빈 결과 메시지/표시 payload action을 music Cog 본문에서 분리 |
+| music search helper/action/yt-dlp executor 분리 | `util/music_search.py` 120줄 추출, `cogs/music.py` 현재 1682줄, search 대상 테스트 10개 통과 | HTTP URL 판별, 검색 결과 URL 정규화, watch entry filtering, 검색 결과 embed title/description 조립, `/재생` 검색과 즐겨찾기 검색의 빈 결과 메시지/표시 payload action, `ytsearch10:` query 조립과 yt-dlp executor scheduling을 music Cog 본문에서 분리 |
 | music embed helper 분리 | `util/music_embeds.py` 98줄 추출, `cogs/music.py` 현재 1682줄, embed 대상 테스트 3개 통과 | 기본 패널/재생 중 embed 생성 UI 책임을 music Cog 본문에서 분리 |
 | music extractor helper 분리 | `util/music_extractor.py` 61줄 추출, `cogs/music.py` 현재 1682줄, extractor 대상 테스트 10개 통과 | yt-dlp 포맷 후보 우선순위, keyword search URL 결정, entries selection 로직을 music Cog 본문에서 분리 |
 | music View/Modal 분리 | `util/music_views.py` 424줄 추출, `cogs/music.py` 현재 1682줄, views 대상 테스트 3개 통과 | 검색 결과/즐겨찾기/control/helper View와 search/seek modal을 music Cog 본문에서 분리 |
