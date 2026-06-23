@@ -1,7 +1,8 @@
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 
-from util.music_voice import (
+from util.music.voice import (
     describe_voice_transition,
     ensure_music_voice_client,
     get_interaction_voice_channel,
@@ -12,9 +13,15 @@ from util.music_voice import (
 
 MISSING_CHANNEL_MESSAGE = "missing voice channel"
 BUSY_CHANNEL_MESSAGE = "busy elsewhere"
+MUSIC_VOICE_PATH = Path("util/music/voice.py")
+LEGACY_MUSIC_VOICE_PATH = Path("util/music_voice.py")
 
 
 class MusicVoiceTests(unittest.IsolatedAsyncioTestCase):
+    def test_music_voice_helper_lives_under_music_package(self):
+        self.assertTrue(MUSIC_VOICE_PATH.exists())
+        self.assertFalse(LEGACY_MUSIC_VOICE_PATH.exists())
+
     async def test_missing_voice_client_and_missing_user_channel_returns_error(self):
         result = await ensure_music_voice_client(
             voice_client=None,

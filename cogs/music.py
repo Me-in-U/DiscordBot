@@ -118,7 +118,7 @@ from util.music_views import (
     MusicHelperView,
     SearchResultView,
 )
-from util.music_voice import (
+from util.music.voice import (
     describe_voice_transition,
     ensure_music_voice_client,
     get_interaction_voice_channel,
