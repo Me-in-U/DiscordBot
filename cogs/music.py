@@ -1019,6 +1019,17 @@ class MusicCog(commands.Cog):
             playback_start.confirmation_message,
         )
 
+    def _begin_play_url_now_replacement(
+        self,
+        state: GuildMusicState,
+        voice_client: Any,
+    ) -> bool:
+        replacing = is_voice_client_active(voice_client)
+        begin_play_url_now_playback_action(state, replacing=replacing)
+        if replacing:
+            voice_client.stop()
+        return replacing
+
     async def _play_url_now(
         self,
         interaction: discord.Interaction,
@@ -1039,11 +1050,7 @@ class MusicCog(commands.Cog):
         if player is None:
             return
 
-        replacing = is_voice_client_active(voice_client)
-        begin_play_url_now_playback_action(state, replacing=replacing)
-        if replacing:
-            voice_client.stop()
-
+        replacing = self._begin_play_url_now_replacement(state, voice_client)
         await self._start_play_url_now_prepared_playback(
             interaction,
             guild_id=guild_id,

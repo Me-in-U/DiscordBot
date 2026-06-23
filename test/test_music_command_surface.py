@@ -372,11 +372,20 @@ class MusicCommandSurfaceTests(unittest.TestCase):
             source_text,
             _function_node(tree, "_play_url_now"),
         )
+        helper_source = ast.get_source_segment(
+            source_text,
+            _any_function_node(tree, "_begin_play_url_now_replacement"),
+        )
 
-        self.assertIn("begin_play_url_now_playback_action", play_url_now_source)
-        self.assertIn("is_voice_client_active(voice_client)", play_url_now_source)
-        self.assertIn("voice_client.stop()", play_url_now_source)
+        self.assertIn("_begin_play_url_now_replacement", play_url_now_source)
+        self.assertNotIn("begin_play_url_now_playback_action", play_url_now_source)
+        self.assertNotIn("is_voice_client_active(voice_client)", play_url_now_source)
+        self.assertNotIn("voice_client.stop()", play_url_now_source)
         self.assertNotIn("complete_play_url_now_playback_action", play_url_now_source)
+        self.assertIn("begin_play_url_now_playback_action", helper_source)
+        self.assertIn("is_voice_client_active(voice_client)", helper_source)
+        self.assertIn("voice_client.stop()", helper_source)
+        self.assertIn("return replacing", helper_source)
         self.assertNotIn("state.is_stopping = False", play_url_now_source)
         self.assertNotIn("state.is_skipping = False", play_url_now_source)
         self.assertNotIn("state.is_seeking = True", play_url_now_source)
