@@ -1016,6 +1016,44 @@ class MusicCog(commands.Cog):
             playback_start.confirmation_message,
         )
 
+    async def _start_music_url_immediate_playback(
+        self,
+        interaction: discord.Interaction,
+        guild_id: int,
+        state: GuildMusicState,
+        url: str,
+    ) -> None:
+        try:
+            player = await prepare_music_player(
+                YTDLSource.from_url,
+                url,
+                loop=self.bot.loop,
+                requester=interaction.user,
+                include_ffmpeg_guidance=True,
+            )
+            dbg(f"_play: prepared player title={getattr(player,'title',None)}")
+        except MusicPlayerPreparationError as exc:
+            dbg(f"_play: {exc.failure.debug_message}")
+            await self._send_auto_delete(
+                interaction,
+                exc.failure.user_message,
+                delay=exc.failure.delete_after,
+            )
+            return
+
+        playback_start = build_prepared_playback_start(player)
+        await self._start_prepared_playback(
+            guild_id=guild_id,
+            state=state,
+            player=player,
+            playback_start=playback_start,
+        )
+        dbg("_play: playback started and updater restarted")
+        await self._send_auto_delete(
+            interaction,
+            playback_start.confirmation_message,
+        )
+
     async def _play_music_url_branch(
         self,
         interaction: discord.Interaction,
@@ -1069,36 +1107,11 @@ class MusicCog(commands.Cog):
             return
 
         # ! 재생 중이 아니면 지금 URL로 바로 준비 후 재생
-        try:
-            player = await prepare_music_player(
-                YTDLSource.from_url,
-                url,
-                loop=self.bot.loop,
-                requester=interaction.user,
-                include_ffmpeg_guidance=True,
-            )
-            dbg(f"_play: prepared player title={getattr(player,'title',None)}")
-        except MusicPlayerPreparationError as exc:
-            dbg(f"_play: {exc.failure.debug_message}")
-            await self._send_auto_delete(
-                interaction,
-                exc.failure.user_message,
-                delay=exc.failure.delete_after,
-            )
-            return
-
-        # !상태 업데이트 및 재생 시작
-        playback_start = build_prepared_playback_start(player)
-        await self._start_prepared_playback(
-            guild_id=guild_id,
-            state=state,
-            player=player,
-            playback_start=playback_start,
-        )
-        dbg("_play: playback started and updater restarted")
-        await self._send_auto_delete(
+        await self._start_music_url_immediate_playback(
             interaction,
-            playback_start.confirmation_message,
+            guild_id,
+            state=state,
+            url=url,
         )
 
     async def _play(self, interaction, url: str, skip_defer: bool = False):

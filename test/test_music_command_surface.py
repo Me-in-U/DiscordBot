@@ -240,8 +240,11 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         self.assertIn("url_play_result.should_prepare", play_source)
         self.assertIn("url_play_result.queued_track", play_source)
         self.assertIn("url_play_result.user_message", play_source)
+        self.assertIn("_start_music_url_immediate_playback", play_source)
         self.assertNotIn("enqueue_url_track", play_source)
         self.assertNotIn("state.queue", play_source)
+        self.assertNotIn("prepare_music_player", play_source)
+        self.assertNotIn("build_prepared_playback_start", play_source)
 
         play_command_source = ast.get_source_segment(
             source_text,
@@ -303,7 +306,7 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         tree = ast.parse(source_text)
         function_source = ast.get_source_segment(
             source_text,
-            _function_node(tree, "_play_music_url_branch"),
+            _function_node(tree, "_start_music_url_immediate_playback"),
         )
 
         self.assertIn("MusicPlayerPreparationError", function_source)
@@ -390,7 +393,7 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         source_text = MUSIC_PATH.read_text(encoding="utf-8")
         tree = ast.parse(source_text)
 
-        for function_name in ("_play_url_now", "_play_music_url_branch"):
+        for function_name in ("_play_url_now", "_start_music_url_immediate_playback"):
             function_source = ast.get_source_segment(
                 source_text,
                 _function_node(tree, function_name),
@@ -409,6 +412,13 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         play_source = ast.get_source_segment(source_text, _function_node(tree, "_play"))
         self.assertIn("_play_music_url_branch", play_source)
         self.assertNotIn("playback_start.confirmation_message", play_source)
+
+        play_url_source = ast.get_source_segment(
+            source_text,
+            _function_node(tree, "_play_music_url_branch"),
+        )
+        self.assertIn("_start_music_url_immediate_playback", play_url_source)
+        self.assertNotIn("playback_start.confirmation_message", play_url_source)
 
     def test_search_result_responses_use_shared_response_helper(self):
         source_text = MUSIC_PATH.read_text(encoding="utf-8")
