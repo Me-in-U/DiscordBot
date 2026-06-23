@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 import random
 import time
 from collections.abc import Callable
+from concurrent.futures import Executor
 from dataclasses import dataclass, field
 from typing import Any, Deque, Optional, Tuple
 
@@ -218,6 +220,23 @@ def extract_queue_track_metadata(
     except (DownloadError, OSError, TypeError, ValueError):
         return None
     return metadata if isinstance(metadata, dict) else None
+
+
+async def fill_queue_track_metadata(
+    track: QueuedTrack,
+    extractor: Callable[[str], Any],
+    *,
+    executor: Executor | None = None,
+) -> bool:
+    loop = asyncio.get_running_loop()
+    metadata = await loop.run_in_executor(
+        executor,
+        lambda: extract_queue_track_metadata(track.url, extractor),
+    )
+    if metadata is None:
+        return False
+    apply_queue_track_metadata(track, metadata)
+    return True
 
 
 def _search_entry_thumbnail(entry: dict[str, Any]) -> str | None:

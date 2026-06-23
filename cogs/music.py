@@ -41,9 +41,8 @@ from util.music_embeds import (
 )
 from util.music_queue import (
     QueuedTrack,
-    apply_queue_track_metadata,
     build_queue_display,
-    extract_queue_track_metadata,
+    fill_queue_track_metadata,
     _track_title,
     build_queue_preview,
     move_queue_track,
@@ -238,18 +237,11 @@ class MusicCog(commands.Cog):
     async def _fill_queue_meta(self, track: "QueuedTrack"):
         """대기열 트랙의 가벼운 메타데이터를 채운다(재생에 영향 없음)."""
         try:
-            loop = asyncio.get_event_loop()
-
-            def _extract():
-                return extract_queue_track_metadata(
-                    track.url,
-                    lambda url: info_ytdl.extract_info(url, download=False),
-                )
-
-            info = await loop.run_in_executor(YTDL_EXECUTOR, _extract)
-            if info is None:
-                return
-            apply_queue_track_metadata(track, info)
+            await fill_queue_track_metadata(
+                track,
+                lambda url: info_ytdl.extract_info(url, download=False),
+                executor=YTDL_EXECUTOR,
+            )
         except (RuntimeError, TypeError, ValueError, KeyError):
             logger.debug("대기열 메타데이터 반영 실패: url=%s", track.url, exc_info=True)
 

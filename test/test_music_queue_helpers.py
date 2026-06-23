@@ -16,6 +16,7 @@ from util.music_queue import (
     apply_queue_track_metadata,
     build_queue_display,
     extract_queue_track_metadata,
+    fill_queue_track_metadata,
 )
 
 
@@ -253,6 +254,36 @@ class MusicQueueHelperTests(unittest.TestCase):
             raise ValueError("bad metadata")
 
         self.assertIsNone(extract_queue_track_metadata("abc", extractor))
+
+
+class MusicQueueMetadataRunnerTests(unittest.IsolatedAsyncioTestCase):
+    async def test_fill_queue_track_metadata_applies_extracted_metadata(self):
+        track = QueuedTrack(url="https://example.com/video")
+
+        def extractor(url: str):
+            self.assertEqual(url, "https://example.com/video")
+            return {
+                "title": "runner title",
+                "duration": "90",
+                "webpage_url": "https://example.com/watch",
+                "uploader": "runner uploader",
+            }
+
+        updated = await fill_queue_track_metadata(track, extractor)
+
+        self.assertTrue(updated)
+        self.assertEqual(track.title, "runner title")
+        self.assertEqual(track.duration, 90)
+        self.assertEqual(track.webpage_url, "https://example.com/watch")
+        self.assertEqual(track.uploader, "runner uploader")
+
+    async def test_fill_queue_track_metadata_returns_false_without_metadata(self):
+        track = QueuedTrack(url="https://example.com/video", title="old title")
+
+        updated = await fill_queue_track_metadata(track, lambda url: None)
+
+        self.assertFalse(updated)
+        self.assertEqual(track.title, "old title")
 
 
 if __name__ == "__main__":

@@ -680,7 +680,7 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         self.assertNotIn("self._favorite_cache[store_action.guild_id]", favorite_loader)
         self.assertNotIn("favorites = []", favorite_loader)
 
-    def test_queue_metadata_loader_uses_extraction_helper(self):
+    def test_queue_metadata_loader_uses_runner_helper(self):
         source_text = MUSIC_PATH.read_text(encoding="utf-8")
         tree = ast.parse(source_text)
 
@@ -691,8 +691,11 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         self.assertIn("TypeError", function_source)
         self.assertIn("ValueError", function_source)
         self.assertIn("logger.debug", function_source)
-        self.assertIn("extract_queue_track_metadata", function_source)
-        self.assertIn("apply_queue_track_metadata", function_source)
+        self.assertIn("fill_queue_track_metadata", function_source)
+        self.assertNotIn("asyncio.get_event_loop", function_source)
+        self.assertNotIn("run_in_executor", function_source)
+        self.assertNotIn("extract_queue_track_metadata", function_source)
+        self.assertNotIn("apply_queue_track_metadata", function_source)
         self.assertNotIn("info_ytdl.extract_info(track.url", function_source)
         self.assertNotIn("except (DownloadError", function_source)
         self.assertNotIn("except Exception", function_source)
