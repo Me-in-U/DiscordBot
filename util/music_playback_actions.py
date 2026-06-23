@@ -74,6 +74,26 @@ def begin_url_play_action(
     )
 
 
+def begin_play_url_now_playback_action(
+    state: GuildMusicState,
+    *,
+    replacing: bool,
+) -> None:
+    state.is_stopping = False
+    state.is_skipping = False
+    if replacing:
+        state.is_seeking = True
+
+
+def complete_play_url_now_playback_action(
+    state: GuildMusicState,
+    *,
+    replacing: bool,
+) -> None:
+    if replacing:
+        state.is_seeking = False
+
+
 def skip_playback_action(state: GuildMusicState) -> PlaybackActionResult:
     return PlaybackActionResult(
         user_message=(

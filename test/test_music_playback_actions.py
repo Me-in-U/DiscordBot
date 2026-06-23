@@ -1,9 +1,11 @@
 import unittest
 
 from util.music_playback_actions import (
+    begin_play_url_now_playback_action,
     begin_url_play_action,
     begin_stop_playback_action,
     begin_seek_playback_action,
+    complete_play_url_now_playback_action,
     complete_seek_playback_action,
     fail_seek_playback_action,
     pause_playback_action,
@@ -87,6 +89,39 @@ class MusicPlaybackActionTests(unittest.TestCase):
         self.assertIsNone(result.queued_track)
         self.assertEqual(result.queue_size, 0)
         self.assertEqual(len(state.queue), 0)
+
+    def test_begin_play_url_now_playback_action_resets_flags_for_replacement(self):
+        state = GuildMusicState(
+            is_stopping=True,
+            is_skipping=True,
+            is_seeking=False,
+        )
+
+        begin_play_url_now_playback_action(state, replacing=True)
+
+        self.assertFalse(state.is_stopping)
+        self.assertFalse(state.is_skipping)
+        self.assertTrue(state.is_seeking)
+
+    def test_begin_play_url_now_playback_action_keeps_seeking_clear_when_not_replacing(self):
+        state = GuildMusicState(
+            is_stopping=True,
+            is_skipping=True,
+            is_seeking=False,
+        )
+
+        begin_play_url_now_playback_action(state, replacing=False)
+
+        self.assertFalse(state.is_stopping)
+        self.assertFalse(state.is_skipping)
+        self.assertFalse(state.is_seeking)
+
+    def test_complete_play_url_now_playback_action_clears_replacement_seeking(self):
+        state = GuildMusicState(is_seeking=True)
+
+        complete_play_url_now_playback_action(state, replacing=True)
+
+        self.assertFalse(state.is_seeking)
 
     def test_skip_playback_action_returns_skip_message_when_loop_is_off(self):
         state = GuildMusicState(is_loop=False, is_skipping=False)

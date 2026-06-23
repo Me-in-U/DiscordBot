@@ -86,9 +86,11 @@ from util.music_playback import (
 )
 from util.music_playback_actions import (
     UrlPlayActionResult,
+    begin_play_url_now_playback_action,
     begin_seek_playback_action,
     begin_stop_playback_action,
     begin_url_play_action,
+    complete_play_url_now_playback_action,
     complete_seek_playback_action,
     fail_seek_playback_action,
     pause_playback_action,
@@ -1000,10 +1002,8 @@ class MusicCog(commands.Cog):
             return
 
         replacing = is_voice_client_active(voice_client)
-        state.is_stopping = False
-        state.is_skipping = False
+        begin_play_url_now_playback_action(state, replacing=replacing)
         if replacing:
-            state.is_seeking = True
             voice_client.stop()
 
         playback_start = build_prepared_playback_start(
@@ -1018,8 +1018,7 @@ class MusicCog(commands.Cog):
                 playback_start=playback_start,
             )
         finally:
-            if replacing:
-                state.is_seeking = False
+            complete_play_url_now_playback_action(state, replacing=replacing)
 
         await self._send_auto_delete(
             interaction,
