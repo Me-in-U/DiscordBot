@@ -1,14 +1,19 @@
 import collections
 import unittest
+from pathlib import Path
 
 from util.music_queue import QueuedTrack
-from util.music_queue_actions import (
+from util.music.queue_actions import (
     begin_search_pick_queue_action,
     clear_queue_action,
     move_queue_action,
     remove_queue_action,
     shuffle_queue_action,
 )
+
+
+MUSIC_QUEUE_ACTIONS_PATH = Path("util/music/queue_actions.py")
+LEGACY_MUSIC_QUEUE_ACTIONS_PATH = Path("util/music_queue_actions.py")
 
 
 def _queue(*titles: str):
@@ -19,6 +24,10 @@ def _queue(*titles: str):
 
 
 class MusicQueueActionTests(unittest.TestCase):
+    def test_music_queue_actions_live_under_music_package(self):
+        self.assertTrue(MUSIC_QUEUE_ACTIONS_PATH.exists())
+        self.assertFalse(LEGACY_MUSIC_QUEUE_ACTIONS_PATH.exists())
+
     def test_remove_queue_action_mutates_queue_and_returns_user_message(self):
         queue = _queue("첫곡", "둘째곡", "셋째곡")
 

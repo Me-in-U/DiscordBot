@@ -54,7 +54,7 @@ from util.music_queue import (
     remove_queue_track,
     shuffle_queue,
 )
-from util.music_queue_actions import (
+from util.music.queue_actions import (
     begin_search_pick_queue_action,
     clear_queue_action,
     move_queue_action,

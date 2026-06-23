@@ -14,8 +14,8 @@
 6. Top 5 리스크는 `music.py`, `youtube_summary.py`, `loop.py` 같은 대형 파일이 변경 위험을 키우는 점이다.
 7. 권장 처리 순서는 Jenkins 테스트 게이트, `on_ready` guard, YouTube temp workspace, 민감 로그 제거, 문서 최신화다.
 8. 현재 작업트리에서는 위 1-4번 리스크의 1차 보강과 대형 파일 일부 분리가 구현되었다.
-9. 현재 최신 검증은 `compileall` 통과, unittest 460개 통과다.
-10. 이번 패치로 music playback action facade가 `util/music/` 카테고리 패키지로 이동되었고, 다음 후보는 music queue action facade의 `util/music/` 패키지 이동이다.
+9. 현재 최신 검증은 `compileall` 통과, unittest 461개 통과다.
+10. 이번 패치로 music queue action facade가 `util/music/` 카테고리 패키지로 이동되었고, 다음 후보는 music queue helper의 `util/music/` 패키지 이동이다.
 
 ## 기준선
 
@@ -31,7 +31,7 @@
 
 이 문서의 진단은 기준 커밋 `34aab00` 상태를 대상으로 한다. 이후 현재 작업트리에서는 아래 항목이 구현되었다.
 
-최신 검증 결과: `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` 460개 통과.
+최신 검증 결과: `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` 461개 통과.
 
 | 상태 | 항목 | 구현 근거 |
 | --- | --- | --- |
@@ -73,7 +73,7 @@
 | 완료 | 운영 리소스 문서화 | `docs/jenkins-deploy.md`에 `mem_limit: 500m`, YouTube 요약/STT 리소스 주의, health check 점검 절차 추가 |
 | 완료 | music queue helper 1차 분리 | `util/music_queue.py`로 queue 조작/preview/URL enqueue/search entry enqueue helper 이동, `test/test_music_queue_helpers.py`에서 util module import 경로 검증 |
 | 완료 | music queue display helper 분리 | `util/music_queue.py`로 대기열 embed title/description 조립 이동, `_track_title` import 회귀 테스트 추가 |
-| 완료 | music queue action facade 분리 | `util/music_queue_actions.py`로 대기열 삭제/비우기/이동/셔플 action 결과와 사용자 응답 문구를 이동하고 `MusicCog`는 음성 채널 guard와 Discord 응답 전송만 담당하도록 축소 |
+| 완료 | music queue action facade 분리 | `util/music/queue_actions.py`로 대기열 삭제/비우기/이동/셔플 action 결과와 사용자 응답 문구를 이동하고 `MusicCog`는 음성 채널 guard와 Discord 응답 전송만 담당하도록 축소 |
 | 완료 | music queue metadata helper 분리 | `util/music_queue.py`의 `apply_queue_track_metadata()`로 yt-dlp metadata dict의 단일 entry 선택과 QueuedTrack title/duration/webpage/uploader/thumbnail 반영을 이동하고, `MusicCog`는 추출 결과 전달만 담당하도록 축소 |
 | 완료 | music queue metadata extraction helper 분리 | `util/music_queue.py`의 `extract_queue_track_metadata()`로 yt-dlp 추출 예외 회수와 dict 결과 필터링을 이동하고, `MusicCog`는 executor scheduling과 metadata 반영만 담당하도록 축소 |
 | 완료 | music queue metadata runner helper 분리 | `util/music_queue.py`의 `fill_queue_track_metadata()`로 executor 실행, metadata 추출, QueuedTrack 반영 sequence를 이동하고, `MusicCog`는 yt-dlp extractor와 executor 전달만 담당하도록 축소 |
@@ -102,7 +102,7 @@
 | 완료 | music play_url_now playback start helper 분리 | `MusicCog._start_play_url_now_prepared_playback()`으로 즐겨찾기/즉시 URL 재생 경로의 playback start 생성, prepared playback 시작, replacement 상태 복구, 확인 응답 전송을 묶고, `_play_url_now()`는 준비된 player와 replacement 여부만 전달하도록 축소 |
 | 완료 | music play_url_now replacement branch helper 분리 | `MusicCog._begin_play_url_now_replacement()`로 즐겨찾기/즉시 URL 재생 경로의 active voice 판정, replacement 상태 시작, 기존 voice stop을 묶고, `_play_url_now()`는 반환된 replacement 여부만 playback start helper에 전달하도록 축소 |
 | 완료 | music URL play action facade 분리 | `util/music/playback_actions.py`로 URL 재생 시 active voice 여부에 따른 대기열 추가/즉시 준비 판단, queue track 반환, 사용자 응답 문구를 이동하고 `MusicCog`는 voice 연결, player 준비, metadata 보강 task, Discord 응답 전송만 담당하도록 축소 |
-| 완료 | music search-pick queue action facade 분리 | `util/music_queue_actions.py`의 `begin_search_pick_queue_action()`으로 검색 선택 URL 보정, active voice 큐 삽입, queue track 반환, 사용자 응답 문구를 이동하고 `MusicCog`는 voice guard, metadata 보강 task, Discord 응답 전송만 담당하도록 축소 |
+| 완료 | music search-pick queue action facade 분리 | `util/music/queue_actions.py`의 `begin_search_pick_queue_action()`으로 검색 선택 URL 보정, active voice 큐 삽입, queue track 반환, 사용자 응답 문구를 이동하고 `MusicCog`는 voice guard, metadata 보강 task, Discord 응답 전송만 담당하도록 축소 |
 | 완료 | music queue added response 경로 통일 | `QUEUE_ADDED_MESSAGE` 상수와 `_send_auto_delete()`로 `_play`, `_play_from_search_pick` 대기열 추가 응답/auto-delete 반복 제거 |
 | 완료 | music search pick voice error 응답 경로 통일 | `_play_from_search_pick`의 음성 연결 실패 응답이 직접 `followup.send()` 대신 `_send_auto_delete()`를 통과하도록 정리 |
 | 완료 | music play URL voice error 응답 경로 통일 | `_play` URL 재생 경로의 음성 연결 실패 응답이 직접 `followup.send()` 대신 `_send_auto_delete()`를 통과하도록 정리 |
@@ -162,7 +162,7 @@
 | 완료 | MapleStory sender 1차 분리 | `util/maplestory_sender.py`로 embed/message build, 채널 resolve, Discord send helper 이동, 기존 `util.maplestory_events` 공개 import 호환 유지 |
 | 완료 | YouTube notification state 1차 분리 | `util/youtube_notification_state.py`로 notified ID 정규화, YouTube datetime 파싱, pending live 재검사 판단 이동 |
 
-이번 패치로 music playback action facade의 `util/music/` 패키지 이동이 완료되었다. 다음 작은 후보는 music queue action facade의 `util/music/` 패키지 이동이다.
+이번 패치로 music queue action facade의 `util/music/` 패키지 이동이 완료되었다. 다음 작은 후보는 music queue helper의 `util/music/` 패키지 이동이다.
 
 ## 현재 구조 요약
 
@@ -586,12 +586,12 @@
 | Docker Python | 기준 커밋 `Dockerfile.deps` -> `FROM python:3.12-slim`, 현재 작업트리 -> `FROM python:3.11-slim` | 로컬/운영 Python minor version 불일치가 해소됨 |
 | 테스트 기준선 | `python -m unittest discover -s test` -> 154개 통과 | 현재 회귀 테스트 기준 |
 | 컴파일 기준선 | `python -m compileall -q bot.py api cogs common func util test` 통과 | 문법/import 기본 검증 |
-| 작업트리 최신 검증 | `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` -> 460개 통과 | 구현 진행 후 회귀 확인 |
+| 작업트리 최신 검증 | `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` -> 461개 통과 | 구현 진행 후 회귀 확인 |
 | 파일 수 | PowerShell 파일 집계 -> Python 파일 96개 | 분석 규모 |
 | 대형 파일 기준선 | 기준 커밋 line count: `music.py` 2663, `youtube_summary.py` 1072, `loop.py` 954, `maplestory_events.py` 875 | 분리 우선 후보였던 초기 상태 |
 | 대형 파일 현재 | Python read line count: `music.py` 1706, `youtube_summary.py` 191, `loop.py` 309, `maplestory_events.py` 251 | 분리 진행 후에도 `music.py`는 command/action facade 축소 여지가 큼 |
 | 대형 파일 1차 분리 | `util/music_queue.py` 추출, `test/test_music_queue_helpers.py` 13개 통과 | `music.py` queue 책임 일부 축소 |
-| music queue display/enqueue/action/metadata/metadata-extraction/metadata-runner helper 분리 | `util/music_queue.py` 261줄, `util/music_queue_actions.py` 104줄, `cogs/music.py` 현재 1706줄, queue helper/action 대상 테스트 26개 통과 | 대기열 표시 title/description 조립, `_play` active-voice URL enqueue, `_play_from_search_pick` 검색 선택 URL 보정과 active-voice queue enqueue, yt-dlp metadata dict의 QueuedTrack 반영, metadata 추출 예외 회수/dict 결과 필터링, executor scheduling과 QueuedTrack 반영 sequence, 삭제/비우기/이동/셔플 사용자 응답 문구를 command handler에서 분리하고 `_track_title` import 누락과 queue action/metadata 계약을 테스트로 고정 |
+| music queue display/enqueue/action/metadata/metadata-extraction/metadata-runner helper 분리 | `util/music_queue.py` 261줄, `util/music/queue_actions.py` 83줄, `cogs/music.py` 현재 1706줄, queue helper/action 대상 테스트 27개 통과, command surface 대상 테스트 50개 통과, `test_music*.py` 221개 통과 | 대기열 표시 title/description 조립, `_play` active-voice URL enqueue, `_play_from_search_pick` 검색 선택 URL 보정과 active-voice queue enqueue, yt-dlp metadata dict의 QueuedTrack 반영, metadata 추출 예외 회수/dict 결과 필터링, executor scheduling과 QueuedTrack 반영 sequence, 삭제/비우기/이동/셔플 사용자 응답 문구를 command handler에서 분리하고 `_track_title` import 누락과 queue action/metadata 계약을 테스트로 고정했으며, root `util/music_queue_actions.py` 제거를 테스트로 고정 |
 | music playback/skip/seek/URL action helper 분리 | `util/music/playback_actions.py` 125줄, `cogs/music.py` 현재 1706줄, playback action 대상 테스트 18개 통과, `test_music*.py` 220개 통과 | 일시정지/다시재생/정지/반복/스킵/구간 이동에 더해 URL 재생의 active voice 대기열 추가/즉시 준비 판단, play_url_now replacement 상태 전이, queue track 반환, 사용자 응답 문구를 command handler에서 분리하고, root `util/music_playback_actions.py` 제거를 테스트로 고정 |
 | music URL play branch/immediate playback/preparation/start/queued response/voice guard/queue decision/branch dispatch/state context/defer/play_url_now voice guard/playback state/player preparation/playback start/replacement branch helper 분리 | `cogs/music.py` 현재 1706줄, command surface 대상 테스트 50개 통과 | `_play_music_url_branch()`가 `/재생` URL 분기의 defer, context 조회, voice guard, immediate dispatch만 담당하고, `_defer_music_url_branch()`가 `skip_defer` 조건과 Discord defer 호출을, `_get_music_url_branch_context()`가 guild id와 `GuildMusicState` 조회를, `_ensure_music_url_voice_client()`가 URL 분기 음성 guard를, `_should_start_music_url_immediate_playback()`이 active voice 판정과 queued 응답 위임을, `_dispatch_music_url_immediate_playback()`이 즉시 재생 여부 판정과 즉시 재생 시작 호출을, `_prepare_music_url_immediate_player()`가 `/재생` URL 즉시 재생 player 준비/실패 응답을, `_start_music_url_prepared_playback()`이 `/재생` URL 즉시 재생 playback start/확인 응답을, `_ensure_play_url_now_voice_client()`가 즉시 URL 재생 경로 음성 guard를, `_prepare_play_url_now_player()`가 즉시 URL 재생 player 준비/실패 응답을, `begin_play_url_now_playback_action()`/`complete_play_url_now_playback_action()`이 replacement 상태 전이를, `_begin_play_url_now_replacement()`가 active voice 판정과 기존 voice stop을, `_start_play_url_now_prepared_playback()`이 즉시 URL 재생 playback start/상태 복구/확인 응답을, `_start_music_url_immediate_playback()`이 준비된 player의 start helper 위임을, `_send_music_url_queued_response()`가 queued metadata task와 auto-delete 응답을 담당하도록 고정 |
 | music play command branch dispatch helper 분리 | `cogs/music.py` 현재 1706줄, command surface 대상 테스트 50개 통과 | `_dispatch_music_play_command_branch()`가 `/재생` 명령의 검색어/URL 분기 선택, 검색 branch 위임, URL branch `skip_defer` 전달을 담당하고, `_play()`는 debug 로그와 branch dispatch helper 호출만 담당하도록 고정 |
