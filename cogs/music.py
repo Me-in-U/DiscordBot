@@ -969,6 +969,27 @@ class MusicCog(commands.Cog):
             dbg(transition_log)
         return voice_client
 
+    async def _prepare_play_url_now_player(
+        self,
+        interaction: discord.Interaction,
+        url: str,
+    ) -> Any | None:
+        try:
+            return await prepare_music_player(
+                YTDLSource.from_url,
+                url,
+                loop=self.bot.loop,
+                requester=interaction.user,
+            )
+        except MusicPlayerPreparationError as exc:
+            dbg(f"_play_url_now: {exc.failure.debug_message}")
+            await self._send_auto_delete(
+                interaction,
+                exc.failure.user_message,
+                delay=exc.failure.delete_after,
+            )
+            return None
+
     async def _play_url_now(
         self,
         interaction: discord.Interaction,
@@ -985,20 +1006,8 @@ class MusicCog(commands.Cog):
         if voice_client is None:
             return
 
-        try:
-            player = await prepare_music_player(
-                YTDLSource.from_url,
-                url,
-                loop=self.bot.loop,
-                requester=interaction.user,
-            )
-        except MusicPlayerPreparationError as exc:
-            dbg(f"_play_url_now: {exc.failure.debug_message}")
-            await self._send_auto_delete(
-                interaction,
-                exc.failure.user_message,
-                delay=exc.failure.delete_after,
-            )
+        player = await self._prepare_play_url_now_player(interaction, url)
+        if player is None:
             return
 
         replacing = is_voice_client_active(voice_client)

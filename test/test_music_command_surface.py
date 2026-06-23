@@ -382,6 +382,29 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         self.assertNotIn("state.is_seeking = True", play_url_now_source)
         self.assertNotIn("state.is_seeking = False", play_url_now_source)
 
+    def test_play_url_now_preparation_delegates_to_helper(self):
+        source_text = MUSIC_PATH.read_text(encoding="utf-8")
+        tree = ast.parse(source_text)
+        play_url_now_source = ast.get_source_segment(
+            source_text,
+            _function_node(tree, "_play_url_now"),
+        )
+        helper_source = ast.get_source_segment(
+            source_text,
+            _function_node(tree, "_prepare_play_url_now_player"),
+        )
+
+        self.assertIn("_prepare_play_url_now_player", play_url_now_source)
+        self.assertNotIn("prepare_music_player", play_url_now_source)
+        self.assertNotIn("MusicPlayerPreparationError", play_url_now_source)
+        self.assertNotIn("exc.failure", play_url_now_source)
+        self.assertIn("prepare_music_player", helper_source)
+        self.assertIn("YTDLSource.from_url", helper_source)
+        self.assertIn("MusicPlayerPreparationError", helper_source)
+        self.assertIn("exc.failure.user_message", helper_source)
+        self.assertIn("exc.failure.delete_after", helper_source)
+        self.assertIn("return None", helper_source)
+
     def test_play_url_preparation_error_uses_shared_auto_delete_response(self):
         source_text = MUSIC_PATH.read_text(encoding="utf-8")
         tree = ast.parse(source_text)
