@@ -42,6 +42,12 @@ class MusicFavoriteSavePayload:
 
 
 @dataclass(frozen=True, slots=True)
+class MusicFavoriteSaveResult:
+    guild_id: int
+    user_message: str
+
+
+@dataclass(frozen=True, slots=True)
 class MusicFavoriteSearchEntrySaveAction:
     payload: MusicFavoriteSavePayload
 
@@ -485,4 +491,23 @@ async def upsert_music_favorite(
             thumbnail,
             int(updated_by) if updated_by else None,
         ),
+    )
+
+
+async def save_music_favorite_payload(
+    payload: MusicFavoriteSavePayload,
+) -> MusicFavoriteSaveResult:
+    await upsert_music_favorite(
+        guild_id=payload.guild_id,
+        slot=payload.slot,
+        title=payload.title,
+        url=payload.url,
+        duration=payload.duration,
+        uploader=payload.uploader,
+        thumbnail=payload.thumbnail,
+        updated_by=payload.updated_by,
+    )
+    return MusicFavoriteSaveResult(
+        guild_id=payload.guild_id,
+        user_message=payload.user_message,
     )

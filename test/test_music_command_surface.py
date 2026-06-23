@@ -505,9 +505,11 @@ class MusicCommandSurfaceTests(unittest.TestCase):
             source_text,
             _function_node(tree, "_save_music_favorite"),
         )
-        self.assertIn("payload.user_message", save_source)
-        self.assertIn("payload.guild_id", save_source)
-        self.assertIn("payload.updated_by", save_source)
+        self.assertIn("save_music_favorite_payload", save_source)
+        self.assertIn("save_result.guild_id", save_source)
+        self.assertIn("save_result.user_message", save_source)
+        self.assertNotIn("upsert_music_favorite", save_source)
+        self.assertNotIn("payload.updated_by", save_source)
 
         search_source = ast.get_source_segment(
             source_text,

@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import AsyncMock, patch
 
 from cogs.music import GuildMusicState, MusicCog, MusicControlView, MusicHelperView
 from util.music_favorites import (
@@ -11,6 +12,7 @@ from util.music_favorites import (
     MusicFavoriteSearchEntrySaveAction,
     MusicFavoriteSearchRequestAction,
     MusicFavoriteSearchSubmitAction,
+    MusicFavoriteSaveResult,
     MusicFavoriteSavePayload,
     MusicFavoriteCurrentSaveButtonAction,
     build_music_favorite_current_save_button_action,
@@ -27,6 +29,7 @@ from util.music_favorites import (
     build_music_favorite_save_payload,
     current_player_to_music_favorite,
     music_favorite_to_save_payload,
+    save_music_favorite_payload,
     search_entry_to_music_favorite_save_payload,
     validate_music_favorite_slot,
 )
@@ -236,6 +239,42 @@ class MusicFavoriteTests(unittest.IsolatedAsyncioTestCase):
                 uploader="업로더",
                 thumbnail="https://example.com/thumb.jpg",
                 updated_by=99,
+            ),
+        )
+
+    async def test_save_music_favorite_payload_persists_payload_and_returns_result(self):
+        payload = MusicFavoriteSavePayload(
+            guild_id=10,
+            slot=2,
+            title="저장곡",
+            url="https://youtube.com/watch?v=abc",
+            duration=125,
+            uploader="업로더",
+            thumbnail="https://example.com/thumb.jpg",
+            updated_by=99,
+        )
+
+        with patch(
+            "util.music_favorites.upsert_music_favorite",
+            new=AsyncMock(),
+        ) as upsert_music_favorite_mock:
+            result = await save_music_favorite_payload(payload)
+
+        upsert_music_favorite_mock.assert_awaited_once_with(
+            guild_id=10,
+            slot=2,
+            title="저장곡",
+            url="https://youtube.com/watch?v=abc",
+            duration=125,
+            uploader="업로더",
+            thumbnail="https://example.com/thumb.jpg",
+            updated_by=99,
+        )
+        self.assertEqual(
+            result,
+            MusicFavoriteSaveResult(
+                guild_id=10,
+                user_message="⭐ 2번 즐겨찾기에 **저장곡** 저장했습니다.",
             ),
         )
 

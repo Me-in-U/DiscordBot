@@ -25,7 +25,7 @@ from util.music_favorites import (
     current_player_to_music_favorite,
     get_music_favorite,
     list_music_favorites,
-    upsert_music_favorite,
+    save_music_favorite_payload,
 )
 from util.music_embeds import (
     PANEL_TITLE,
@@ -334,21 +334,12 @@ class MusicCog(commands.Cog):
         interaction: discord.Interaction,
         payload: MusicFavoriteSavePayload,
     ) -> None:
-        await upsert_music_favorite(
-            guild_id=payload.guild_id,
-            slot=payload.slot,
-            title=payload.title,
-            url=payload.url,
-            duration=payload.duration,
-            uploader=payload.uploader,
-            thumbnail=payload.thumbnail,
-            updated_by=payload.updated_by,
-        )
-        await self._load_music_favorites(payload.guild_id, refresh=True)
-        await self._refresh_music_panel_for_favorites(payload.guild_id)
+        save_result = await save_music_favorite_payload(payload)
+        await self._load_music_favorites(save_result.guild_id, refresh=True)
+        await self._refresh_music_panel_for_favorites(save_result.guild_id)
         await self._send_auto_delete(
             interaction,
-            payload.user_message,
+            save_result.user_message,
         )
 
     async def _save_search_entry_as_favorite(
