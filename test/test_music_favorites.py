@@ -5,10 +5,14 @@ from util.music_favorites import (
     MusicFavorite,
     MusicFavoriteManagerSelectionAction,
     MusicFavoritePlayActionResult,
+    MusicFavoriteSearchModalAction,
+    MusicFavoriteSearchSubmitAction,
     MusicFavoriteSavePayload,
     build_music_favorite_manager_selection_action,
     build_music_favorite_button_label,
     build_music_favorite_play_action,
+    build_music_favorite_search_modal_action,
+    build_music_favorite_search_submit_action,
     build_music_favorite_save_payload,
     current_player_to_music_favorite,
     music_favorite_to_save_payload,
@@ -240,6 +244,31 @@ class MusicFavoriteTests(unittest.IsolatedAsyncioTestCase):
     def test_music_favorite_manager_selection_action_validates_slot(self):
         with self.assertRaisesRegex(ValueError, "즐겨찾기 번호는 1~5"):
             build_music_favorite_manager_selection_action("6")
+
+    def test_music_favorite_search_modal_action_validates_slot(self):
+        result = build_music_favorite_search_modal_action("4")
+
+        self.assertEqual(result, MusicFavoriteSearchModalAction(slot=4))
+
+    def test_music_favorite_search_submit_action_normalizes_query(self):
+        result = build_music_favorite_search_submit_action(
+            slot="2",
+            query_value="  lofi hiphop  ",
+        )
+
+        self.assertEqual(
+            result,
+            MusicFavoriteSearchSubmitAction(slot=2, query="lofi hiphop"),
+        )
+
+    def test_music_favorite_search_submit_action_handles_empty_query(self):
+        result = build_music_favorite_search_submit_action(slot=2, query_value=None)
+
+        self.assertEqual(result, MusicFavoriteSearchSubmitAction(slot=2, query=""))
+
+    def test_music_favorite_search_submit_action_validates_slot(self):
+        with self.assertRaisesRegex(ValueError, "즐겨찾기 번호는 1~5"):
+            build_music_favorite_search_submit_action(slot=7, query_value="lofi")
 
     async def test_default_music_view_shows_search_manage_and_five_favorite_slots(self):
         favorite = MusicFavorite(

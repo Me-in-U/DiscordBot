@@ -10,7 +10,8 @@ from util.music_favorites import (
     MusicFavorite,
     build_music_favorite_button_label,
     build_music_favorite_manager_selection_action,
-    validate_music_favorite_slot,
+    build_music_favorite_search_modal_action,
+    build_music_favorite_search_submit_action,
 )
 from util.music_queue import parse_seek_seconds
 
@@ -110,13 +111,18 @@ class FavoriteSearchModal(discord.ui.Modal, title="즐겨찾기 음악 검색"):
     def __init__(self, cog: Any, slot: int):
         super().__init__()
         self.cog = cog
-        self.slot = validate_music_favorite_slot(slot)
+        modal_action = build_music_favorite_search_modal_action(slot)
+        self.slot = modal_action.slot
 
     async def on_submit(self, interaction: discord.Interaction):
+        submit_action = build_music_favorite_search_submit_action(
+            slot=self.slot,
+            query_value=self.query.value,
+        )
         await self.cog._search_music_for_favorite_slot(
             interaction,
-            self.slot,
-            str(self.query.value or ""),
+            submit_action.slot,
+            submit_action.query,
         )
 
 
@@ -195,8 +201,9 @@ class MusicFavoriteManageView(View):
         ).status_text
 
     async def _on_search(self, interaction: discord.Interaction):
+        modal_action = build_music_favorite_search_modal_action(self.selected_slot)
         await interaction.response.send_modal(
-            FavoriteSearchModal(self.cog, self.selected_slot)
+            FavoriteSearchModal(self.cog, modal_action.slot)
         )
 
     async def _on_current(self, interaction: discord.Interaction):

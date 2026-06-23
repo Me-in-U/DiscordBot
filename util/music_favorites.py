@@ -60,6 +60,17 @@ class MusicFavoriteManagerSelectionAction:
         return str(value) == self.selected_value
 
 
+@dataclass(frozen=True, slots=True)
+class MusicFavoriteSearchModalAction:
+    slot: int
+
+
+@dataclass(frozen=True, slots=True)
+class MusicFavoriteSearchSubmitAction:
+    slot: int
+    query: str
+
+
 def validate_music_favorite_slot(slot: int) -> int:
     slot = int(slot)
     if slot < MUSIC_FAVORITE_SLOT_MIN or slot > MUSIC_FAVORITE_SLOT_MAX:
@@ -130,6 +141,23 @@ def build_music_favorite_manager_selection_action(
         selected_slot=slot,
         selected_value=str(slot),
         status_text=f"저장/수정할 즐겨찾기 슬롯: **{slot}번**",
+    )
+
+
+def build_music_favorite_search_modal_action(
+    slot: int | str,
+) -> MusicFavoriteSearchModalAction:
+    return MusicFavoriteSearchModalAction(slot=validate_music_favorite_slot(slot))
+
+
+def build_music_favorite_search_submit_action(
+    *,
+    slot: int | str,
+    query_value: object,
+) -> MusicFavoriteSearchSubmitAction:
+    return MusicFavoriteSearchSubmitAction(
+        slot=validate_music_favorite_slot(slot),
+        query=str(query_value or "").strip(),
     )
 
 

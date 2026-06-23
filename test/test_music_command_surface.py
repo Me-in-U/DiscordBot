@@ -811,6 +811,25 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         self.assertNotIn("option.value == self.values[0]", callback_source)
         self.assertIn("build_music_favorite_manager_selection_action", status_source)
 
+    def test_music_favorite_search_modal_delegates_submit_mapping_to_helper(self):
+        source_text = MUSIC_VIEWS_PATH.read_text(encoding="utf-8")
+        modal_source = source_text[
+            source_text.index("class FavoriteSearchModal"):
+            source_text.index("class MusicFavoriteSlotSelect")
+        ]
+        manager_source = source_text[
+            source_text.index("class MusicFavoriteManageView"):
+            source_text.index("class MusicHelperView")
+        ]
+
+        self.assertIn("build_music_favorite_search_modal_action", modal_source)
+        self.assertIn("build_music_favorite_search_submit_action", modal_source)
+        self.assertIn("submit_action.slot", modal_source)
+        self.assertIn("submit_action.query", modal_source)
+        self.assertNotIn("validate_music_favorite_slot", modal_source)
+        self.assertNotIn("str(self.query.value or \"\")", modal_source)
+        self.assertIn("build_music_favorite_search_modal_action", manager_source)
+
 
 if __name__ == "__main__":
     unittest.main()

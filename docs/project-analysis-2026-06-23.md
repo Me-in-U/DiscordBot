@@ -14,8 +14,8 @@
 6. Top 5 리스크는 `music.py`, `youtube_summary.py`, `loop.py` 같은 대형 파일이 변경 위험을 키우는 점이다.
 7. 권장 처리 순서는 Jenkins 테스트 게이트, `on_ready` guard, YouTube temp workspace, 민감 로그 제거, 문서 최신화다.
 8. 현재 작업트리에서는 위 1-4번 리스크의 1차 보강과 대형 파일 일부 분리가 구현되었다.
-9. 현재 최신 검증은 `compileall` 통과, unittest 394개 통과다.
-10. 이번 패치로 music favorite manager selection action 분리가 구현되었고, 다음 후보는 music favorite modal/search submit action 분리다.
+9. 현재 최신 검증은 `compileall` 통과, unittest 399개 통과다.
+10. 이번 패치로 music favorite modal/search submit action 분리가 구현되었고, 다음 후보는 music favorite current save button action 분리다.
 
 ## 기준선
 
@@ -31,7 +31,7 @@
 
 이 문서의 진단은 기준 커밋 `34aab00` 상태를 대상으로 한다. 이후 현재 작업트리에서는 아래 항목이 구현되었다.
 
-최신 검증 결과: `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` 394개 통과.
+최신 검증 결과: `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` 399개 통과.
 
 | 상태 | 항목 | 구현 근거 |
 | --- | --- | --- |
@@ -105,6 +105,7 @@
 | 완료 | music favorite 저장 payload/action 분리 | `util/music_favorites.py`로 검색 결과 entry와 현재 재생 snapshot을 저장 payload로 정규화하고, `MusicCog`는 DB upsert, 패널 refresh, Discord 응답만 담당하도록 축소 |
 | 완료 | music favorite play action facade 분리 | `util/music_favorites.py`의 `build_music_favorite_play_action()`으로 빈 슬롯 사용자 문구와 즐겨찾기 재생 URL/prefix를 이동하고, `MusicCog`는 DB 조회, Discord 응답, 재생 호출만 담당하도록 축소 |
 | 완료 | music favorite manager selection action 분리 | `util/music_favorites.py`의 `build_music_favorite_manager_selection_action()`으로 슬롯 선택값 검증, 상태 문구, Select option default 판정을 이동하고, `MusicFavoriteSlotSelect`는 결과 적용과 Discord edit만 담당하도록 축소 |
+| 완료 | music favorite modal/search submit action 분리 | `util/music_favorites.py`의 search modal/submit action helper로 modal 슬롯 검증과 검색어 정규화를 이동하고, `FavoriteSearchModal`과 manager 검색 버튼은 helper 결과 전달만 담당하도록 축소 |
 | 완료 | music state helper 1차 분리 | `util/music_state.py`로 `GuildMusicState`와 playback/idle reset/start/finish 상태 전이 이동 |
 | 완료 | music voice helper 1차 분리 | `util/music_voice.py`로 음성 연결, 채널 이동, 활성 상태 판단, 같은 음성 채널 guard, 연결 transition debug 이동 |
 | 완료 | music playback start state 보강 | `util/music_state.py`에 재생 시작 상태 전이 helper 추가 |
@@ -122,7 +123,7 @@
 | 완료 | MapleStory sender 1차 분리 | `util/maplestory_sender.py`로 embed/message build, 채널 resolve, Discord send helper 이동, 기존 `util.maplestory_events` 공개 import 호환 유지 |
 | 완료 | YouTube notification state 1차 분리 | `util/youtube_notification_state.py`로 notified ID 정규화, YouTube datetime 파싱, pending live 재검사 판단 이동 |
 
-이번 패치로 music favorite manager selection action 분리가 완료되었다. 다음 작은 후보는 music favorite modal/search submit action 분리다.
+이번 패치로 music favorite modal/search submit action 분리가 완료되었다. 다음 작은 후보는 music favorite current save button action 분리다.
 
 ## 현재 구조 요약
 
@@ -546,7 +547,7 @@
 | Docker Python | 기준 커밋 `Dockerfile.deps` -> `FROM python:3.12-slim`, 현재 작업트리 -> `FROM python:3.11-slim` | 로컬/운영 Python minor version 불일치가 해소됨 |
 | 테스트 기준선 | `python -m unittest discover -s test` -> 154개 통과 | 현재 회귀 테스트 기준 |
 | 컴파일 기준선 | `python -m compileall -q bot.py api cogs common func util test` 통과 | 문법/import 기본 검증 |
-| 작업트리 최신 검증 | `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` -> 394개 통과 | 구현 진행 후 회귀 확인 |
+| 작업트리 최신 검증 | `python -m compileall -q bot.py api cogs common func util test scripts` 통과, `python -m unittest discover -s test` -> 399개 통과 | 구현 진행 후 회귀 확인 |
 | 파일 수 | PowerShell 파일 집계 -> Python 파일 96개 | 분석 규모 |
 | 대형 파일 기준선 | 기준 커밋 line count: `music.py` 2663, `youtube_summary.py` 1072, `loop.py` 954, `maplestory_events.py` 875 | 분리 우선 후보였던 초기 상태 |
 | 대형 파일 현재 | Python read line count: `music.py` 1670, `youtube_summary.py` 191, `loop.py` 309, `maplestory_events.py` 251 | 분리 진행 후에도 `music.py`는 command/action facade 축소 여지가 큼 |
@@ -558,9 +559,9 @@
 | music search helper/action 분리 | `util/music_search.py` 98줄 추출, `cogs/music.py` 현재 1670줄, search 대상 테스트 7개 통과 | HTTP URL 판별, 검색 결과 URL 정규화, watch entry filtering, 검색 결과 embed title/description 조립에 더해 `/재생` 검색과 즐겨찾기 검색의 빈 결과 메시지/표시 payload action을 music Cog 본문에서 분리 |
 | music embed helper 분리 | `util/music_embeds.py` 98줄 추출, `cogs/music.py` 현재 1670줄, embed 대상 테스트 3개 통과 | 기본 패널/재생 중 embed 생성 UI 책임을 music Cog 본문에서 분리 |
 | music extractor helper 분리 | `util/music_extractor.py` 61줄 추출, `cogs/music.py` 현재 1670줄, extractor 대상 테스트 10개 통과 | yt-dlp 포맷 후보 우선순위, keyword search URL 결정, entries selection 로직을 music Cog 본문에서 분리 |
-| music View/Modal 분리 | `util/music_views.py` 408줄 추출, `cogs/music.py` 현재 1670줄, views 대상 테스트 3개 통과 | 검색 결과/즐겨찾기/control/helper View와 search/seek modal을 music Cog 본문에서 분리 |
+| music View/Modal 분리 | `util/music_views.py` 415줄 추출, `cogs/music.py` 현재 1670줄, views 대상 테스트 3개 통과 | 검색 결과/즐겨찾기/control/helper View와 search/seek modal을 music Cog 본문에서 분리 |
 | music panel store 분리 | `util/music_panel_store.py` 58줄 추출, `cogs/music.py` 현재 1670줄, panel store 대상 테스트 4개 통과 | panel message id 로드/저장/삭제 DB 접근을 music Cog 본문에서 분리 |
-| music favorite snapshot/payload/play/manager helper 분리 | `util/music_favorites.py` 현재 325줄, `cogs/music.py` 현재 1670줄, favorite 대상 테스트 18개 통과 | 현재 재생 player를 즐겨찾기 snapshot으로 바꾸고, 검색 결과 entry와 현재 재생 snapshot을 저장 payload/action으로 정규화하며, 빈 슬롯/재생 URL action 판단과 manager 슬롯 선택 상태 계산을 music Cog/View 본문에서 분리 |
+| music favorite snapshot/payload/play/manager/modal helper 분리 | `util/music_favorites.py` 현재 353줄, `cogs/music.py` 현재 1670줄, favorite 대상 테스트 22개 통과 | 현재 재생 player를 즐겨찾기 snapshot으로 바꾸고, 검색 결과 entry와 현재 재생 snapshot을 저장 payload/action으로 정규화하며, 빈 슬롯/재생 URL action 판단, manager 슬롯 선택 상태 계산, favorite 검색 modal/submit 정규화를 music Cog/View 본문에서 분리 |
 | music state helper 분리 | `util/music_state.py` 67줄 추출, `cogs/music.py` 현재 1670줄, state 대상 테스트 5개 통과 | `GuildMusicState`와 playback/idle reset/playback start/track finish 상태 전이를 music Cog 본문에서 분리 |
 | music voice helper 분리 | `util/music_voice.py` 96줄 추출, `cogs/music.py` 현재 1670줄, voice 대상 테스트 11개 통과 | 음성 연결, 채널 이동, 재생/일시정지 활성 상태 판단, 같은 음성 채널 guard, 연결 transition debug를 music Cog 본문에서 분리 |
 | music source preparation/playback payload helper 분리 | `util/music_playback.py` 132줄 추출, `cogs/music.py` 현재 1670줄, playback 대상 테스트 8개 통과 | 일반 재생, 즐겨찾기 재생, seek, loop fallback refresh, 다음 대기열 곡 준비의 `YTDLSource.from_url` 호출과 FFmpeg/스트림 준비 실패 매핑, loop/skip replay source 재사용, prepared player의 source/확인 메시지 payload와 prepared playback side effect sequence를 단일화 |
