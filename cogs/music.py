@@ -1249,10 +1249,13 @@ class MusicCog(commands.Cog):
             url=url,
         )
 
-    async def _play(self, interaction, url: str, skip_defer: bool = False):
-        dbg(
-            f"_play: called url={url} guild={interaction.guild.id} user={interaction.user.id}"
-        )
+    async def _dispatch_music_play_command_branch(
+        self,
+        interaction: discord.Interaction,
+        url: str,
+        *,
+        skip_defer: bool,
+    ) -> None:
         # ? 검색어 처리
         if not is_http_url(url):
             await self._play_music_search_branch(interaction, url)
@@ -1261,6 +1264,21 @@ class MusicCog(commands.Cog):
 
         # ? URL 재생
         await self._play_music_url_branch(
+            interaction,
+            url,
+            skip_defer=skip_defer,
+        )
+
+    async def _play(
+        self,
+        interaction: discord.Interaction,
+        url: str,
+        skip_defer: bool = False,
+    ) -> None:
+        dbg(
+            f"_play: called url={url} guild={interaction.guild.id} user={interaction.user.id}"
+        )
+        await self._dispatch_music_play_command_branch(
             interaction,
             url,
             skip_defer=skip_defer,

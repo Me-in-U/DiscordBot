@@ -217,7 +217,8 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         self.assertNotIn('"▶ **대기열에 추가되었습니다.**"', queued_response_source)
 
         play_source = ast.get_source_segment(source_text, _function_node(tree, "_play"))
-        self.assertIn("_play_music_url_branch", play_source)
+        self.assertIn("_dispatch_music_play_command_branch", play_source)
+        self.assertNotIn("_play_music_url_branch", play_source)
         self.assertNotIn("url_play_result.user_message", play_source)
 
         search_pick_source = ast.get_source_segment(
@@ -301,8 +302,20 @@ class MusicCommandSurfaceTests(unittest.TestCase):
             source_text,
             _function_node(tree, "_play"),
         )
-        self.assertIn("_play_music_url_branch", play_command_source)
+        self.assertIn("_dispatch_music_play_command_branch", play_command_source)
+        self.assertNotIn("_play_music_url_branch", play_command_source)
+        self.assertNotIn("is_http_url", play_command_source)
         self.assertNotIn("begin_url_play_action", play_command_source)
+
+        play_branch_source = ast.get_source_segment(
+            source_text,
+            _function_node(tree, "_dispatch_music_play_command_branch"),
+        )
+        self.assertIn("is_http_url(url)", play_branch_source)
+        self.assertIn("_play_music_search_branch", play_branch_source)
+        self.assertIn("_play_music_url_branch", play_branch_source)
+        self.assertIn("skip_defer=skip_defer", play_branch_source)
+        self.assertIn("return", play_branch_source)
 
     def test_play_url_queue_decision_helper_handles_queued_response(self):
         source_text = MUSIC_PATH.read_text(encoding="utf-8")
@@ -615,7 +628,8 @@ class MusicCommandSurfaceTests(unittest.TestCase):
                 self.assertNotIn("self._auto_delete(", function_source)
 
         play_source = ast.get_source_segment(source_text, _function_node(tree, "_play"))
-        self.assertIn("_play_music_url_branch", play_source)
+        self.assertIn("_dispatch_music_play_command_branch", play_source)
+        self.assertNotIn("_play_music_url_branch", play_source)
         self.assertNotIn("playback_start.confirmation_message", play_source)
 
         play_url_source = ast.get_source_segment(
@@ -666,12 +680,19 @@ class MusicCommandSurfaceTests(unittest.TestCase):
                 self.assertNotIn("except Exception", function_source)
 
         play_source = ast.get_source_segment(source_text, _function_node(tree, "_play"))
-        self.assertIn("_play_music_search_branch", play_source)
+        self.assertIn("_dispatch_music_play_command_branch", play_source)
+        self.assertNotIn("_play_music_search_branch", play_source)
         self.assertNotIn("Embed(", play_source)
         self.assertNotIn("SearchResultView", play_source)
         self.assertNotIn("search_result.user_message", play_source)
         self.assertNotIn("search_result.embed_title", play_source)
         self.assertNotIn("search_result.embed_description", play_source)
+
+        play_branch_source = ast.get_source_segment(
+            source_text,
+            _function_node(tree, "_dispatch_music_play_command_branch"),
+        )
+        self.assertIn("_play_music_search_branch", play_branch_source)
 
     def test_play_and_favorite_search_delegate_result_mapping_to_search_action_helper(self):
         source_text = MUSIC_PATH.read_text(encoding="utf-8")
@@ -698,9 +719,16 @@ class MusicCommandSurfaceTests(unittest.TestCase):
                 self.assertNotIn("description = \"\\n\".join", function_source)
 
         play_source = ast.get_source_segment(source_text, _function_node(tree, "_play"))
-        self.assertIn("_play_music_search_branch", play_source)
+        self.assertIn("_dispatch_music_play_command_branch", play_source)
+        self.assertNotIn("_play_music_search_branch", play_source)
         self.assertNotIn("build_music_search_flow", play_source)
         self.assertNotIn("_send_music_search_response", play_source)
+
+        play_branch_source = ast.get_source_segment(
+            source_text,
+            _function_node(tree, "_dispatch_music_play_command_branch"),
+        )
+        self.assertIn("_play_music_search_branch", play_branch_source)
 
     def test_favorite_search_request_delegates_input_mapping_to_helper(self):
         source_text = MUSIC_PATH.read_text(encoding="utf-8")
