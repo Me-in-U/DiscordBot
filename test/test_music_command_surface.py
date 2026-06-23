@@ -453,10 +453,25 @@ class MusicCommandSurfaceTests(unittest.TestCase):
             _function_node(tree, "_play_music_favorite"),
         )
         self.assertIn("_send_ephemeral_response", play_favorite_source)
-        self.assertIn("즐겨찾기가 비어있습니다", play_favorite_source)
         self.assertIn("_play_url_now", play_favorite_source)
         self.assertNotIn("interaction.response.send_message", play_favorite_source)
         self.assertNotIn("interaction.followup.send", play_favorite_source)
+
+    def test_favorite_play_command_delegates_result_mapping_to_helper(self):
+        source_text = MUSIC_PATH.read_text(encoding="utf-8")
+        tree = ast.parse(source_text)
+        play_favorite_source = ast.get_source_segment(
+            source_text,
+            _function_node(tree, "_play_music_favorite"),
+        )
+
+        self.assertIn("build_music_favorite_play_action", play_favorite_source)
+        self.assertIn("play_result.should_play", play_favorite_source)
+        self.assertIn("play_result.user_message", play_favorite_source)
+        self.assertIn("play_result.url", play_favorite_source)
+        self.assertIn("play_result.success_prefix", play_favorite_source)
+        self.assertNotIn("즐겨찾기가 비어있습니다", play_favorite_source)
+        self.assertNotIn("⭐ 즐겨찾기 재생", play_favorite_source)
 
     def test_favorite_save_commands_delegate_payload_mapping_to_helper(self):
         source_text = MUSIC_PATH.read_text(encoding="utf-8")

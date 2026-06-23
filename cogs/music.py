@@ -16,6 +16,7 @@ from util.channel_settings import get_channel
 from util.music_favorites import (
     MusicFavorite,
     MusicFavoriteSavePayload,
+    build_music_favorite_play_action,
     current_player_to_music_favorite,
     get_music_favorite,
     list_music_favorites,
@@ -395,18 +396,19 @@ class MusicCog(commands.Cog):
         interaction: discord.Interaction,
         slot: int,
     ) -> None:
-        slot = validate_music_favorite_slot(slot)
+        slot = build_music_favorite_play_action(slot=slot, favorite=None).slot
         favorite = await get_music_favorite(interaction.guild.id, slot)
-        if favorite is None:
+        play_result = build_music_favorite_play_action(slot=slot, favorite=favorite)
+        if not play_result.should_play:
             await self._send_ephemeral_response(
                 interaction,
-                f"❌ {slot}번 즐겨찾기가 비어있습니다.",
+                play_result.user_message,
             )
             return
         await self._play_url_now(
             interaction,
-            favorite.url,
-            success_prefix="⭐ 즐겨찾기 재생",
+            play_result.url,
+            success_prefix=play_result.success_prefix,
         )
 
     async def _play_from_search_pick(

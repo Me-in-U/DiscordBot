@@ -3,8 +3,10 @@ import unittest
 from cogs.music import GuildMusicState, MusicCog, MusicControlView, MusicHelperView
 from util.music_favorites import (
     MusicFavorite,
+    MusicFavoritePlayActionResult,
     MusicFavoriteSavePayload,
     build_music_favorite_button_label,
+    build_music_favorite_play_action,
     build_music_favorite_save_payload,
     current_player_to_music_favorite,
     music_favorite_to_save_payload,
@@ -178,6 +180,42 @@ class MusicFavoriteTests(unittest.IsolatedAsyncioTestCase):
                 updated_by=99,
             ),
         )
+
+    def test_music_favorite_play_action_returns_empty_slot_message(self):
+        result = build_music_favorite_play_action(slot=2, favorite=None)
+
+        self.assertEqual(
+            result,
+            MusicFavoritePlayActionResult(
+                slot=2,
+                should_play=False,
+                user_message="❌ 2번 즐겨찾기가 비어있습니다.",
+            ),
+        )
+
+    def test_music_favorite_play_action_returns_url_and_prefix(self):
+        favorite = MusicFavorite(
+            guild_id=10,
+            slot=2,
+            title="저장된 노래",
+            url="https://youtube.com/watch?v=abc",
+        )
+
+        result = build_music_favorite_play_action(slot=2, favorite=favorite)
+
+        self.assertEqual(
+            result,
+            MusicFavoritePlayActionResult(
+                slot=2,
+                should_play=True,
+                url="https://youtube.com/watch?v=abc",
+                success_prefix="⭐ 즐겨찾기 재생",
+            ),
+        )
+
+    def test_music_favorite_play_action_validates_slot(self):
+        with self.assertRaisesRegex(ValueError, "즐겨찾기 번호는 1~5"):
+            build_music_favorite_play_action(slot=0, favorite=None)
 
     async def test_default_music_view_shows_search_manage_and_five_favorite_slots(self):
         favorite = MusicFavorite(

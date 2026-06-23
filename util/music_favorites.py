@@ -41,6 +41,15 @@ class MusicFavoriteSavePayload:
         return f"⭐ {self.slot}번 즐겨찾기에 **{self.title}** 저장했습니다."
 
 
+@dataclass(frozen=True, slots=True)
+class MusicFavoritePlayActionResult:
+    slot: int
+    should_play: bool
+    user_message: str | None = None
+    url: str | None = None
+    success_prefix: str | None = None
+
+
 def validate_music_favorite_slot(slot: int) -> int:
     slot = int(slot)
     if slot < MUSIC_FAVORITE_SLOT_MIN or slot > MUSIC_FAVORITE_SLOT_MAX:
@@ -80,6 +89,27 @@ def build_music_favorite_button_label(
     if favorite is None:
         return f"{slot} 빈칸"
     return f"{slot} {shorten_music_favorite_title(favorite.title)}"
+
+
+def build_music_favorite_play_action(
+    *,
+    slot: int,
+    favorite: MusicFavorite | None,
+) -> MusicFavoritePlayActionResult:
+    slot = validate_music_favorite_slot(slot)
+    if favorite is None:
+        return MusicFavoritePlayActionResult(
+            slot=slot,
+            should_play=False,
+            user_message=f"❌ {slot}번 즐겨찾기가 비어있습니다.",
+        )
+
+    return MusicFavoritePlayActionResult(
+        slot=slot,
+        should_play=True,
+        url=favorite.url,
+        success_prefix="⭐ 즐겨찾기 재생",
+    )
 
 
 def current_player_to_music_favorite(
