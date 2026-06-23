@@ -237,8 +237,11 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         )
 
         self.assertIn("_ensure_music_url_voice_client", play_source)
+        self.assertIn("_defer_music_url_branch", play_source)
         self.assertIn("_get_music_url_branch_context", play_source)
         self.assertIn("_dispatch_music_url_immediate_playback", play_source)
+        self.assertNotIn("interaction.response.defer", play_source)
+        self.assertNotIn("if not skip_defer:", play_source)
         self.assertNotIn("_get_state", play_source)
         self.assertNotIn("guild_id = interaction.guild.id", play_source)
         self.assertNotIn("_should_start_music_url_immediate_playback", play_source)
@@ -269,6 +272,13 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         self.assertIn("url_play_result.user_message", queued_response_source)
         self.assertIn("_fill_queue_meta", queued_response_source)
         self.assertIn("_spawn_bg", queued_response_source)
+
+        defer_source = ast.get_source_segment(
+            source_text,
+            _function_node(tree, "_defer_music_url_branch"),
+        )
+        self.assertIn("if not skip_defer:", defer_source)
+        self.assertIn("interaction.response.defer(thinking=True, ephemeral=True)", defer_source)
 
         context_source = ast.get_source_segment(
             source_text,

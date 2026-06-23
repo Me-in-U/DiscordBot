@@ -1216,6 +1216,15 @@ class MusicCog(commands.Cog):
         state = self._get_state(guild_id)
         return guild_id, state
 
+    async def _defer_music_url_branch(
+        self,
+        interaction: discord.Interaction,
+        *,
+        skip_defer: bool,
+    ) -> None:
+        if not skip_defer:
+            await interaction.response.defer(thinking=True, ephemeral=True)
+
     async def _play_music_url_branch(
         self,
         interaction: discord.Interaction,
@@ -1223,8 +1232,7 @@ class MusicCog(commands.Cog):
         *,
         skip_defer: bool = False,
     ) -> None:
-        if not skip_defer:
-            await interaction.response.defer(thinking=True, ephemeral=True)
+        await self._defer_music_url_branch(interaction, skip_defer=skip_defer)
 
         # ! 기본정보 로드
         guild_id, state = self._get_music_url_branch_context(interaction)
