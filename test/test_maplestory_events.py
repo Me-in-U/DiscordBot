@@ -7,6 +7,7 @@ from util.maplestory_events import (
     MapleStoryEvent,
     MapleStoryNotice,
     SUNDAY_MAPLE_EVENT_TITLE,
+    build_maplestory_notice_embed,
     build_maplestory_notice_message,
     build_sunday_maple_event_embeds,
     fetch_sunday_maple_event,
@@ -308,6 +309,33 @@ class MapleStoryEventTests(unittest.TestCase):
             "불편을 드려 죄송합니다. 7/1(수)까지 수령해 주세요.\n\n"
             "[바로가기](https://maplestory.nexon.com/News/Notice/149370)",
         )
+
+    def test_builds_maplestory_notice_embed_with_three_summary_lines(self):
+        notice = MapleStoryNotice(
+            notice_id="149370",
+            category="[공지]",
+            title="6/22(월) 사과 보상 안내",
+            url="https://maplestory.nexon.com/News/Notice/149370",
+            summary="불편을 드려 죄송합니다. 7/1(수)까지 수령해 주세요.",
+        )
+
+        embed = build_maplestory_notice_embed(
+            notice,
+            [
+                "7/1까지 사과 보상 수령",
+                "월드 내 1회 지급",
+                "공식 공지에서 상세 확인",
+            ],
+        )
+
+        self.assertEqual(embed.title, "6/22(월) 사과 보상 안내")
+        self.assertEqual(embed.url, notice.url)
+        self.assertEqual(
+            embed.description,
+            "7/1까지 사과 보상 수령\n월드 내 1회 지급\n공식 공지에서 상세 확인",
+        )
+        self.assertEqual(embed.fields[0].name, "분류")
+        self.assertEqual(embed.fields[0].value, "[공지]")
 
     def test_slash_command_help_and_loop_include_maplestory_notice_subscription(self):
         cog_source = Path("cogs/maplestory.py").read_text(encoding="utf-8")
