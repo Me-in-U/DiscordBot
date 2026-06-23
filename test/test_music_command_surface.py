@@ -666,7 +666,11 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         self.assertIn("build_music_favorite_cache_load_action", favorite_loader)
         self.assertIn("cache_action.should_use_cache", favorite_loader)
         self.assertIn("cache_action.cached_favorites", favorite_loader)
+        self.assertIn("build_music_favorite_cache_store_action", favorite_loader)
+        self.assertIn("store_action.guild_id", favorite_loader)
+        self.assertIn("store_action.favorites", favorite_loader)
         self.assertNotIn("guild_id in self._favorite_cache", favorite_loader)
+        self.assertNotIn("self._favorite_cache[cache_action.guild_id]", favorite_loader)
 
     def test_queue_metadata_loader_uses_specific_extraction_exceptions(self):
         source_text = MUSIC_PATH.read_text(encoding="utf-8")

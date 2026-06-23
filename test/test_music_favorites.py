@@ -5,6 +5,7 @@ from cogs.music import GuildMusicState, MusicCog, MusicControlView, MusicHelperV
 from util.music_favorites import (
     MusicFavorite,
     MusicFavoriteCacheLoadAction,
+    MusicFavoriteCacheStoreAction,
     MusicFavoriteManagerOpenAction,
     MusicFavoriteManagerSelectionAction,
     MusicFavoritePanelRefreshAction,
@@ -19,6 +20,7 @@ from util.music_favorites import (
     MusicFavoriteSavePayload,
     MusicFavoriteCurrentSaveButtonAction,
     build_music_favorite_cache_load_action,
+    build_music_favorite_cache_store_action,
     build_music_favorite_current_save_button_action,
     build_music_favorite_current_track_save_action,
     build_music_favorite_search_entry_save_action,
@@ -393,6 +395,27 @@ class MusicFavoriteTests(unittest.IsolatedAsyncioTestCase):
                 guild_id=10,
                 should_use_cache=False,
                 cached_favorites=None,
+            ),
+        )
+
+    def test_music_favorite_cache_store_action_builds_cache_payload(self):
+        favorite = MusicFavorite(
+            guild_id=10,
+            slot=1,
+            title="loaded",
+            url="https://example.com/watch?v=1",
+        )
+
+        result = build_music_favorite_cache_store_action(
+            guild_id="10",
+            favorites=[favorite],
+        )
+
+        self.assertEqual(
+            result,
+            MusicFavoriteCacheStoreAction(
+                guild_id=10,
+                favorites=[favorite],
             ),
         )
 

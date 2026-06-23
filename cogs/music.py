@@ -17,6 +17,7 @@ from util.music_favorites import (
     MusicFavorite,
     MusicFavoriteSavePayload,
     build_music_favorite_cache_load_action,
+    build_music_favorite_cache_store_action,
     build_music_favorite_current_track_save_action,
     build_music_favorite_manager_open_action,
     build_music_favorite_panel_refresh_action,
@@ -205,7 +206,11 @@ class MusicCog(commands.Cog):
                 exc_info=True,
             )
             favorites = []
-        self._favorite_cache[cache_action.guild_id] = favorites
+        store_action = build_music_favorite_cache_store_action(
+            guild_id=cache_action.guild_id,
+            favorites=favorites,
+        )
+        self._favorite_cache[store_action.guild_id] = store_action.favorites
         return favorites
 
     async def _build_helper_view(self, guild_id: int) -> MusicHelperView:
