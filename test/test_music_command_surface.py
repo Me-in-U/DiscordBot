@@ -389,19 +389,29 @@ class MusicCommandSurfaceTests(unittest.TestCase):
                 self.assertNotIn("msg = await interaction.followup.send", function_source)
                 self.assertNotIn("self._auto_delete(", function_source)
 
-    def test_search_result_responses_use_shared_ephemeral_helper(self):
+    def test_search_result_responses_use_shared_response_helper(self):
         source_text = MUSIC_PATH.read_text(encoding="utf-8")
         tree = ast.parse(source_text)
 
-        helper_source = ast.get_source_segment(
+        ephemeral_helper_source = ast.get_source_segment(
             source_text,
             _function_node(tree, "_send_ephemeral_response"),
         )
-        self.assertIn("discord.NotFound", helper_source)
-        self.assertIn("discord.Forbidden", helper_source)
-        self.assertIn("discord.HTTPException", helper_source)
-        self.assertIn("logger.warning", helper_source)
-        self.assertNotIn("except Exception", helper_source)
+        self.assertIn("discord.NotFound", ephemeral_helper_source)
+        self.assertIn("discord.Forbidden", ephemeral_helper_source)
+        self.assertIn("discord.HTTPException", ephemeral_helper_source)
+        self.assertIn("logger.warning", ephemeral_helper_source)
+        self.assertNotIn("except Exception", ephemeral_helper_source)
+
+        response_helper_source = ast.get_source_segment(
+            source_text,
+            _function_node(tree, "_send_music_search_response"),
+        )
+        self.assertIn("search_result.user_message", response_helper_source)
+        self.assertIn("Embed(", response_helper_source)
+        self.assertIn("SearchResultView", response_helper_source)
+        self.assertIn("favorite_slot=favorite_slot", response_helper_source)
+        self.assertIn("_send_ephemeral_response", response_helper_source)
 
         for function_name in ("_play", "_search_music_for_favorite_slot"):
             function_source = ast.get_source_segment(
@@ -409,8 +419,12 @@ class MusicCommandSurfaceTests(unittest.TestCase):
                 _function_node(tree, function_name),
             )
             with self.subTest(function_name=function_name):
-                self.assertIn("_send_ephemeral_response", function_source)
-                self.assertIn("SearchResultView", function_source)
+                self.assertIn("_send_music_search_response", function_source)
+                self.assertNotIn("Embed(", function_source)
+                self.assertNotIn("SearchResultView", function_source)
+                self.assertNotIn("search_result.user_message", function_source)
+                self.assertNotIn("search_result.embed_title", function_source)
+                self.assertNotIn("search_result.embed_description", function_source)
                 self.assertNotIn("interaction.response.send_message", function_source)
                 self.assertNotIn("interaction.followup.send", function_source)
                 self.assertNotIn("except Exception", function_source)
@@ -426,14 +440,14 @@ class MusicCommandSurfaceTests(unittest.TestCase):
             )
             with self.subTest(function_name=function_name):
                 self.assertIn("build_music_search_action", function_source)
-                self.assertIn("search_result.videos", function_source)
-                self.assertIn("search_result.embed_title", function_source)
-                self.assertIn("search_result.embed_description", function_source)
-                self.assertIn("search_result.user_message", function_source)
                 self.assertIn("run_music_search_query", function_source)
+                self.assertIn("_send_music_search_response", function_source)
                 self.assertNotIn("run_in_executor", function_source)
                 self.assertNotIn("search_ytdl.extract_info", function_source)
                 self.assertNotIn("ytsearch10:", function_source)
+                self.assertNotIn("search_result.videos", function_source)
+                self.assertNotIn("search_result.embed_title", function_source)
+                self.assertNotIn("search_result.embed_description", function_source)
                 self.assertNotIn("filter_youtube_watch_entries", function_source)
                 self.assertNotIn("build_search_results_display", function_source)
                 self.assertNotIn("description = \"\\n\".join", function_source)

@@ -69,6 +69,7 @@ from util.music_progress import (
     make_timeline_line as build_music_timeline_line,
 )
 from util.music_search import (
+    MusicSearchActionResult,
     build_music_search_action,
     is_http_url,
     run_music_search_query,
@@ -235,6 +236,32 @@ class MusicCog(commands.Cog):
         favorites = await self._load_music_favorites(guild_id)
         return MusicControlView(self, state, favorites)
 
+    async def _send_music_search_response(
+        self,
+        interaction: discord.Interaction,
+        search_result: MusicSearchActionResult,
+        *,
+        favorite_slot: int | None = None,
+    ) -> None:
+        if search_result.user_message:
+            await self._send_ephemeral_response(
+                interaction,
+                search_result.user_message,
+            )
+            return
+
+        embed = Embed(
+            title=search_result.embed_title,
+            description=search_result.embed_description,
+            color=0xFFC0CB,
+        )
+        view = SearchResultView(
+            self,
+            search_result.videos,
+            favorite_slot=favorite_slot,
+        )
+        await self._send_ephemeral_response(interaction, embed=embed, view=view)
+
     async def _fill_queue_meta(self, track: "QueuedTrack"):
         """대기열 트랙의 가벼운 메타데이터를 채운다(재생에 영향 없음)."""
         try:
@@ -298,24 +325,11 @@ class MusicCog(commands.Cog):
             info=info,
             favorite_slot=favorite_search_action.slot,
         )
-        if search_result.user_message:
-            await self._send_ephemeral_response(
-                interaction,
-                search_result.user_message,
-            )
-            return
-
-        embed = Embed(
-            title=search_result.embed_title,
-            description=search_result.embed_description,
-            color=0xFFC0CB,
-        )
-        view = SearchResultView(
-            self,
-            search_result.videos,
+        await self._send_music_search_response(
+            interaction,
+            search_result,
             favorite_slot=favorite_search_action.slot,
         )
-        await self._send_ephemeral_response(interaction, embed=embed, view=view)
 
     async def _save_music_favorite(
         self,
@@ -1011,26 +1025,7 @@ class MusicCog(commands.Cog):
                 f"_play: search info keys={list(info.keys()) if isinstance(info,dict) else type(info)}"
             )
             search_result = build_music_search_action(url, info)
-            if search_result.user_message:
-                await self._send_ephemeral_response(
-                    interaction, search_result.user_message
-                )
-                return
-
-            dbg(f"_play: videos_count={len(search_result.videos)}")
-
-            # Embed  View 생성
-            dbg(
-                f"_play: description built length={len(search_result.embed_description or '')}"
-            )
-            embed = Embed(
-                title=search_result.embed_title,
-                description=search_result.embed_description,
-                color=0xFFC0CB,
-            )
-            view = SearchResultView(self, search_result.videos)
-            # ! 완료 메시지
-            await self._send_ephemeral_response(interaction, embed=embed, view=view)
+            await self._send_music_search_response(interaction, search_result)
             # 검색 모드에서는 여기서 종료 (선택은 SelectView가 처리)
             return
 
