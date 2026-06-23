@@ -1208,6 +1208,14 @@ class MusicCog(commands.Cog):
             url=url,
         )
 
+    def _get_music_url_branch_context(
+        self,
+        interaction: discord.Interaction,
+    ) -> tuple[int, GuildMusicState]:
+        guild_id = interaction.guild.id
+        state = self._get_state(guild_id)
+        return guild_id, state
+
     async def _play_music_url_branch(
         self,
         interaction: discord.Interaction,
@@ -1219,13 +1227,12 @@ class MusicCog(commands.Cog):
             await interaction.response.defer(thinking=True, ephemeral=True)
 
         # ! 기본정보 로드
-        guild_id = interaction.guild.id
+        guild_id, state = self._get_music_url_branch_context(interaction)
         voice_client = await self._ensure_music_url_voice_client(interaction)
         if voice_client is None:
             return
 
         # ! 이미 재생(또는 일시정지) 중이면 URL만 큐에 추가
-        state = self._get_state(interaction.guild.id)
         await self._dispatch_music_url_immediate_playback(
             interaction,
             guild_id=guild_id,

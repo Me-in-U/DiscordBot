@@ -237,7 +237,10 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         )
 
         self.assertIn("_ensure_music_url_voice_client", play_source)
+        self.assertIn("_get_music_url_branch_context", play_source)
         self.assertIn("_dispatch_music_url_immediate_playback", play_source)
+        self.assertNotIn("_get_state", play_source)
+        self.assertNotIn("guild_id = interaction.guild.id", play_source)
         self.assertNotIn("_should_start_music_url_immediate_playback", play_source)
         self.assertNotIn("_start_music_url_immediate_playback", play_source)
         self.assertNotIn("should_start_now", play_source)
@@ -266,6 +269,14 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         self.assertIn("url_play_result.user_message", queued_response_source)
         self.assertIn("_fill_queue_meta", queued_response_source)
         self.assertIn("_spawn_bg", queued_response_source)
+
+        context_source = ast.get_source_segment(
+            source_text,
+            _any_function_node(tree, "_get_music_url_branch_context"),
+        )
+        self.assertIn("guild_id = interaction.guild.id", context_source)
+        self.assertIn("self._get_state(guild_id)", context_source)
+        self.assertIn("return guild_id, state", context_source)
 
         dispatch_source = ast.get_source_segment(
             source_text,
