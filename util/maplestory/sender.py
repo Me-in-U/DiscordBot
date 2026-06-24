@@ -15,15 +15,42 @@ logger = logging.getLogger(__name__)
 
 
 MAPLESTORY_NOTICE_SUMMARY_MODEL = "gpt-5.4-mini"
-MAPLESTORY_NOTICE_SUMMARY_MAX_OUTPUT_TOKENS = 220
-MAPLESTORY_NOTICE_SUMMARY_LINE_LIMIT = 45
+MAPLESTORY_NOTICE_SUMMARY_MAX_OUTPUT_TOKENS = 320
+MAPLESTORY_NOTICE_SUMMARY_LINE_LIMIT = 90
+MAPLESTORY_NOTICE_SUMMARY_MIN_LINES = 3
+MAPLESTORY_NOTICE_SUMMARY_MAX_LINES = 4
+MAPLESTORY_NOTICE_FULL_BODY_LIMIT = 1200
+MAPLESTORY_NOTICE_IMPORTANT_BODY_LIMIT = 2200
+MAPLESTORY_NOTICE_IMPORTANT_BLOCK_LIMIT = 6
 MAPLESTORY_NOTICE_SUMMARY_INSTRUCTIONS = (
-    "너는 메이플스토리 공식 공지를 Discord 임베드 알림용으로 요약한다.\n"
-    "한국어로 정확히 3줄만 출력한다.\n"
-    "각 줄은 35자 안팎으로 짧고 밀도 있게 쓴다.\n"
-    "원문에 없는 날짜, 보상, 원인을 만들지 않는다.\n"
-    "인사말, 사과문, 중복 표현은 버리고 핵심 일정, 대상, 조치만 남긴다.\n"
+    "너는 메이플스토리 공식 공지를 Discord 임베드 알림용으로 재밌게 요약한다.\n"
+    "한국어로 3~4줄만 출력한다.\n"
+    "말투는 '반갑다 용사들아', '점검이 왔다', '알아서 원문 확인해라'처럼 건방지고 직설적인 반말로 쓴다.\n"
+    "욕설, 혐오, 특정 집단 비하, 성적 표현은 쓰지 않는다.\n"
+    "원문에 없는 날짜, 시간, 대상, 보상, 원인을 만들지 않는다.\n"
+    "인사말, 사과문, 중복 표현은 버리고 핵심 일정, 대상, 영향, 보상만 남긴다.\n"
+    "월드나 채널별 시간이 복잡하면 '월드별로 다르니 원문 확인해라'로 압축한다.\n"
     "번호, 불릿, 제목, 머리말 없이 줄바꿈으로만 구분한다."
+)
+_NOTICE_SECTION_LABEL_PATTERN = re.compile(r"\[\s*([^\]]{1,60})\s*\]")
+_IMPORTANT_NOTICE_LABEL_KEYWORDS = (
+    "작업일시",
+    "작업대상",
+    "작업내역",
+    "적용일시",
+    "전체월드작업내역",
+    "점검일정",
+    "점검내용",
+    "점검시간",
+    "작업영향",
+    "보상",
+    "기간",
+    "지급",
+    "수령",
+)
+_IMPORTANT_NOTICE_DIRECT_PHRASES = (
+    "점검시간과 작업영향",
+    "점검 시간과 작업 영향",
 )
 GenerateText = Callable[[str, str, str, int | None], str]
 SummarizeNotice = Callable[[MapleStoryNotice], Awaitable[list[str]]]
@@ -244,15 +271,107 @@ def _load_openai_text_generator() -> GenerateText:
 
 
 def _build_maplestory_notice_summary_input(notice: MapleStoryNotice) -> str:
+    source_label, body = _select_maplestory_notice_summary_body(notice)
     return "\n".join(
         [
             f"분류: {notice.category or '공지'}",
             f"제목: {notice.title}",
             f"링크: {notice.url}",
+            f"본문 발췌 방식: {source_label}",
             "본문:",
-            notice.summary or notice.title,
+            body,
         ]
     )
+
+
+def _select_maplestory_notice_summary_body(notice: MapleStoryNotice) -> tuple[str, str]:
+    body = _normalize_summary_source(
+        getattr(notice, "body_text", "") or notice.summary or notice.title
+    )
+    if len(body) <= MAPLESTORY_NOTICE_FULL_BODY_LIMIT:
+        return "전문", body
+
+    important_blocks = _extract_important_notice_blocks(body)
+    if important_blocks:
+        return "중요 블록", _fit_notice_summary_blocks(important_blocks)
+
+    return "긴 전문 앞부분", _truncate_discord_text(
+        body,
+        MAPLESTORY_NOTICE_IMPORTANT_BODY_LIMIT,
+    )
+
+
+def _normalize_summary_source(text: str) -> str:
+    return " ".join((text or "").split())
+
+
+def _extract_important_notice_blocks(body: str) -> list[str]:
+    markers = _find_notice_section_markers(body)
+    if not markers:
+        return []
+
+    blocks: list[str] = []
+    seen_blocks: set[str] = set()
+    for index, (start, label) in enumerate(markers):
+        if not _is_important_notice_label(label):
+            continue
+
+        end = markers[index + 1][0] if index + 1 < len(markers) else len(body)
+        block = body[start:end].strip()
+        if not block or block in seen_blocks:
+            continue
+
+        seen_blocks.add(block)
+        blocks.append(block)
+        if len(blocks) == MAPLESTORY_NOTICE_IMPORTANT_BLOCK_LIMIT:
+            break
+
+    return blocks
+
+
+def _find_notice_section_markers(body: str) -> list[tuple[int, str]]:
+    markers: list[tuple[int, str]] = []
+    for match in _NOTICE_SECTION_LABEL_PATTERN.finditer(body):
+        markers.append((match.start(), match.group(1)))
+
+    for phrase in _IMPORTANT_NOTICE_DIRECT_PHRASES:
+        start = 0
+        while True:
+            index = body.find(phrase, start)
+            if index < 0:
+                break
+            markers.append((index, phrase))
+            start = index + len(phrase)
+
+    deduped: dict[int, str] = {}
+    for start, label in markers:
+        deduped.setdefault(start, label)
+    return sorted(deduped.items(), key=lambda item: item[0])
+
+
+def _is_important_notice_label(label: str) -> bool:
+    compact = re.sub(r"\s+", "", label or "")
+    return any(keyword in compact for keyword in _IMPORTANT_NOTICE_LABEL_KEYWORDS)
+
+
+def _fit_notice_summary_blocks(blocks: list[str]) -> str:
+    selected: list[str] = []
+    used = 0
+    for block in blocks:
+        separator_length = 1 if selected else 0
+        remaining = MAPLESTORY_NOTICE_IMPORTANT_BODY_LIMIT - used - separator_length
+        if remaining <= 0:
+            break
+
+        normalized = _normalize_summary_source(block)
+        if len(normalized) > remaining:
+            normalized = _truncate_discord_text(normalized, remaining)
+
+        if normalized:
+            selected.append(normalized)
+            used += len(normalized) + separator_length
+
+    return "\n".join(selected)
 
 
 def _coerce_maplestory_notice_summary_lines(
@@ -265,18 +384,18 @@ def _coerce_maplestory_notice_summary_lines(
         if not line:
             continue
         lines.append(_truncate_discord_text(line, MAPLESTORY_NOTICE_SUMMARY_LINE_LIMIT))
-        if len(lines) == 3:
+        if len(lines) == MAPLESTORY_NOTICE_SUMMARY_MAX_LINES:
             break
 
-    if len(lines) < 3:
+    if len(lines) < MAPLESTORY_NOTICE_SUMMARY_MIN_LINES:
         for fallback_line in _fallback_maplestory_notice_summary_lines(notice):
             if fallback_line in lines:
                 continue
             lines.append(fallback_line)
-            if len(lines) == 3:
+            if len(lines) == MAPLESTORY_NOTICE_SUMMARY_MIN_LINES:
                 break
 
-    return lines[:3]
+    return lines[:MAPLESTORY_NOTICE_SUMMARY_MAX_LINES]
 
 
 def _clean_maplestory_notice_summary_line(line: str) -> str:
@@ -286,34 +405,51 @@ def _clean_maplestory_notice_summary_line(line: str) -> str:
 
 
 def _fallback_maplestory_notice_summary_lines(notice: MapleStoryNotice) -> list[str]:
-    source = notice.summary or notice.title
-    source = _strip_notice_greeting(source)
-    candidates = [
+    source = _strip_notice_greeting(
+        _normalize_summary_source(
+            getattr(notice, "body_text", "") or notice.summary or notice.title
+        )
+    )
+    source_blocks = _extract_important_notice_blocks(source)
+    candidates = source_blocks or [
         _clean_maplestory_notice_summary_line(part)
         for part in re.split(r"(?<=[.!?])\s+|[\r\n]+", source)
     ]
-    lines = [
-        _truncate_discord_text(candidate, MAPLESTORY_NOTICE_SUMMARY_LINE_LIMIT)
-        for candidate in candidates
-        if candidate
-    ]
 
-    fallback_candidates = [
-        notice.title,
-        f"{notice.category or '[공지]'} 공지입니다.",
-        "상세 내용은 공식 공지에서 확인해 주세요.",
-    ]
-    for candidate in fallback_candidates:
-        line = _truncate_discord_text(
-            _clean_maplestory_notice_summary_line(candidate),
-            MAPLESTORY_NOTICE_SUMMARY_LINE_LIMIT,
-        )
-        if line and line not in lines:
-            lines.append(line)
-        if len(lines) >= 3:
+    lines = [_spicy_notice_intro_line(notice)]
+    for candidate in candidates:
+        fact_line = _spicy_notice_fact_line(candidate)
+        if not fact_line or fact_line in lines:
+            continue
+        lines.append(fact_line)
+        if len(lines) == MAPLESTORY_NOTICE_SUMMARY_MAX_LINES - 1:
             break
 
-    return lines[:3]
+    closing = "자세한 건 원문 보고 헛걸음하지 마라."
+    if closing not in lines:
+        lines.append(closing)
+
+    return [
+        _truncate_discord_text(line, MAPLESTORY_NOTICE_SUMMARY_LINE_LIMIT)
+        for line in lines[:MAPLESTORY_NOTICE_SUMMARY_MAX_LINES]
+    ]
+
+
+def _spicy_notice_intro_line(notice: MapleStoryNotice) -> str:
+    label = f"{notice.category} {notice.title}"
+    if "점검" in label or "패치" in label:
+        return "반갑다 용사들아, 점검 공지 떴다."
+    if "보상" in label:
+        return "반갑다 용사들아, 보상 공지 떴다."
+    return "반갑다 용사들아, 새 공지 떴다."
+
+
+def _spicy_notice_fact_line(text: str) -> str:
+    cleaned = _clean_maplestory_notice_summary_line(text)
+    cleaned = re.sub(r"^\[[^\]]+\]\s*", "", cleaned).strip()
+    if not cleaned:
+        return ""
+    return f"핵심은 {cleaned}"
 
 
 def _strip_notice_greeting(text: str) -> str:

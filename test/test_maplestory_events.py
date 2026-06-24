@@ -279,6 +279,10 @@ class MapleStoryEventTests(unittest.TestCase):
             notice.summary,
             "불편을 드려 죄송합니다. 7/1(수)까지 수령해 주세요. 더 나은 서비스 제공을 위해 최선을 다하겠습니다.",
         )
+        self.assertEqual(
+            notice.body_text,
+            "안녕하세요. 메이플스토리 입니다. 불편을 드려 죄송합니다. 7/1(수)까지 수령해 주세요. 더 나은 서비스 제공을 위해 최선을 다하겠습니다.",
+        )
 
     def test_maplestory_notice_updates_include_same_id_fingerprint_changes(self):
         original = MapleStoryNotice(

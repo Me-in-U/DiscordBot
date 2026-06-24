@@ -13,6 +13,7 @@ from util.maplestory.notice_state import (
     MAPLESTORY_NOTICE_STATE_LIMIT,
     build_maplestory_notice_fingerprint,
     find_maplestory_notice_updates,
+    find_maplestory_notice_updates_with_state,
     maplestory_notice_state_from_notices,
     normalize_maplestory_notice_state as _normalize_maplestory_notice_state,
     remember_maplestory_notice_in_state as _remember_maplestory_notice_in_state,
@@ -151,7 +152,14 @@ async def refresh_maplestory_notice_messages(
             )
             continue
 
-        updates = find_maplestory_notice_updates(notices, guild_state)
+        updates, checked_state, migrated = find_maplestory_notice_updates_with_state(
+            notices,
+            guild_state,
+        )
+        if migrated:
+            guild_states[guild_key] = checked_state
+            guild_state = checked_state
+            changed = True
         if not updates:
             results.append(
                 MapleStoryNoticeUpdateResult(

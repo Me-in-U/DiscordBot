@@ -45,6 +45,7 @@ class MapleStoryNotice:
     title: str
     url: str
     summary: str = ""
+    body_text: str = ""
 
 
 def parse_maplestory_ongoing_event_url(
@@ -79,12 +80,14 @@ def parse_maplestory_notice_detail(
 ) -> MapleStoryNotice:
     parser = _MapleStoryNoticeDetailParser()
     parser.feed(html)
+    body_text = parser.body_text
     return MapleStoryNotice(
         notice_id=notice.notice_id,
         category=parser.category or notice.category,
         title=parser.title or notice.title,
         url=notice.url,
-        summary=_build_notice_summary(parser.body_text),
+        summary=_build_notice_summary(body_text),
+        body_text=body_text,
     )
 
 

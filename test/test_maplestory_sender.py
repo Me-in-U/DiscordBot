@@ -1,6 +1,7 @@
 import unittest
 import warnings
 from pathlib import Path
+from unittest.mock import patch
 
 from util.maplestory.parser import MapleStoryEvent, MapleStoryNotice
 
@@ -135,10 +136,97 @@ class MapleStorySenderTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(
             lines,
-            ["7/1까지 보상 수령 가능", "월드 내 1회 지급", "불필요한 인사말 제거"],
+            ["7/1까지 보상 수령 가능", "월드 내 1회 지급", "불필요한 인사말 제거", "네번째 줄 제거"],
         )
-        self.assertIn("정확히 3줄", calls[0][1])
+        self.assertIn("3~4줄", calls[0][1])
         self.assertIn(notice.summary, calls[0][0])
+
+    async def test_short_notice_summary_input_includes_full_body_text(self):
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            from util.maplestory.sender import _build_maplestory_notice_summary_input
+
+        notice = MapleStoryNotice(
+            notice_id="149380",
+            category="[공지]",
+            title="(수정) 6/25(목) 넥슨 정기점검 안내",
+            url="https://maplestory.nexon.com/News/Notice/149380",
+            summary="짧은 공지 요약",
+            body_text=(
+                "안녕하세요, 넥슨 고객 여러분. 매주 목요일은 넥슨 정기점검입니다. "
+                "오전 3시 ~ 오전 8시 고객센터 이용 불가. 오전 7시 ~ 오전 8시 넥슨PC방 홈페이지 이용 불가."
+            ),
+        )
+
+        summary_input = _build_maplestory_notice_summary_input(notice)
+
+        self.assertIn("본문 발췌 방식: 전문", summary_input)
+        self.assertIn("오전 3시 ~ 오전 8시 고객센터 이용 불가", summary_input)
+        self.assertIn("오전 7시 ~ 오전 8시 넥슨PC방 홈페이지 이용 불가", summary_input)
+
+    async def test_long_notice_summary_input_keeps_important_blocks(self):
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            from util.maplestory.sender import _build_maplestory_notice_summary_input
+
+        long_intro = "안녕하세요. 용사님! " + "인사말입니다. " * 140
+        body = (
+            f"{long_intro}"
+            "[작업 일시] 2026년 6월 23일 오후 5시 45분 ~ 오후 6시 45분 (1시간) "
+            "[작업 대상] 모든 월드 1~29채널, 일부 월드 30~79채널은 구간별로 진행 "
+            "[작업 내역] 서버 안정화 "
+            "[관련 공지] 이 블록은 요약 입력에서 우선하지 않는다 "
+            "[기타] 중요하지 않은 안내 " + "반복 안내 " * 200
+        )
+        notice = MapleStoryNotice(
+            notice_id="149382",
+            category="[점검]",
+            title="[점검완료] 6/23(화) 전체 월드 채널 점검",
+            url="https://maplestory.nexon.com/News/Notice/149382",
+            summary=body[:220],
+            body_text=body,
+        )
+
+        summary_input = _build_maplestory_notice_summary_input(notice)
+
+        self.assertIn("본문 발췌 방식: 중요 블록", summary_input)
+        self.assertIn("[작업 일시] 2026년 6월 23일", summary_input)
+        self.assertIn("[작업 대상] 모든 월드", summary_input)
+        self.assertIn("[작업 내역] 서버 안정화", summary_input)
+        self.assertNotIn("인사말입니다. 인사말입니다. 인사말입니다.", summary_input)
+        self.assertLessEqual(len(summary_input), 2600)
+
+    async def test_fallback_notice_summary_uses_spicy_three_or_four_lines(self):
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            from util.maplestory.sender import summarize_maplestory_notice_with_openai
+
+        notice = MapleStoryNotice(
+            notice_id="149382",
+            category="[점검]",
+            title="[점검완료] 6/23(화) 전체 월드 채널 점검",
+            url="https://maplestory.nexon.com/News/Notice/149382",
+            summary="2026년 6월 23일 오후 5시 45분 ~ 오후 6시 45분 채널 점검입니다.",
+            body_text=(
+                "[작업 일시] 2026년 6월 23일 오후 5시 45분 ~ 오후 6시 45분 "
+                "[작업 대상] 모든 메이플스토리 월드 "
+                "[작업 내역] 서버 안정화"
+            ),
+        )
+
+        def failing_generate_text_model(user_input, instructions, model, max_output_tokens):
+            raise RuntimeError("boom")
+
+        with patch("util.maplestory.sender.logger.warning"):
+            lines = await summarize_maplestory_notice_with_openai(
+                notice,
+                generate_text=failing_generate_text_model,
+            )
+
+        self.assertGreaterEqual(len(lines), 3)
+        self.assertLessEqual(len(lines), 4)
+        self.assertTrue(lines[0].startswith("반갑다"))
+        self.assertTrue(any("점검" in line for line in lines))
 
 
 class MapleStorySenderCompatibilityTests(unittest.TestCase):

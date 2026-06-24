@@ -12,6 +12,7 @@ class MapleStoryNoticeLike(Protocol):
     category: str
     title: str
     summary: str
+    body_text: str
 
 
 NoticeT = TypeVar("NoticeT", bound=MapleStoryNoticeLike)
@@ -24,6 +25,19 @@ def build_maplestory_notice_fingerprint(notice: MapleStoryNoticeLike) -> str:
             notice.category,
             notice.title,
             notice.summary,
+        ]
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def build_maplestory_notice_body_fingerprint(notice: MapleStoryNoticeLike) -> str:
+    body_text = getattr(notice, "body_text", "") or notice.summary
+    payload = "\n".join(
+        [
+            notice.notice_id,
+            notice.category,
+            notice.title,
+            body_text,
         ]
     )
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
@@ -44,15 +58,38 @@ def find_maplestory_notice_updates(
     notices: Sequence[NoticeT],
     state: dict[str, Any] | None,
 ) -> list[NoticeT]:
+    updates, _checked_state, _migrated = find_maplestory_notice_updates_with_state(
+        notices,
+        state,
+    )
+    return updates
+
+
+def find_maplestory_notice_updates_with_state(
+    notices: Sequence[NoticeT],
+    state: dict[str, Any] | None,
+) -> tuple[list[NoticeT], dict[str, Any], bool]:
     normalized = normalize_maplestory_notice_state(state)
     stored_notices = normalized["notices"]
     updates: list[NoticeT] = []
+    migrated = False
     for notice in notices:
         stored = stored_notices.get(notice.notice_id)
         fingerprint = build_maplestory_notice_fingerprint(notice)
         if not isinstance(stored, dict) or stored.get("fingerprint") != fingerprint:
             updates.append(notice)
-    return updates
+            continue
+
+        body_fingerprint = build_maplestory_notice_body_fingerprint(notice)
+        if not stored.get("bodyFingerprint"):
+            stored["bodyFingerprint"] = body_fingerprint
+            migrated = True
+            continue
+
+        if stored.get("bodyFingerprint") != body_fingerprint:
+            updates.append(notice)
+
+    return updates, normalized, migrated
 
 
 def normalize_maplestory_notice_state(
@@ -83,6 +120,7 @@ def remember_maplestory_notice_in_state(
     normalized = normalize_maplestory_notice_state(state)
     normalized["notices"][notice.notice_id] = {
         "fingerprint": build_maplestory_notice_fingerprint(notice),
+        "bodyFingerprint": build_maplestory_notice_body_fingerprint(notice),
         "title": notice.title,
         "category": notice.category,
     }
