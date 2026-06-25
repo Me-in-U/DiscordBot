@@ -139,6 +139,9 @@ class MapleStorySenderTests(unittest.IsolatedAsyncioTestCase):
             ["7/1까지 보상 수령 가능", "월드 내 1회 지급", "불필요한 인사말 제거", "네번째 줄 제거"],
         )
         self.assertIn("3~4줄", calls[0][1])
+        self.assertNotIn("알아서", calls[0][1])
+        self.assertNotIn("핵심은", calls[0][1])
+        self.assertNotIn("헛걸음", calls[0][1])
         self.assertIn(notice.summary, calls[0][0])
 
     async def test_short_notice_summary_input_includes_full_body_text(self):
@@ -225,8 +228,52 @@ class MapleStorySenderTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertGreaterEqual(len(lines), 3)
         self.assertLessEqual(len(lines), 4)
-        self.assertTrue(lines[0].startswith("반갑다"))
         self.assertTrue(any("점검" in line for line in lines))
+        rendered = "\n".join(lines)
+        self.assertNotIn("핵심은", rendered)
+        self.assertNotIn("헛걸음", rendered)
+        self.assertNotIn("자세한 건 원문 보고", rendered)
+
+    def test_fallback_notice_summary_first_line_reflects_notice_status(self):
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            from util.maplestory.sender import _fallback_maplestory_notice_summary_lines
+
+        scheduled = MapleStoryNotice(
+            notice_id="149500",
+            category="[점검]",
+            title="[점검예정] 6/25(목) 챌린저스 월드 채널 점검 (11:50~12:50)",
+            url="https://maplestory.nexon.com/News/Notice/149500",
+            summary="2026년 6월 25일 오전 11시 50분 ~ 낮 12시 50분 채널 점검입니다.",
+            body_text="[작업 일시] 2026년 6월 25일 오전 11시 50분 ~ 낮 12시 50분 [작업 대상] 챌린저스 월드",
+        )
+        in_progress = MapleStoryNotice(
+            notice_id="149500",
+            category="[점검]",
+            title="[점검중] 6/25(목) 챌린저스 월드 채널 점검 (11:50~12:50)",
+            url="https://maplestory.nexon.com/News/Notice/149500",
+            summary=scheduled.summary,
+            body_text=scheduled.body_text,
+        )
+        completed = MapleStoryNotice(
+            notice_id="149500",
+            category="[점검]",
+            title="[점검완료] 6/25(목) 챌린저스 월드 채널 점검 (11:50~12:50)",
+            url="https://maplestory.nexon.com/News/Notice/149500",
+            summary=scheduled.summary,
+            body_text=scheduled.body_text,
+        )
+
+        first_lines = {
+            _fallback_maplestory_notice_summary_lines(scheduled)[0],
+            _fallback_maplestory_notice_summary_lines(in_progress)[0],
+            _fallback_maplestory_notice_summary_lines(completed)[0],
+        }
+
+        self.assertEqual(len(first_lines), 3)
+        self.assertTrue(any("예정" in line for line in first_lines))
+        self.assertTrue(any("진행" in line for line in first_lines))
+        self.assertTrue(any("완료" in line for line in first_lines))
 
 
 class MapleStorySenderCompatibilityTests(unittest.TestCase):

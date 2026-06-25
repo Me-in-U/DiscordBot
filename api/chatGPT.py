@@ -62,7 +62,7 @@ def generate_text_model(
         "model": model,
         "instructions": instructions,
         "input": user_input,
-        "reasoning": {"effort": "minimal"},
+        "reasoning": {"effort": "low"},
         "text": {"verbosity": "low"},
     }
     if max_output_tokens is not None:

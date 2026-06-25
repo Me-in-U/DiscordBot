@@ -25,11 +25,12 @@ MAPLESTORY_NOTICE_IMPORTANT_BLOCK_LIMIT = 6
 MAPLESTORY_NOTICE_SUMMARY_INSTRUCTIONS = (
     "너는 메이플스토리 공식 공지를 Discord 임베드 알림용으로 재밌게 요약한다.\n"
     "한국어로 3~4줄만 출력한다.\n"
-    "말투는 '반갑다 용사들아', '점검이 왔다', '알아서 원문 확인해라'처럼 건방지고 직설적인 반말로 쓴다.\n"
+    "말투는 짧고 직설적인 반말로 쓰되, 같은 시작 문장을 반복하지 않는다.\n"
     "욕설, 혐오, 특정 집단 비하, 성적 표현은 쓰지 않는다.\n"
     "원문에 없는 날짜, 시간, 대상, 보상, 원인을 만들지 않는다.\n"
     "인사말, 사과문, 중복 표현은 버리고 핵심 일정, 대상, 영향, 보상만 남긴다.\n"
-    "월드나 채널별 시간이 복잡하면 '월드별로 다르니 원문 확인해라'로 압축한다.\n"
+    "월드나 채널별 시간이 복잡하면 세부 채널은 링크에서 확인하라는 식으로 압축한다.\n"
+    "고정 접두사, 과한 훈계, 낡은 농담, 불필요한 원문 유도 문구는 쓰지 않는다.\n"
     "번호, 불릿, 제목, 머리말 없이 줄바꿈으로만 구분한다."
 )
 _NOTICE_SECTION_LABEL_PATTERN = re.compile(r"\[\s*([^\]]{1,60})\s*\]")
@@ -416,16 +417,16 @@ def _fallback_maplestory_notice_summary_lines(notice: MapleStoryNotice) -> list[
         for part in re.split(r"(?<=[.!?])\s+|[\r\n]+", source)
     ]
 
-    lines = [_spicy_notice_intro_line(notice)]
+    lines = [_fallback_notice_status_line(notice)]
     for candidate in candidates:
-        fact_line = _spicy_notice_fact_line(candidate)
+        fact_line = _fallback_notice_fact_line(candidate)
         if not fact_line or fact_line in lines:
             continue
         lines.append(fact_line)
         if len(lines) == MAPLESTORY_NOTICE_SUMMARY_MAX_LINES - 1:
             break
 
-    closing = "자세한 건 원문 보고 헛걸음하지 마라."
+    closing = _fallback_notice_closing_line(notice)
     if closing not in lines:
         lines.append(closing)
 
@@ -435,21 +436,34 @@ def _fallback_maplestory_notice_summary_lines(notice: MapleStoryNotice) -> list[
     ]
 
 
-def _spicy_notice_intro_line(notice: MapleStoryNotice) -> str:
+def _fallback_notice_status_line(notice: MapleStoryNotice) -> str:
     label = f"{notice.category} {notice.title}"
-    if "점검" in label or "패치" in label:
-        return "반갑다 용사들아, 점검 공지 떴다."
+    if "패치완료" in label:
+        return "패치 완료 안내입니다."
+    if "점검완료" in label:
+        return "점검 완료 안내입니다."
+    if "점검중" in label:
+        return "점검 진행 중입니다."
+    if "점검예정" in label or "점검" in label:
+        return "점검 예정 안내입니다."
     if "보상" in label:
-        return "반갑다 용사들아, 보상 공지 떴다."
-    return "반갑다 용사들아, 새 공지 떴다."
+        return "보상 안내입니다."
+    return "새 공지 안내입니다."
 
 
-def _spicy_notice_fact_line(text: str) -> str:
+def _fallback_notice_fact_line(text: str) -> str:
     cleaned = _clean_maplestory_notice_summary_line(text)
     cleaned = re.sub(r"^\[[^\]]+\]\s*", "", cleaned).strip()
-    if not cleaned:
+    if not cleaned or cleaned == "-":
         return ""
-    return f"핵심은 {cleaned}"
+    return cleaned
+
+
+def _fallback_notice_closing_line(notice: MapleStoryNotice) -> str:
+    label = f"{notice.category} {notice.title}"
+    if "채널" in label or "월드" in label:
+        return "세부 채널은 링크에서 확인."
+    return "세부 내용은 링크에서 확인."
 
 
 def _strip_notice_greeting(text: str) -> str:
