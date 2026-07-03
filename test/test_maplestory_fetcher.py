@@ -26,6 +26,21 @@ NOTICE_LIST_HTML = """
 </a>
 """
 
+NOTICE_LIST_WITH_IGNORED_HTML = """
+<a href="/News/Notice/All/149375">
+    <em><img src="notice_icon01.png" alt="[공지]" /></em>
+    <span>7/3(금) 버그/불법프로그램 신고 보상 안내</span>
+</a>
+<a href="/News/Notice/All/149374">
+    <em><img src="notice_icon01.png" alt="[공지]" /></em>
+    <span>Tver.1.2.202 우수테스터 발표 안내</span>
+</a>
+<a href="/News/Notice/All/149371">
+    <em><img src="notice_icon03.png" alt="[점검]" /></em>
+    <span>6/22(월) 서버 점검</span>
+</a>
+"""
+
 NOTICE_DETAIL_HTML = """
 <p class="qs_title"><em><img alt="[점검]" /></em><span>[점검완료] 6/22(월) 서버 점검</span></p>
 <div class="qs_text"><p>안녕하세요. 메이플스토리입니다.</p><p>점검이 완료되었습니다.</p></div>
@@ -106,6 +121,31 @@ class MapleStoryFetcherModuleTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(notices[0].title, "[점검완료] 6/22(월) 서버 점검")
         self.assertEqual(notices[0].summary, "점검이 완료되었습니다.")
+
+    async def test_fetch_latest_maplestory_notices_skips_low_signal_reward_announcements(self):
+        from util.maplestory.fetcher import fetch_latest_maplestory_notices
+
+        requested_urls = []
+
+        async def fake_fetch(url: str) -> str:
+            requested_urls.append(url)
+            if url.endswith("/News/Notice"):
+                return NOTICE_LIST_WITH_IGNORED_HTML
+            return NOTICE_DETAIL_HTML
+
+        notices = await fetch_latest_maplestory_notices(
+            fetch_html=fake_fetch,
+            limit=10,
+        )
+
+        self.assertEqual([notice.notice_id for notice in notices], ["149371"])
+        self.assertEqual(
+            requested_urls,
+            [
+                "https://maplestory.nexon.com/News/Notice",
+                "https://maplestory.nexon.com/News/Notice/149371",
+            ],
+        )
 
 
 class MapleStoryFetcherCompatibilityTests(unittest.TestCase):

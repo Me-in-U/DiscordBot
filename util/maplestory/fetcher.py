@@ -20,6 +20,11 @@ from util.maplestory.parser import (
 
 logger = logging.getLogger(__name__)
 
+MAPLESTORY_IGNORED_NOTICE_TITLE_MARKERS = (
+    "신고보상안내",
+    "우수테스터발표안내",
+)
+
 MAPLESTORY_HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -58,6 +63,11 @@ async def fetch_latest_maplestory_notices(
     fetch = fetch_html or _fetch_html
     list_html = await fetch(MAPLESTORY_NOTICE_LIST_URL)
     notices = await asyncio.to_thread(parse_maplestory_notice_list, list_html)
+    notices = [
+        notice
+        for notice in notices
+        if not _should_ignore_maplestory_notice_alert(notice)
+    ]
     hydrated: list[MapleStoryNotice] = []
     for notice in notices[:limit]:
         try:
@@ -77,6 +87,14 @@ async def fetch_latest_maplestory_notices(
             )
             hydrated.append(notice)
     return hydrated
+
+
+def _should_ignore_maplestory_notice_alert(notice: MapleStoryNotice) -> bool:
+    compact_title = "".join((notice.title or "").split())
+    return any(
+        marker in compact_title
+        for marker in MAPLESTORY_IGNORED_NOTICE_TITLE_MARKERS
+    )
 
 
 async def _fetch_html(url: str) -> str:
