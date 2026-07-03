@@ -12,6 +12,7 @@ from func.youtube_links import (
     extract_youtube_link,
     get_youtube_link_kind,
 )
+from util.logging_utils import log_user_error
 
 
 logger = logging.getLogger(__name__)
@@ -65,14 +66,18 @@ class YouTubeSummaryView(discord.ui.View):
                     view=None,
                 )
 
-        except Exception:
-            logger.exception("YouTube 요약 처리 실패: url=%s", self.youtube_url)
+        except Exception as exc:
             button.disabled = True
             button.label = "오류!"
             button.style = discord.ButtonStyle.danger
             if self.original_message:
                 await self.original_message.edit(
-                    content="⚠️ 유튜브 요약 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
+                    content=log_user_error(
+                        logger,
+                        "유튜브 요약",
+                        exc,
+                        extra={"youtube_url": self.youtube_url},
+                    ),
                     view=self,
                 )
 

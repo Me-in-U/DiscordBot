@@ -1,7 +1,10 @@
 import logging
+import os
 import unittest
 
 from util.logging_utils import log_user_error, user_error_message
+
+os.environ.setdefault("OPENAI_KEY", "test-key")
 
 
 class ErrorHandlingHelperTests(unittest.TestCase):
@@ -28,6 +31,35 @@ class ErrorHandlingHelperTests(unittest.TestCase):
         self.assertNotIn("secret-token", message)
         self.assertIn("번역", "\n".join(captured.output))
         self.assertIn("secret-token", "\n".join(captured.output))
+
+    def test_openai_model_error_returns_admin_contact_message(self):
+        from api.chatGPT import OpenAIModelError
+
+        message = user_error_message(
+            "검색",
+            OpenAIModelError("OpenAI prompt response failed."),
+        )
+
+        self.assertIn("검색", message)
+        self.assertIn("관리자에게 연락해주세요", message)
+        self.assertNotIn("잠시 후 다시 시도", message)
+        self.assertNotIn("OpenAI", message)
+
+    def test_nested_openai_model_error_returns_admin_contact_message(self):
+        from api.chatGPT import OpenAIModelError
+
+        try:
+            try:
+                raise OpenAIModelError("OpenAI prompt response failed.")
+            except OpenAIModelError as exc:
+                raise RuntimeError("wrapper-secret") from exc
+        except RuntimeError as exc:
+            message = user_error_message("유튜브 요약", exc)
+
+        self.assertIn("유튜브 요약", message)
+        self.assertIn("관리자에게 연락해주세요", message)
+        self.assertNotIn("잠시 후 다시 시도", message)
+        self.assertNotIn("wrapper-secret", message)
 
 
 if __name__ == "__main__":
