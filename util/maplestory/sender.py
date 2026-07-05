@@ -10,7 +10,6 @@ import discord
 
 from util.maplestory.parser import MapleStoryEvent, MapleStoryNotice
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -25,7 +24,7 @@ MAPLESTORY_NOTICE_IMPORTANT_BLOCK_LIMIT = 6
 MAPLESTORY_NOTICE_SUMMARY_INSTRUCTIONS = (
     "너는 메이플스토리 공식 공지를 Discord 임베드 알림용으로 재밌게 요약한다.\n"
     "한국어로 3~4줄만 출력한다.\n"
-    "말투는 짧고 직설적인 반말로 쓰되, 같은 시작 문장을 반복하지 않는다.\n"
+    "말투는 짧고 직설적인 커뮤니티 반말 말투로 쓰되, 같은 시작 문장을 반복하지 않는다.\n"
     "욕설, 혐오, 특정 집단 비하, 성적 표현은 쓰지 않는다.\n"
     "원문에 없는 날짜, 시간, 대상, 보상, 원인을 만들지 않는다.\n"
     "인사말, 사과문, 중복 표현은 버리고 핵심 일정, 대상, 영향, 보상만 남긴다.\n"
