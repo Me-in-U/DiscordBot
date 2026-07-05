@@ -57,13 +57,15 @@ def generate_text_model(
     instructions: str,
     model: str = "gpt-5.4-mini",
     max_output_tokens: int | None = None,
+    reasoning_effort: str = "low",
+    text_verbosity: str = "low",
 ):
     request_kwargs = {
         "model": model,
         "instructions": instructions,
         "input": user_input,
-        "reasoning": {"effort": "low"},
-        "text": {"verbosity": "low"},
+        "reasoning": {"effort": reasoning_effort},
+        "text": {"verbosity": text_verbosity},
     }
     if max_output_tokens is not None:
         request_kwargs["max_output_tokens"] = max_output_tokens

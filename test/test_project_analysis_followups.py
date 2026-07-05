@@ -305,6 +305,34 @@ class SensitiveLogPolicyTests(unittest.TestCase):
             {"effort": "low"},
         )
 
+    def test_generate_text_model_accepts_none_reasoning_effort(self):
+        import api.chatGPT as chatgpt
+
+        class FakeResponse:
+            output_text = "메뉴"
+
+        with patch.object(
+            chatgpt.clientGPT.responses,
+            "create",
+            return_value=FakeResponse(),
+        ) as create_mock:
+            self.assertEqual(
+                chatgpt.generate_text_model(
+                    "입력",
+                    "지시",
+                    model="gpt-5.4-nano",
+                    reasoning_effort="none",
+                    text_verbosity="low",
+                    max_output_tokens=24,
+                ),
+                "메뉴",
+            )
+
+        self.assertEqual(
+            create_mock.call_args.kwargs["reasoning"],
+            {"effort": "none"},
+        )
+
     def test_chatgpt_helpers_wrap_client_failures_in_domain_error(self):
         import api.chatGPT as chatgpt
 
