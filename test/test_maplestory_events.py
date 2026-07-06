@@ -6,6 +6,7 @@ from unittest.mock import patch
 from util.maplestory.events import (
     MapleStoryEvent,
     MapleStoryNotice,
+    MapleStoryNoticeUpdateResult,
     SUNDAY_MAPLE_EVENT_TITLE,
     build_maplestory_notice_embed,
     build_maplestory_notice_message,
@@ -17,8 +18,10 @@ from util.maplestory.events import (
     parse_maplestory_notice_list,
     parse_maplestory_event_detail,
     parse_maplestory_ongoing_event_url,
+    refresh_maplestory_notice_messages,
     refresh_sunday_maple_messages,
 )
+from util.maplestory.notice_state import remember_maplestory_notice_in_state
 
 
 MAPLESTORY_EVENTS_PATH = Path("util/maplestory/events.py")
@@ -367,6 +370,180 @@ class MapleStoryEventTests(unittest.TestCase):
         self.assertIn("@tasks.loop(minutes=3)", loop_source)
         self.assertIn("maplestory_notice_check", loop_source)
 
+    def test_refresh_maplestory_notice_messages_deletes_tracked_pre_completion_messages(self):
+        scheduled = MapleStoryNotice(
+            notice_id="149500",
+            category="[점검]",
+            title="[점검예정] 6/25(목) 챌린저스 월드 채널 점검",
+            url="https://maplestory.nexon.com/News/Notice/149500",
+            summary="오전 11시 50분부터 점검합니다.",
+        )
+        completed = MapleStoryNotice(
+            notice_id="149500",
+            category="[점검]",
+            title="[점검완료] 6/25(목) 챌린저스 월드 채널 점검",
+            url="https://maplestory.nexon.com/News/Notice/149500",
+            summary="점검이 완료되었습니다.",
+        )
+        guild_state = maplestory_notice_state_from_notices([scheduled])
+        remember_maplestory_notice_in_state(
+            guild_state,
+            scheduled,
+            channel_id=1234,
+            message_id=111,
+        )
+        state = {"guilds": {"10": guild_state}}
+        saved_states = []
+        bot = _FakeBot()
+        previous_message = _FakeNoticeMessage(
+            message_id=111,
+            author=bot.user,
+            title=scheduled.title,
+            url=scheduled.url,
+        )
+        channel = _FakeNoticeChannel(channel_id=1234, messages=[previous_message])
+
+        async def fake_get_channels_by_purpose(_purpose):
+            return {10: 1234}
+
+        async def fake_load_state():
+            return state
+
+        async def fake_save_state(saved_state):
+            saved_states.append(saved_state)
+
+        async def fake_fetch_notices():
+            return [completed]
+
+        async def fake_send_notice(_target, *, guild_id, channel_id, notice):
+            return MapleStoryNoticeUpdateResult(
+                guild_id=guild_id,
+                channel_id=channel_id,
+                notice_id=notice.notice_id,
+                message_id=222,
+                action="sent",
+            )
+
+        async def fake_resolve_channel(_bot, _channel_id):
+            return channel
+
+        with patch("util.guild.channel_settings.get_channels_by_purpose", fake_get_channels_by_purpose), patch(
+            "util.maplestory.events._load_maplestory_notice_state",
+            fake_load_state,
+        ), patch(
+            "util.maplestory.events._save_maplestory_notice_state",
+            fake_save_state,
+        ), patch(
+            "util.maplestory.events.resolve_text_channel",
+            fake_resolve_channel,
+        ), patch(
+            "util.maplestory.events.send_maplestory_notice_to_channel",
+            fake_send_notice,
+        ):
+            results = asyncio.run(
+                refresh_maplestory_notice_messages(
+                    bot=bot,
+                    fetch_notices=fake_fetch_notices,
+                )
+            )
+
+        self.assertTrue(previous_message.deleted)
+        self.assertEqual(results[0].deleted_message_ids, [111])
+        notice_state = saved_states[0]["guilds"]["10"]["notices"]["149500"]
+        self.assertEqual(
+            [record["messageId"] for record in notice_state["sentMessages"]],
+            [222],
+        )
+
+    def test_refresh_maplestory_notice_messages_scans_legacy_history_when_message_ids_are_missing(self):
+        scheduled = MapleStoryNotice(
+            notice_id="149501",
+            category="[점검]",
+            title="[점검중] 6/26(금) 전체 월드 채널 점검",
+            url="https://maplestory.nexon.com/News/Notice/149501",
+            summary="점검 진행 중입니다.",
+        )
+        completed = MapleStoryNotice(
+            notice_id="149501",
+            category="[점검]",
+            title="[점검완료] 6/26(금) 전체 월드 채널 점검",
+            url="https://maplestory.nexon.com/News/Notice/149501",
+            summary="점검이 완료되었습니다.",
+        )
+        state = {"guilds": {"10": maplestory_notice_state_from_notices([scheduled])}}
+        bot = _FakeBot()
+        previous_message = _FakeNoticeMessage(
+            message_id=333,
+            author=bot.user,
+            title=scheduled.title,
+            url=scheduled.url,
+        )
+        other_notice_message = _FakeNoticeMessage(
+            message_id=334,
+            author=bot.user,
+            title="[점검중] 다른 공지",
+            url="https://maplestory.nexon.com/News/Notice/999999",
+        )
+        user_message = _FakeNoticeMessage(
+            message_id=335,
+            author=object(),
+            title=scheduled.title,
+            url=scheduled.url,
+        )
+        channel = _FakeNoticeChannel(
+            channel_id=1234,
+            messages=[previous_message, other_notice_message, user_message],
+        )
+
+        async def fake_get_channels_by_purpose(_purpose):
+            return {10: 1234}
+
+        async def fake_load_state():
+            return state
+
+        async def fake_save_state(_saved_state):
+            return None
+
+        async def fake_fetch_notices():
+            return [completed]
+
+        async def fake_send_notice(_target, *, guild_id, channel_id, notice):
+            return MapleStoryNoticeUpdateResult(
+                guild_id=guild_id,
+                channel_id=channel_id,
+                notice_id=notice.notice_id,
+                message_id=444,
+                action="sent",
+            )
+
+        async def fake_resolve_channel(_bot, _channel_id):
+            return channel
+
+        with patch("util.guild.channel_settings.get_channels_by_purpose", fake_get_channels_by_purpose), patch(
+            "util.maplestory.events._load_maplestory_notice_state",
+            fake_load_state,
+        ), patch(
+            "util.maplestory.events._save_maplestory_notice_state",
+            fake_save_state,
+        ), patch(
+            "util.maplestory.events.resolve_text_channel",
+            fake_resolve_channel,
+        ), patch(
+            "util.maplestory.events.send_maplestory_notice_to_channel",
+            fake_send_notice,
+        ):
+            results = asyncio.run(
+                refresh_maplestory_notice_messages(
+                    bot=bot,
+                    fetch_notices=fake_fetch_notices,
+                )
+            )
+
+        self.assertTrue(previous_message.deleted)
+        self.assertFalse(other_notice_message.deleted)
+        self.assertFalse(user_message.deleted)
+        self.assertEqual(results[0].deleted_message_ids, [333])
+
 
 class _FakeSentMessage:
     id = 9876
@@ -380,6 +557,46 @@ class _FakeTextChannel:
     async def send(self, **kwargs):
         self.sent_messages.append(kwargs)
         return _FakeSentMessage()
+
+
+class _FakeBot:
+    def __init__(self):
+        self.user = object()
+
+
+class _FakeNoticeMessage:
+    def __init__(self, *, message_id: int, author: object, title: str, url: str):
+        self.id = message_id
+        self.author = author
+        self.embeds = [_FakeNoticeEmbed(title=title, url=url)]
+        self.deleted = False
+
+    async def delete(self):
+        self.deleted = True
+
+
+class _FakeNoticeEmbed:
+    def __init__(self, *, title: str, url: str):
+        self.title = title
+        self.url = url
+        self.fields = []
+
+
+class _FakeNoticeChannel:
+    def __init__(self, *, channel_id: int, messages: list[_FakeNoticeMessage]):
+        self.id = channel_id
+        self.messages = {message.id: message for message in messages}
+        self.history_messages = messages
+
+    async def fetch_message(self, message_id: int):
+        return self.messages[int(message_id)]
+
+    def history(self, *, limit=None):
+        async def iterator():
+            for message in self.history_messages[:limit]:
+                yield message
+
+        return iterator()
 
 
 if __name__ == "__main__":

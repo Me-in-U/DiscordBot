@@ -4,7 +4,7 @@ import asyncio
 import logging
 import re
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import discord
 
@@ -71,6 +71,8 @@ class MapleStoryNoticeUpdateResult:
     guild_id: int
     channel_id: int | None = None
     notice_id: str | None = None
+    message_id: int | None = None
+    deleted_message_ids: list[int] = field(default_factory=list)
     action: str | None = None
     status: str = "ok"
     error: str | None = None
@@ -219,7 +221,9 @@ async def send_maplestory_notice_to_channel(
         summary_lines = _fallback_maplestory_notice_summary_lines(notice)
 
     try:
-        await target.send(embed=build_maplestory_notice_embed(notice, summary_lines))
+        sent_message = await target.send(
+            embed=build_maplestory_notice_embed(notice, summary_lines)
+        )
     except (discord.Forbidden, discord.HTTPException) as exc:
         logger.warning(
             "메이플스토리 공지 전송 실패: guild=%s channel=%s notice=%s",
@@ -241,6 +245,7 @@ async def send_maplestory_notice_to_channel(
         guild_id=guild_id,
         channel_id=channel_id,
         notice_id=notice.notice_id,
+        message_id=getattr(sent_message, "id", None),
         action="sent",
     )
 

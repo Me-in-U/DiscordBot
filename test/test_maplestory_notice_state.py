@@ -4,9 +4,12 @@ from pathlib import Path
 from util.maplestory.events import MapleStoryNotice
 from util.maplestory.notice_state import (
     build_maplestory_notice_fingerprint,
+    get_maplestory_notice_maintenance_status,
+    get_maplestory_notice_pre_completion_message_records,
     find_maplestory_notice_updates_with_state,
     find_maplestory_notice_updates,
     maplestory_notice_state_from_notices,
+    remember_maplestory_notice_in_state,
 )
 
 
@@ -72,6 +75,61 @@ class MapleStoryNoticeStateTests(unittest.TestCase):
         self.assertEqual(updates, [])
         self.assertTrue(migrated)
         self.assertIn("bodyFingerprint", migrated_state["notices"]["149382"])
+
+    def test_maintenance_notice_status_detects_pre_completion_and_completion_titles(self):
+        cases = [
+            ("[점검예정] 6/25(목) 챌린저스 월드 채널 점검", "scheduled"),
+            ("[점검중] 6/25(목) 챌린저스 월드 채널 점검", "in_progress"),
+            ("(수정) 6/25(목) 연장 점검 안내", "extended"),
+            ("6/25(목) 연장 점검 안내", "extended"),
+            ("[점검완료] 6/25(목) 챌린저스 월드 채널 점검", "completed"),
+        ]
+
+        for title, expected in cases:
+            with self.subTest(title=title):
+                notice = MapleStoryNotice(
+                    notice_id="149500",
+                    category="[점검]",
+                    title=title,
+                    url="https://maplestory.nexon.com/News/Notice/149500",
+                )
+
+                self.assertEqual(
+                    get_maplestory_notice_maintenance_status(notice),
+                    expected,
+                )
+
+    def test_notice_state_tracks_previous_pre_completion_message_records(self):
+        scheduled = MapleStoryNotice(
+            notice_id="149500",
+            category="[점검]",
+            title="[점검예정] 6/25(목) 챌린저스 월드 채널 점검",
+            url="https://maplestory.nexon.com/News/Notice/149500",
+            summary="오전 11시 50분부터 점검합니다.",
+        )
+        completed = MapleStoryNotice(
+            notice_id="149500",
+            category="[점검]",
+            title="[점검완료] 6/25(목) 챌린저스 월드 채널 점검",
+            url="https://maplestory.nexon.com/News/Notice/149500",
+            summary="점검이 완료되었습니다.",
+        )
+        state = maplestory_notice_state_from_notices([scheduled])
+
+        remember_maplestory_notice_in_state(
+            state,
+            scheduled,
+            channel_id=1234,
+            message_id=111,
+        )
+
+        records = get_maplestory_notice_pre_completion_message_records(
+            state,
+            completed,
+            channel_id=1234,
+        )
+
+        self.assertEqual([record["messageId"] for record in records], [111])
 
 
 if __name__ == "__main__":

@@ -100,6 +100,7 @@ class MapleStorySenderTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result.action, "sent")
         self.assertEqual(result.notice_id, "149371")
+        self.assertEqual(result.message_id, 2468)
         sent = channel.sent_messages[0]
         self.assertEqual(sent["args"], ())
         embed = sent["kwargs"]["embed"]
