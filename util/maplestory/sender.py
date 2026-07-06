@@ -250,6 +250,68 @@ async def send_maplestory_notice_to_channel(
     )
 
 
+async def edit_maplestory_notice_message(
+    message: object,
+    *,
+    guild_id: int,
+    channel_id: int,
+    notice: MapleStoryNotice,
+    summarize_notice: SummarizeNotice | None = None,
+) -> MapleStoryNoticeUpdateResult:
+    summarize = summarize_notice or summarize_maplestory_notice_with_openai
+    try:
+        summary_lines = await summarize(notice)
+    except Exception:
+        logger.warning(
+            "메이플스토리 공지 요약 실패: guild=%s channel=%s notice=%s",
+            guild_id,
+            channel_id,
+            notice.notice_id,
+            exc_info=True,
+        )
+        summary_lines = _fallback_maplestory_notice_summary_lines(notice)
+
+    try:
+        edited_message = await message.edit(
+            embed=build_maplestory_notice_embed(notice, summary_lines)
+        )
+    except discord.NotFound as exc:
+        return MapleStoryNoticeUpdateResult(
+            guild_id=guild_id,
+            channel_id=channel_id,
+            notice_id=notice.notice_id,
+            status="skipped",
+            action="edit_target_missing",
+            error=str(exc),
+        )
+    except (discord.Forbidden, discord.HTTPException) as exc:
+        logger.warning(
+            "메이플스토리 공지 수정 실패: guild=%s channel=%s notice=%s message=%s",
+            guild_id,
+            channel_id,
+            notice.notice_id,
+            getattr(message, "id", None),
+            exc_info=True,
+        )
+        return MapleStoryNoticeUpdateResult(
+            guild_id=guild_id,
+            channel_id=channel_id,
+            notice_id=notice.notice_id,
+            message_id=getattr(message, "id", None),
+            status="error",
+            action="edit_failed",
+            error=str(exc),
+        )
+
+    return MapleStoryNoticeUpdateResult(
+        guild_id=guild_id,
+        channel_id=channel_id,
+        notice_id=notice.notice_id,
+        message_id=getattr(edited_message, "id", getattr(message, "id", None)),
+        action="edited",
+    )
+
+
 async def resolve_text_channel(bot: discord.Client, channel_id: int):
     target = bot.get_channel(int(channel_id))
     if target is None:

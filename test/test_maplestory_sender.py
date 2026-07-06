@@ -24,6 +24,17 @@ class FakeTextChannel:
         return FakeSentMessage()
 
 
+class FakeEditableMessage:
+    id = 8642
+
+    def __init__(self):
+        self.edits = []
+
+    async def edit(self, *args, **kwargs):
+        self.edits.append({"args": args, "kwargs": kwargs})
+        return self
+
+
 class MapleStorySenderTests(unittest.IsolatedAsyncioTestCase):
     async def test_maplestory_sender_lives_under_maplestory_package(self):
         self.assertTrue(MAPLESTORY_SENDER_PATH.exists())
@@ -109,6 +120,48 @@ class MapleStorySenderTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             embed.description,
             "전체 월드 채널 점검 완료\n오후 4시 30분부터 정상 이용\n접속 중이면 재접속 필요",
+        )
+
+    async def test_edit_maplestory_notice_message_updates_existing_embed(self):
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            from util.maplestory.sender import edit_maplestory_notice_message
+
+        message = FakeEditableMessage()
+        notice = MapleStoryNotice(
+            notice_id="149600",
+            category="[공지]",
+            title="(수정) 6/30(화) 테스트 공지",
+            url="https://maplestory.nexon.com/News/Notice/149600",
+            summary="수정된 공지입니다.",
+        )
+
+        async def fake_summarize_notice(input_notice):
+            self.assertEqual(input_notice, notice)
+            return [
+                "수정된 공지 안내",
+                "내용이 바뀌었으니 확인 필요",
+                "원문 링크 기준으로 갱신",
+            ]
+
+        result = await edit_maplestory_notice_message(
+            message,
+            guild_id=10,
+            channel_id=1234,
+            notice=notice,
+            summarize_notice=fake_summarize_notice,
+        )
+
+        self.assertEqual(result.action, "edited")
+        self.assertEqual(result.notice_id, "149600")
+        self.assertEqual(result.message_id, 8642)
+        self.assertEqual(len(message.edits), 1)
+        embed = message.edits[0]["kwargs"]["embed"]
+        self.assertEqual(embed.title, "(수정) 6/30(화) 테스트 공지")
+        self.assertEqual(embed.url, notice.url)
+        self.assertEqual(
+            embed.description,
+            "수정된 공지 안내\n내용이 바뀌었으니 확인 필요\n원문 링크 기준으로 갱신",
         )
 
     async def test_openai_notice_summary_is_coerced_to_three_compact_lines(self):

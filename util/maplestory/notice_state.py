@@ -172,6 +172,25 @@ def get_maplestory_notice_pre_completion_message_records(
     ]
 
 
+def get_latest_maplestory_notice_message_record(
+    state: dict[str, Any],
+    notice: MapleStoryNoticeLike,
+    *,
+    channel_id: int,
+) -> dict[str, Any] | None:
+    normalized = normalize_maplestory_notice_state(state)
+    stored = normalized["notices"].get(notice.notice_id)
+    if not isinstance(stored, dict):
+        return None
+
+    records = [
+        record
+        for record in _normalize_sent_message_records(stored.get("sentMessages"))
+        if record.get("channelId") == int(channel_id)
+    ]
+    return records[-1] if records else None
+
+
 def remember_maplestory_notice_in_state(
     state: dict[str, Any],
     notice: MapleStoryNoticeLike,

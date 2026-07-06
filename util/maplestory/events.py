@@ -10,12 +10,15 @@ import aiohttp
 import discord
 
 from util.maplestory.notice_state import (
+    MAPLESTORY_NOTICE_COMPLETED_STATUS,
     MAPLESTORY_NOTICE_STATE_LIMIT,
     MAPLESTORY_NOTICE_PRE_COMPLETION_STATUSES,
     build_maplestory_notice_fingerprint,
     classify_maplestory_notice_maintenance_status,
     find_maplestory_notice_updates,
     find_maplestory_notice_updates_with_state,
+    get_latest_maplestory_notice_message_record,
+    get_maplestory_notice_maintenance_status,
     get_maplestory_notice_pre_completion_message_records,
     is_maplestory_notice_completion,
     maplestory_notice_state_from_notices,
@@ -46,6 +49,7 @@ from util.maplestory.sender import (
     build_maplestory_notice_embed,
     build_maplestory_notice_message,
     build_sunday_maple_event_embeds,
+    edit_maplestory_notice_message,
     resolve_text_channel,
     send_maplestory_notice_to_channel,
     send_sunday_maple_event_to_channels,
@@ -196,12 +200,46 @@ async def refresh_maplestory_notice_messages(
                 notice,
                 channel_id=channel_id,
             )
-            result = await send_maplestory_notice_to_channel(
-                target,
-                guild_id=guild_id,
+            if _should_send_maplestory_notice_without_edit(
+                current_state,
+                notice,
                 channel_id=channel_id,
-                notice=notice,
-            )
+            ):
+                result = await send_maplestory_notice_to_channel(
+                    target,
+                    guild_id=guild_id,
+                    channel_id=channel_id,
+                    notice=notice,
+                )
+            else:
+                edit_message = await _find_existing_maplestory_notice_message(
+                    target,
+                    bot,
+                    current_state,
+                    notice,
+                    channel_id=channel_id,
+                )
+                if edit_message is None:
+                    result = await send_maplestory_notice_to_channel(
+                        target,
+                        guild_id=guild_id,
+                        channel_id=channel_id,
+                        notice=notice,
+                    )
+                else:
+                    result = await edit_maplestory_notice_message(
+                        edit_message,
+                        guild_id=guild_id,
+                        channel_id=channel_id,
+                        notice=notice,
+                    )
+                    if result.action == "edit_target_missing":
+                        result = await send_maplestory_notice_to_channel(
+                            target,
+                            guild_id=guild_id,
+                            channel_id=channel_id,
+                            notice=notice,
+                        )
             if result.status != "ok":
                 results.append(result)
                 continue
@@ -231,6 +269,117 @@ async def refresh_maplestory_notice_messages(
         await _save_maplestory_notice_state(state)
 
     return results
+
+
+def _should_send_maplestory_notice_without_edit(
+    state: dict[str, Any],
+    notice: MapleStoryNotice,
+    *,
+    channel_id: int,
+) -> bool:
+    notice_status = get_maplestory_notice_maintenance_status(notice)
+    if notice_status == MAPLESTORY_NOTICE_COMPLETED_STATUS:
+        return True
+
+    if notice_status != "extended":
+        return False
+
+    record = get_latest_maplestory_notice_message_record(
+        state,
+        notice,
+        channel_id=channel_id,
+    )
+    if record is None:
+        return True
+    return _maplestory_notice_message_record_status(record) != "extended"
+
+
+def _maplestory_notice_message_record_status(record: dict[str, Any]) -> str | None:
+    status = record.get("status")
+    if isinstance(status, str) and status:
+        return status
+
+    title = record.get("title")
+    if isinstance(title, str):
+        return classify_maplestory_notice_maintenance_status("", title)
+    return None
+
+
+async def _find_existing_maplestory_notice_message(
+    target: object,
+    bot: discord.Client,
+    state: dict[str, Any],
+    notice: MapleStoryNotice,
+    *,
+    channel_id: int,
+) -> object | None:
+    record = get_latest_maplestory_notice_message_record(
+        state,
+        notice,
+        channel_id=channel_id,
+    )
+    if record is not None:
+        message_id = _coerce_int(record.get("messageId"))
+        if message_id is not None:
+            message = await _fetch_maplestory_notice_message(target, message_id)
+            if (
+                message is not None
+                and _is_editable_maplestory_notice_message(message, bot, notice)
+            ):
+                return message
+
+    return await _find_legacy_maplestory_notice_message_from_history(
+        target,
+        bot,
+        notice,
+    )
+
+
+async def _find_legacy_maplestory_notice_message_from_history(
+    target: object,
+    bot: discord.Client,
+    notice: MapleStoryNotice,
+) -> object | None:
+    history = getattr(target, "history", None)
+    if not callable(history):
+        return None
+
+    try:
+        messages = history(limit=MAPLESTORY_NOTICE_LEGACY_HISTORY_SCAN_LIMIT)
+        async for message in messages:
+            if _is_editable_maplestory_notice_message(message, bot, notice):
+                return message
+    except (discord.Forbidden, discord.HTTPException):
+        logger.warning(
+            "메이플스토리 기존 공지 히스토리 조회 실패: notice=%s",
+            notice.notice_id,
+            exc_info=True,
+        )
+    return None
+
+
+def _is_editable_maplestory_notice_message(
+    message: object,
+    bot: discord.Client,
+    notice: MapleStoryNotice,
+) -> bool:
+    bot_user = getattr(bot, "user", None)
+    if bot_user is not None and getattr(message, "author", None) != bot_user:
+        return False
+    return _message_references_maplestory_notice(message, notice)
+
+
+def _message_references_maplestory_notice(
+    message: object,
+    notice: MapleStoryNotice,
+) -> bool:
+    embeds = getattr(message, "embeds", []) or []
+    for embed in embeds:
+        if str(getattr(embed, "url", "") or "") == notice.url:
+            return True
+
+    content = str(getattr(message, "content", "") or "")
+    return notice.url in content
 
 
 async def seed_maplestory_notice_state_for_guild(

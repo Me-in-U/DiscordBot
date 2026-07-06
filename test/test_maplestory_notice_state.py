@@ -5,6 +5,7 @@ from util.maplestory.events import MapleStoryNotice
 from util.maplestory.notice_state import (
     build_maplestory_notice_fingerprint,
     get_maplestory_notice_maintenance_status,
+    get_latest_maplestory_notice_message_record,
     get_maplestory_notice_pre_completion_message_records,
     find_maplestory_notice_updates_with_state,
     find_maplestory_notice_updates,
@@ -130,6 +131,44 @@ class MapleStoryNoticeStateTests(unittest.TestCase):
         )
 
         self.assertEqual([record["messageId"] for record in records], [111])
+
+    def test_notice_state_finds_latest_message_record_for_same_notice_and_channel(self):
+        notice = MapleStoryNotice(
+            notice_id="149600",
+            category="[공지]",
+            title="6/30(화) 테스트 공지",
+            url="https://maplestory.nexon.com/News/Notice/149600",
+            summary="첫 공지입니다.",
+        )
+        state = maplestory_notice_state_from_notices([notice])
+        remember_maplestory_notice_in_state(
+            state,
+            notice,
+            channel_id=1234,
+            message_id=111,
+        )
+        remember_maplestory_notice_in_state(
+            state,
+            notice,
+            channel_id=5678,
+            message_id=222,
+        )
+        remember_maplestory_notice_in_state(
+            state,
+            notice,
+            channel_id=1234,
+            message_id=333,
+        )
+
+        record = get_latest_maplestory_notice_message_record(
+            state,
+            notice,
+            channel_id=1234,
+        )
+
+        self.assertIsNotNone(record)
+        assert record is not None
+        self.assertEqual(record["messageId"], 333)
 
 
 if __name__ == "__main__":
