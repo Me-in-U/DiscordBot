@@ -23,6 +23,8 @@ logger = logging.getLogger(__name__)
 MAPLESTORY_IGNORED_NOTICE_TITLE_MARKERS = (
     "신고보상안내",
     "우수테스터발표안내",
+    "npay",
+    "네이버페이",
 )
 
 MAPLESTORY_HEADERS = {
@@ -90,7 +92,7 @@ async def fetch_latest_maplestory_notices(
 
 
 def _should_ignore_maplestory_notice_alert(notice: MapleStoryNotice) -> bool:
-    compact_title = "".join((notice.title or "").split())
+    compact_title = "".join((notice.title or "").split()).lower()
     return any(
         marker in compact_title
         for marker in MAPLESTORY_IGNORED_NOTICE_TITLE_MARKERS

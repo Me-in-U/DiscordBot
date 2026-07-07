@@ -41,6 +41,17 @@ NOTICE_LIST_WITH_IGNORED_HTML = """
 </a>
 """
 
+NOTICE_LIST_WITH_NPAY_HTML = """
+<a href="/News/Notice/All/149390">
+    <em><img src="notice_icon01.png" alt="[공지]" /></em>
+    <span>Npay 7% 네이버페이 포인트 적립 이벤트</span>
+</a>
+<a href="/News/Notice/All/149371">
+    <em><img src="notice_icon03.png" alt="[점검]" /></em>
+    <span>6/22(월) 서버 점검</span>
+</a>
+"""
+
 NOTICE_DETAIL_HTML = """
 <p class="qs_title"><em><img alt="[점검]" /></em><span>[점검완료] 6/22(월) 서버 점검</span></p>
 <div class="qs_text"><p>안녕하세요. 메이플스토리입니다.</p><p>점검이 완료되었습니다.</p></div>
@@ -131,6 +142,31 @@ class MapleStoryFetcherModuleTests(unittest.IsolatedAsyncioTestCase):
             requested_urls.append(url)
             if url.endswith("/News/Notice"):
                 return NOTICE_LIST_WITH_IGNORED_HTML
+            return NOTICE_DETAIL_HTML
+
+        notices = await fetch_latest_maplestory_notices(
+            fetch_html=fake_fetch,
+            limit=10,
+        )
+
+        self.assertEqual([notice.notice_id for notice in notices], ["149371"])
+        self.assertEqual(
+            requested_urls,
+            [
+                "https://maplestory.nexon.com/News/Notice",
+                "https://maplestory.nexon.com/News/Notice/149371",
+            ],
+        )
+
+    async def test_fetch_latest_maplestory_notices_skips_npay_promotional_announcements(self):
+        from util.maplestory.fetcher import fetch_latest_maplestory_notices
+
+        requested_urls = []
+
+        async def fake_fetch(url: str) -> str:
+            requested_urls.append(url)
+            if url.endswith("/News/Notice"):
+                return NOTICE_LIST_WITH_NPAY_HTML
             return NOTICE_DETAIL_HTML
 
         notices = await fetch_latest_maplestory_notices(
