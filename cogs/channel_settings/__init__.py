@@ -11,7 +11,23 @@ PURPOSE_CHOICES = {
     "gamble": "도박",
     "music": "음악",
     "youtube": "유튜브",
+    "maplestory_notice": "메이플공지",
 }
+PURPOSE_DESCRIPTION = "기념일/도박/음악/유튜브/메이플공지"
+
+
+def _add_current_channel_fields(
+    embed: discord.Embed,
+    summary: dict[str, int],
+) -> None:
+    for purpose_key, purpose_label in PURPOSE_CHOICES.items():
+        channel_id = summary.get(purpose_key)
+        channel_value = f"<#{channel_id}>" if channel_id else "미지정"
+        embed.add_field(
+            name=f"현재 {purpose_label} 채널",
+            value=channel_value,
+            inline=True,
+        )
 
 
 class ChannelSettings(commands.Cog):
@@ -20,7 +36,7 @@ class ChannelSettings(commands.Cog):
 
     @app_commands.command(
         name="채널설정",
-        description="기념일, 도박, 음악, 유튜브 기능이 동작할 채널을 지정하거나 해제합니다.",
+        description=f"{PURPOSE_DESCRIPTION} 기능이 동작할 채널을 지정하거나 해제합니다.",
     )
     @app_commands.describe(
         purpose="설정할 기능 타입을 선택하세요.",
@@ -33,6 +49,7 @@ class ChannelSettings(commands.Cog):
             app_commands.Choice(name="도박", value="gamble"),
             app_commands.Choice(name="음악", value="music"),
             app_commands.Choice(name="유튜브", value="youtube"),
+            app_commands.Choice(name="메이플공지", value="maplestory_notice"),
         ]
     )
     async def configure_channel(
@@ -69,10 +86,6 @@ class ChannelSettings(commands.Cog):
         channel_text = "설정 해제" if channel is None else channel.mention
 
         summary = await get_settings_for_guild(guild_id)
-        celebration = summary.get("celebration")
-        gamble = summary.get("gamble")
-        music = summary.get("music")
-        youtube = summary.get("youtube")
 
         embed = discord.Embed(
             title="⚙️ 채널 설정",
@@ -82,37 +95,13 @@ class ChannelSettings(commands.Cog):
             ),
             color=discord.Color.blurple(),
         )
-        celebration_value = f"<#{celebration}>" if celebration else "미지정"
-        gamble_value = f"<#{gamble}>" if gamble else "미지정"
-        music_value = f"<#{music}>" if music else "미지정"
-        youtube_value = f"<#{youtube}>" if youtube else "미지정"
-
-        embed.add_field(
-            name="현재 기념일 채널",
-            value=celebration_value,
-            inline=True,
-        )
-        embed.add_field(
-            name="현재 도박 채널",
-            value=gamble_value,
-            inline=True,
-        )
-        embed.add_field(
-            name="현재 음악 채널",
-            value=music_value,
-            inline=True,
-        )
-        embed.add_field(
-            name="현재 유튜브 채널",
-            value=youtube_value,
-            inline=True,
-        )
+        _add_current_channel_fields(embed, summary)
 
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @app_commands.command(
         name="채널설정확인",
-        description="현재 길드에 설정된 기념일/도박/음악/유튜브 채널을 확인합니다.",
+        description=f"현재 길드에 설정된 {PURPOSE_DESCRIPTION} 채널을 확인합니다.",
     )
     async def show_channel_settings(self, interaction: discord.Interaction) -> None:
         if interaction.guild_id is None:
@@ -123,37 +112,9 @@ class ChannelSettings(commands.Cog):
             return
 
         summary = await get_settings_for_guild(int(interaction.guild_id))
-        celebration = summary.get("celebration")
-        gamble = summary.get("gamble")
-        music = summary.get("music")
-        youtube = summary.get("youtube")
 
         embed = discord.Embed(title="🔎 채널 설정 현황", color=discord.Color.blurple())
-        celebration_value = f"<#{celebration}>" if celebration else "미지정"
-        gamble_value = f"<#{gamble}>" if gamble else "미지정"
-        music_value = f"<#{music}>" if music else "미지정"
-        youtube_value = f"<#{youtube}>" if youtube else "미지정"
-
-        embed.add_field(
-            name="기념일",
-            value=celebration_value,
-            inline=True,
-        )
-        embed.add_field(
-            name="도박",
-            value=gamble_value,
-            inline=True,
-        )
-        embed.add_field(
-            name="음악",
-            value=music_value,
-            inline=True,
-        )
-        embed.add_field(
-            name="유튜브",
-            value=youtube_value,
-            inline=True,
-        )
+        _add_current_channel_fields(embed, summary)
 
         await interaction.response.send_message(embed=embed, ephemeral=True)
 

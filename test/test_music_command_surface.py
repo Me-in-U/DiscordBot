@@ -109,6 +109,36 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         self.assertIn('"music": "음악"', text)
         self.assertIn('app_commands.Choice(name="음악", value="music")', text)
 
+    def test_channel_settings_can_configure_maplestory_notice_channel(self):
+        text = CHANNEL_SETTINGS_PATH.read_text(encoding="utf-8")
+        help_text = HELP_PATH.read_text(encoding="utf-8")
+
+        self.assertIn('"maplestory_notice": "메이플공지"', text)
+        self.assertIn(
+            'app_commands.Choice(name="메이플공지", value="maplestory_notice")',
+            text,
+        )
+        self.assertIn("기념일/도박/음악/유튜브/메이플공지", text)
+        self.assertIn("for purpose_key, purpose_label in PURPOSE_CHOICES.items()", text)
+        self.assertIn("summary.get(purpose_key)", text)
+        self.assertIn("기념일/도박/음악/유튜브/메이플공지", help_text)
+        self.assertIn("현재 채널 shortcut으로", help_text)
+
+    def test_channel_settings_embed_fields_include_maplestory_notice_channel(self):
+        from cogs.channel_settings import _add_current_channel_fields
+
+        class FakeEmbed:
+            def __init__(self):
+                self.fields = []
+
+            def add_field(self, *, name, value, inline):
+                self.fields.append((name, value, inline))
+
+        embed = FakeEmbed()
+        _add_current_channel_fields(embed, {"maplestory_notice": 9876})
+
+        self.assertIn(("현재 메이플공지 채널", "<#9876>", True), embed.fields)
+
     def test_channel_settings_cog_uses_package_layout(self):
         self.assertTrue(CHANNEL_SETTINGS_PATH.exists())
         self.assertFalse(LEGACY_CHANNEL_SETTINGS_COG_PATH.exists())
