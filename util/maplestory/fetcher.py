@@ -25,6 +25,11 @@ MAPLESTORY_IGNORED_NOTICE_TITLE_MARKERS = (
     "우수테스터발표안내",
     "npay",
     "네이버페이",
+    "토스페이",
+    "tosspay",
+    "계좌",
+    "결제",
+    "할인",
 )
 
 MAPLESTORY_HEADERS = {

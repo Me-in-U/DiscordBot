@@ -52,6 +52,17 @@ NOTICE_LIST_WITH_NPAY_HTML = """
 </a>
 """
 
+NOTICE_LIST_WITH_TOSS_PAY_HTML = """
+<a href="/News/Notice/All/149585">
+    <em><img src="notice_icon01.png" alt="[공지]" /></em>
+    <span>토스페이 계좌/머니로 5만원 이상 결제 시 2천원 즉시 할인</span>
+</a>
+<a href="/News/Notice/All/149371">
+    <em><img src="notice_icon03.png" alt="[점검]" /></em>
+    <span>6/22(월) 서버 점검</span>
+</a>
+"""
+
 NOTICE_DETAIL_HTML = """
 <p class="qs_title"><em><img alt="[점검]" /></em><span>[점검완료] 6/22(월) 서버 점검</span></p>
 <div class="qs_text"><p>안녕하세요. 메이플스토리입니다.</p><p>점검이 완료되었습니다.</p></div>
@@ -182,6 +193,49 @@ class MapleStoryFetcherModuleTests(unittest.IsolatedAsyncioTestCase):
                 "https://maplestory.nexon.com/News/Notice/149371",
             ],
         )
+
+    async def test_fetch_latest_maplestory_notices_skips_toss_pay_promotional_announcements(self):
+        from util.maplestory.fetcher import fetch_latest_maplestory_notices
+
+        requested_urls = []
+
+        async def fake_fetch(url: str) -> str:
+            requested_urls.append(url)
+            if url.endswith("/News/Notice"):
+                return NOTICE_LIST_WITH_TOSS_PAY_HTML
+            return NOTICE_DETAIL_HTML
+
+        notices = await fetch_latest_maplestory_notices(
+            fetch_html=fake_fetch,
+            limit=10,
+        )
+
+        self.assertEqual([notice.notice_id for notice in notices], ["149371"])
+        self.assertEqual(
+            requested_urls,
+            [
+                "https://maplestory.nexon.com/News/Notice",
+                "https://maplestory.nexon.com/News/Notice/149371",
+            ],
+        )
+
+    def test_payment_promotion_title_markers_are_ignored(self):
+        from util.maplestory.fetcher import _should_ignore_maplestory_notice_alert
+
+        for title in (
+            "토스페이 혜택 안내",
+            "계좌 이용 이벤트",
+            "결제 이벤트 안내",
+            "즉시 할인 이벤트",
+        ):
+            with self.subTest(title=title):
+                notice = MapleStoryNotice(
+                    notice_id="promotion",
+                    category="[공지]",
+                    title=title,
+                    url="https://maplestory.nexon.com/News/Notice/promotion",
+                )
+                self.assertTrue(_should_ignore_maplestory_notice_alert(notice))
 
 
 class MapleStoryFetcherCompatibilityTests(unittest.TestCase):
