@@ -63,7 +63,7 @@ Discord 서버 운영, AI 보조, 음악 재생, 게임/도박, 일정, 외부 �
 - `cogs/music/`: 음악 명령 surface, queue/playback/source/view helper는 `util/music/`
 - `cogs/youtube_subscriptions/`: YouTube 구독 명령 surface, 상태/알림/WebSub helper는 `util/youtube/`
 - `cogs/maplestory/`: MapleStory 명령 surface, fetch/parser/sender/state는 `util/maplestory/`
-- `cogs/loop/`: background task orchestration, 세부 runner는 `util/loop/`, `util/youtube/`, `util/maplestory/`
+- `cogs/loop/`: background task orchestration, 세부 runner는 `util/loop/`, `util/youtube/`, `util/maplestory/`, `util/codex_resets/`
 
 ## 명령어
 
@@ -75,7 +75,7 @@ Discord 서버 운영, AI 보조, 음악 재생, 게임/도박, 일정, 외부 �
 | `/기가채드` | 기가채드 이미지 전송 |
 | `/핑` | 봇 latency 확인 |
 | `/clean` | 관리자 전용 최근 메시지 정리 |
-| `/채널설정` | 기념일, 도박, 음악, 유튜브 채널 지정/해제 |
+| `/채널설정` | 기념일, 도박, 음악, 유튜브, 메이플공지, 코덱스리셋 채널 지정/해제 |
 | `/채널설정확인` | 현재 길드의 기능별 채널 설정 확인 |
 
 ### 기념일/DDAY/일정
@@ -146,6 +146,14 @@ YouTube 알림은 다음 경로를 조합합니다.
 | `/메이플공지구독` | 현재 채널에 메이플스토리 공지 알림 구독/해제 |
 
 공지 알림은 3분마다 확인합니다. 새 점검 공지는 새 메시지로 보내고, 일반 수정은 기존 메시지를 수정합니다. 연장 공지는 별도 메시지로 알리고, 점검 완료 공지가 나오면 이전 점검 관련 메시지를 정리한 뒤 완료 공지를 전송합니다.
+
+### Codex 리셋
+
+| 명령어/기능 | 설명 |
+| --- | --- |
+| `/코덱스리셋알림` | 현재 채널에 Codex 사용량 리셋 알림 설정/해제 |
+
+`codex-resets.com`의 공개 API를 3분마다 확인합니다. 사이트가 리셋으로 분류한 새 X 게시물만 알리며, 24시간 리셋 가능성 예측은 알림 대상에서 제외합니다. 이 사이트는 OpenAI 공식 서비스가 아닌 비공식 추적기입니다.
 
 ### 게임/랭크/투표
 

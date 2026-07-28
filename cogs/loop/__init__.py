@@ -11,6 +11,7 @@ from bot import (
     SEOUL_TZ,
     load_recent_messages,
 )
+from util.codex_resets.loop_runner import run_codex_reset_notification_loop
 from util.loop.daily_refresh_runner import run_daily_refreshes
 from util.env_utils import getenv_clean
 from util.loop.task_lifecycle import cancel_loop_tasks, start_loop_tasks
@@ -67,6 +68,7 @@ LOOP_TASK_NAMES = (
     "youtube_notification_check",
     "youtube_community_check",
     "maplestory_notice_check",
+    "codex_reset_notification_check",
     "youtube_websub_renewal",
 )
 logger = logging.getLogger(__name__)
@@ -274,6 +276,14 @@ class LoopTasks(commands.Cog):
         except Exception:
             logger.exception("메이플스토리 공지 확인 오류")
 
+    @tasks.loop(minutes=3)
+    async def codex_reset_notification_check(self):
+        """Codex 사용량 리셋 알림을 확인합니다."""
+        try:
+            await run_codex_reset_notification_loop(self.bot)
+        except Exception:
+            logger.exception("Codex 리셋 알림 확인 오류")
+
     @tasks.loop(hours=12)
     async def youtube_websub_renewal(self):
         """YouTube WebSub 구독을 주기적으로 갱신합니다."""
@@ -295,6 +305,11 @@ class LoopTasks(commands.Cog):
     @maplestory_notice_check.before_loop
     async def before_maplestory_notice_check(self):
         print("-------------메이플스토리 공지 알림 체크 대기중...---------------")
+        await self.bot.wait_until_ready()
+
+    @codex_reset_notification_check.before_loop
+    async def before_codex_reset_notification_check(self):
+        print("-------------Codex 리셋 알림 체크 대기중...---------------")
         await self.bot.wait_until_ready()
 
     @youtube_websub_renewal.before_loop

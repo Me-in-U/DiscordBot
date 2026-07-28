@@ -12,8 +12,9 @@ PURPOSE_CHOICES = {
     "music": "음악",
     "youtube": "유튜브",
     "maplestory_notice": "메이플공지",
+    "codex_reset": "코덱스리셋",
 }
-PURPOSE_DESCRIPTION = "기념일/도박/음악/유튜브/메이플공지"
+PURPOSE_DESCRIPTION = "기념일/도박/음악/유튜브/메이플공지/코덱스리셋"
 
 
 def _add_current_channel_fields(
@@ -50,6 +51,7 @@ class ChannelSettings(commands.Cog):
             app_commands.Choice(name="음악", value="music"),
             app_commands.Choice(name="유튜브", value="youtube"),
             app_commands.Choice(name="메이플공지", value="maplestory_notice"),
+            app_commands.Choice(name="코덱스리셋", value="codex_reset"),
         ]
     )
     async def configure_channel(
