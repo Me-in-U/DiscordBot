@@ -1,0 +1,353 @@
+from __future__ import annotations
+
+import json
+import unittest
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from types import SimpleNamespace
+
+import aiohttp
+
+from util.earthquake.alerts import (
+    build_jma_eew_embed,
+    process_jma_eew_event,
+)
+from util.earthquake.jma_eew import (
+    JmaEewEvent,
+    is_recent_jma_eew,
+    parse_jma_eew_message,
+)
+from util.earthquake.state import (
+    EarthquakeAlertState,
+    find_jma_eew_record,
+    remember_jma_eew_message,
+)
+from util.earthquake.stream import consume_jma_eew_messages
+
+
+CHANNEL_SETTINGS_PATH = Path("cogs/channel_settings/__init__.py")
+LOOP_PATH = Path("cogs/loop/__init__.py")
+NOW = datetime.now(timezone.utc)
+
+
+def _payload(
+    *,
+    event_id: str = "20260728165922",
+    serial: int = 1,
+    magnitude: float = 4.3,
+    is_final: bool = False,
+    is_cancelled: bool = False,
+    is_training: bool = False,
+) -> dict:
+    announced = NOW.astimezone(timezone(timedelta(hours=9)))
+    origin = announced - timedelta(seconds=15)
+    return {
+        "type": "jma_eew",
+        "Title": "緊急地震速報（予報）",
+        "CodeType": "緊急地震速報",
+        "Issue": {"Source": "大阪", "Status": "通常"},
+        "EventID": event_id,
+        "Serial": serial,
+        "AnnouncedTime": announced.strftime("%Y/%m/%d %H:%M:%S"),
+        "OriginTime": origin.strftime("%Y/%m/%d %H:%M:%S"),
+        "Hypocenter": "熊本県熊本地方",
+        "Latitude": 32.7,
+        "Longitude": 130.7,
+        "Magunitude": magnitude,
+        "Depth": 10,
+        "MaxIntensity": "4",
+        "WarnArea": [
+            {
+                "Chiiki": "熊本県熊本",
+                "Shindo1": "4",
+                "Shindo2": "4",
+                "Type": "予報",
+                "Arrive": "既に到達と予測",
+            }
+        ],
+        "isSea": False,
+        "isTraining": is_training,
+        "isAssumption": False,
+        "isWarn": False,
+        "isFinal": is_final,
+        "isCancel": is_cancelled,
+    }
+
+
+def _event(**overrides) -> JmaEewEvent:
+    payload = _payload(**overrides)
+    event = parse_jma_eew_message(payload)
+    assert event is not None
+    return event
+
+
+class JmaEewParserTests(unittest.TestCase):
+    def test_parses_wolfx_jma_eew_payload(self):
+        event = _event(serial=8, magnitude=4.3, is_final=True)
+
+        self.assertEqual(event.event_id, "20260728165922")
+        self.assertEqual(event.serial, 8)
+        self.assertEqual(event.magnitude, 4.3)
+        self.assertEqual(event.hypocenter, "熊本県熊本地方")
+        self.assertTrue(event.is_final)
+        self.assertEqual(event.warn_areas[0].maximum_intensity, "4")
+
+    def test_ignores_heartbeat_payload(self):
+        self.assertIsNone(
+            parse_jma_eew_message(
+                {"type": "heartbeat", "timestamp": 1785225687453}
+            )
+        )
+
+    def test_detects_stale_initial_snapshot(self):
+        event = _event()
+        self.assertTrue(is_recent_jma_eew(event, now=NOW))
+        self.assertFalse(
+            is_recent_jma_eew(
+                event,
+                now=NOW + timedelta(minutes=3),
+            )
+        )
+
+    def test_channel_setting_and_stream_are_connected(self):
+        channel_source = CHANNEL_SETTINGS_PATH.read_text(encoding="utf-8")
+        loop_source = LOOP_PATH.read_text(encoding="utf-8")
+
+        self.assertIn(
+            '"earthquake_alert": "일본지진알림"',
+            channel_source,
+        )
+        self.assertIn(
+            'name="일본지진알림"',
+            channel_source,
+        )
+        self.assertIn('"jma_eew_stream"', loop_source)
+        self.assertIn("run_jma_eew_stream(self.bot)", loop_source)
+
+
+class EarthquakeStateTests(unittest.TestCase):
+    def test_remembers_latest_serial_and_message(self):
+        state = EarthquakeAlertState(channel_id=100)
+        state = remember_jma_eew_message(
+            state,
+            event_id="event-1",
+            serial=1,
+            message_id=900,
+        )
+        state = remember_jma_eew_message(
+            state,
+            event_id="event-1",
+            serial=2,
+            message_id=900,
+        )
+
+        record = find_jma_eew_record(state, "event-1")
+        self.assertIsNotNone(record)
+        self.assertEqual(record.serial, 2)
+        self.assertEqual(record.message_id, 900)
+        self.assertEqual(len(state.records), 1)
+
+
+class JmaEewAlertTests(unittest.IsolatedAsyncioTestCase):
+    async def test_sends_first_magnitude_four_report(self):
+        event = _event(magnitude=4.0)
+        saved_states = []
+        sent_events = []
+
+        async def get_channels():
+            return {1: 100}
+
+        async def load(_guild_id):
+            return EarthquakeAlertState(channel_id=100)
+
+        async def save(_guild_id, state):
+            saved_states.append(state)
+
+        async def resolve(_bot, _channel_id):
+            return object()
+
+        async def send(_target, sent_event):
+            sent_events.append(sent_event)
+            return 900
+
+        results = await process_jma_eew_event(
+            object(),
+            event,
+            get_channels=get_channels,
+            load_state=load,
+            save_state=save,
+            resolve_channel=resolve,
+            send_alert=send,
+        )
+
+        self.assertEqual(results[0].action, "sent")
+        self.assertEqual(sent_events, [event])
+        self.assertEqual(
+            find_jma_eew_record(saved_states[0], event.event_id).message_id,
+            900,
+        )
+
+    async def test_skips_first_report_below_magnitude_four(self):
+        event = _event(magnitude=3.9)
+
+        async def get_channels():
+            return {1: 100}
+
+        async def load(_guild_id):
+            return EarthquakeAlertState(channel_id=100)
+
+        async def send(_target, _event):
+            raise AssertionError("M4.0 미만은 보내면 안 됩니다.")
+
+        results = await process_jma_eew_event(
+            object(),
+            event,
+            get_channels=get_channels,
+            load_state=load,
+            send_alert=send,
+        )
+
+        self.assertEqual(results[0].status, "skipped")
+        self.assertEqual(results[0].action, "below_threshold")
+
+    async def test_edits_existing_message_for_later_report(self):
+        event = _event(serial=2, magnitude=4.5, is_final=True)
+        initial_state = remember_jma_eew_message(
+            EarthquakeAlertState(channel_id=100),
+            event_id=event.event_id,
+            serial=1,
+            message_id=900,
+        )
+        edited = []
+        saved_states = []
+
+        async def get_channels():
+            return {1: 100}
+
+        async def load(_guild_id):
+            return initial_state
+
+        async def save(_guild_id, state):
+            saved_states.append(state)
+
+        async def resolve(_bot, _channel_id):
+            return object()
+
+        async def edit(_target, message_id, edited_event):
+            edited.append((message_id, edited_event))
+            return message_id
+
+        results = await process_jma_eew_event(
+            object(),
+            event,
+            get_channels=get_channels,
+            load_state=load,
+            save_state=save,
+            resolve_channel=resolve,
+            edit_alert=edit,
+        )
+
+        self.assertEqual(results[0].action, "edited")
+        self.assertEqual(edited, [(900, event)])
+        self.assertEqual(
+            find_jma_eew_record(saved_states[0], event.event_id).serial,
+            2,
+        )
+
+    async def test_cancel_report_edits_tracked_message(self):
+        event = _event(serial=3, magnitude=0.0, is_cancelled=True)
+        initial_state = remember_jma_eew_message(
+            EarthquakeAlertState(channel_id=100),
+            event_id=event.event_id,
+            serial=2,
+            message_id=900,
+        )
+
+        async def get_channels():
+            return {1: 100}
+
+        async def load(_guild_id):
+            return initial_state
+
+        async def save(_guild_id, _state):
+            return None
+
+        async def resolve(_bot, _channel_id):
+            return object()
+
+        async def edit(_target, message_id, _event):
+            return message_id
+
+        results = await process_jma_eew_event(
+            object(),
+            event,
+            get_channels=get_channels,
+            load_state=load,
+            save_state=save,
+            resolve_channel=resolve,
+            edit_alert=edit,
+        )
+
+        self.assertEqual(results[0].action, "cancelled")
+
+    def test_builds_eew_embed(self):
+        embed = build_jma_eew_embed(
+            _event(serial=8, magnitude=4.3, is_final=True)
+        )
+
+        self.assertIn("M4.3", embed.title)
+        self.assertIn("제 8보", embed.fields[0].value)
+        self.assertTrue(
+            any(field.name == "예상 지역" for field in embed.fields)
+        )
+
+
+class JmaEewStreamTests(unittest.IsolatedAsyncioTestCase):
+    async def test_consumes_heartbeat_and_eew_message(self):
+        class FakeWebSocket:
+            def __init__(self):
+                self.sent = []
+                self.messages = [
+                    SimpleNamespace(
+                        type=aiohttp.WSMsgType.TEXT,
+                        data=json.dumps({"type": "heartbeat"}),
+                    ),
+                    SimpleNamespace(
+                        type=aiohttp.WSMsgType.TEXT,
+                        data=json.dumps(_payload(), ensure_ascii=False),
+                    ),
+                ]
+
+            def __aiter__(self):
+                self._iterator = iter(self.messages)
+                return self
+
+            async def __anext__(self):
+                try:
+                    return next(self._iterator)
+                except StopIteration:
+                    raise StopAsyncIteration
+
+            async def send_str(self, value):
+                self.sent.append(value)
+
+        websocket = FakeWebSocket()
+        processed_events = []
+
+        async def process(_bot, event):
+            processed_events.append(event)
+            return []
+
+        count = await consume_jma_eew_messages(
+            object(),
+            websocket,
+            process_event=process,
+        )
+
+        self.assertEqual(count, 1)
+        self.assertEqual(websocket.sent, ["ping"])
+        self.assertEqual(processed_events[0].magnitude, 4.3)
+
+
+if __name__ == "__main__":
+    unittest.main()

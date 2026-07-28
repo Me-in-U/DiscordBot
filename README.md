@@ -63,7 +63,7 @@ Discord 서버 운영, AI 보조, 음악 재생, 게임/도박, 일정, 외부 �
 - `cogs/music/`: 음악 명령 surface, queue/playback/source/view helper는 `util/music/`
 - `cogs/youtube_subscriptions/`: YouTube 구독 명령 surface, 상태/알림/WebSub helper는 `util/youtube/`
 - `cogs/maplestory/`: MapleStory 명령 surface, fetch/parser/sender/state는 `util/maplestory/`
-- `cogs/loop/`: background task orchestration, 세부 runner는 `util/loop/`, `util/youtube/`, `util/maplestory/`, `util/codex_resets/`
+- `cogs/loop/`: background task orchestration, 세부 runner는 `util/loop/`, `util/youtube/`, `util/maplestory/`, `util/codex_resets/`, `util/earthquake/`
 
 ## 명령어
 
@@ -75,7 +75,7 @@ Discord 서버 운영, AI 보조, 음악 재생, 게임/도박, 일정, 외부 �
 | `/기가채드` | 기가채드 이미지 전송 |
 | `/핑` | 봇 latency 확인 |
 | `/clean` | 관리자 전용 최근 메시지 정리 |
-| `/채널설정` | 기념일, 도박, 음악, 유튜브, 메이플공지, 코덱스리셋 채널 지정/해제 |
+| `/채널설정` | 기념일, 도박, 음악, 유튜브, 메이플공지, 코덱스리셋, 일본지진알림 채널 지정/해제 |
 | `/채널설정확인` | 현재 길드의 기능별 채널 설정 확인 |
 
 ### 기념일/DDAY/일정
@@ -154,6 +154,12 @@ YouTube 알림은 다음 경로를 조합합니다.
 | `/코덱스리셋알림` | 현재 채널에 Codex 사용량 리셋 알림 설정/해제 |
 
 `codex-resets.com`의 공개 API를 3분마다 확인합니다. 사이트가 리셋으로 분류한 새 X 게시물만 알리며, 24시간 리셋 가능성 예측은 알림 대상에서 제외합니다. 이 사이트는 OpenAI 공식 서비스가 아닌 비공식 추적기입니다.
+
+### 일본 긴급지진속보
+
+`/채널설정 기능:일본지진알림 채널:#알림채널`로 설정합니다. Wolfx의 JMA 긴급지진속보 WebSocket에 상시 연결하고 일본 기상청이 발표한 M4.0 이상 예보와 경보를 실시간으로 전달합니다. 같은 지진의 후속보와 최종보는 기존 Discord 메시지를 수정하며 취소보도 반영합니다. 훈련보와 2분 이상 지난 초기 스냅샷은 알리지 않습니다.
+
+Wolfx는 일본 기상청과 관계없는 비공식 중계 서비스입니다. 속보의 규모, 진원, 예상 진도는 후속보에서 바뀌거나 취소될 수 있으므로 공식 재난 알림을 우선 확인해야 합니다.
 
 ### 게임/랭크/투표
 

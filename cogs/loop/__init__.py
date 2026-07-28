@@ -12,6 +12,7 @@ from bot import (
     load_recent_messages,
 )
 from util.codex_resets.loop_runner import run_codex_reset_notification_loop
+from util.earthquake.stream import run_jma_eew_stream
 from util.loop.daily_refresh_runner import run_daily_refreshes
 from util.env_utils import getenv_clean
 from util.loop.task_lifecycle import cancel_loop_tasks, start_loop_tasks
@@ -69,6 +70,7 @@ LOOP_TASK_NAMES = (
     "youtube_community_check",
     "maplestory_notice_check",
     "codex_reset_notification_check",
+    "jma_eew_stream",
     "youtube_websub_renewal",
 )
 logger = logging.getLogger(__name__)
@@ -284,6 +286,14 @@ class LoopTasks(commands.Cog):
         except Exception:
             logger.exception("Codex 리셋 알림 확인 오류")
 
+    @tasks.loop(seconds=5)
+    async def jma_eew_stream(self):
+        """일본 JMA M4.0 이상 긴급지진속보를 실시간 수신합니다."""
+        try:
+            await run_jma_eew_stream(self.bot)
+        except Exception:
+            logger.exception("일본 JMA EEW 스트림 오류")
+
     @tasks.loop(hours=12)
     async def youtube_websub_renewal(self):
         """YouTube WebSub 구독을 주기적으로 갱신합니다."""
@@ -310,6 +320,11 @@ class LoopTasks(commands.Cog):
     @codex_reset_notification_check.before_loop
     async def before_codex_reset_notification_check(self):
         print("-------------Codex 리셋 알림 체크 대기중...---------------")
+        await self.bot.wait_until_ready()
+
+    @jma_eew_stream.before_loop
+    async def before_jma_eew_stream(self):
+        print("-------------일본 JMA EEW 스트림 대기중...---------------")
         await self.bot.wait_until_ready()
 
     @youtube_websub_renewal.before_loop

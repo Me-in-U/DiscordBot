@@ -4,6 +4,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from util.earthquake.state import delete_earthquake_alert_state
 from util.guild.channel_settings import get_settings_for_guild, set_channel
 
 PURPOSE_CHOICES = {
@@ -13,8 +14,9 @@ PURPOSE_CHOICES = {
     "youtube": "유튜브",
     "maplestory_notice": "메이플공지",
     "codex_reset": "코덱스리셋",
+    "earthquake_alert": "일본지진알림",
 }
-PURPOSE_DESCRIPTION = "기념일/도박/음악/유튜브/메이플공지/코덱스리셋"
+PURPOSE_DESCRIPTION = "기념일/도박/음악/유튜브/메이플공지/코덱스리셋/일본지진알림"
 
 
 def _add_current_channel_fields(
@@ -52,6 +54,10 @@ class ChannelSettings(commands.Cog):
             app_commands.Choice(name="유튜브", value="youtube"),
             app_commands.Choice(name="메이플공지", value="maplestory_notice"),
             app_commands.Choice(name="코덱스리셋", value="codex_reset"),
+            app_commands.Choice(
+                name="일본지진알림",
+                value="earthquake_alert",
+            ),
         ]
     )
     async def configure_channel(
@@ -83,6 +89,8 @@ class ChannelSettings(commands.Cog):
 
         guild_id = int(interaction.guild_id)
         await set_channel(guild_id, purpose.value, channel.id if channel else None)
+        if purpose.value == "earthquake_alert":
+            await delete_earthquake_alert_state(guild_id)
 
         action = "해제" if channel is None else "설정"
         channel_text = "설정 해제" if channel is None else channel.mention

@@ -119,13 +119,13 @@ class MusicCommandSurfaceTests(unittest.TestCase):
             text,
         )
         self.assertIn(
-            "기념일/도박/음악/유튜브/메이플공지/코덱스리셋",
+            "기념일/도박/음악/유튜브/메이플공지/코덱스리셋/일본지진알림",
             text,
         )
         self.assertIn("for purpose_key, purpose_label in PURPOSE_CHOICES.items()", text)
         self.assertIn("summary.get(purpose_key)", text)
         self.assertIn(
-            "기념일/도박/음악/유튜브/메이플공지/코덱스리셋",
+            "기념일/도박/음악/유튜브/메이플공지/코덱스리셋/일본지진알림",
             help_text,
         )
         self.assertIn("현재 채널 shortcut으로", help_text)
@@ -146,11 +146,16 @@ class MusicCommandSurfaceTests(unittest.TestCase):
             {
                 "maplestory_notice": 9876,
                 "codex_reset": 1234,
+                "earthquake_alert": 5678,
             },
         )
 
         self.assertIn(("현재 메이플공지 채널", "<#9876>", True), embed.fields)
         self.assertIn(("현재 코덱스리셋 채널", "<#1234>", True), embed.fields)
+        self.assertIn(
+            ("현재 일본지진알림 채널", "<#5678>", True),
+            embed.fields,
+        )
 
     def test_channel_settings_cog_uses_package_layout(self):
         self.assertTrue(CHANNEL_SETTINGS_PATH.exists())
