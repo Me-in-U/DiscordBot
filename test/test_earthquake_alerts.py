@@ -269,8 +269,8 @@ class EarthquakeAlertCommandTests(unittest.IsolatedAsyncioTestCase):
 
 
 class JmaEewAlertTests(unittest.IsolatedAsyncioTestCase):
-    async def test_sends_first_magnitude_four_report(self):
-        event = _event(magnitude=4.0)
+    async def test_sends_first_magnitude_five_point_five_report(self):
+        event = _event(magnitude=5.5)
         saved_states = []
         sent_events = []
 
@@ -307,8 +307,8 @@ class JmaEewAlertTests(unittest.IsolatedAsyncioTestCase):
             900,
         )
 
-    async def test_skips_first_report_below_magnitude_four(self):
-        event = _event(magnitude=3.9)
+    async def test_skips_first_report_below_magnitude_five_point_five(self):
+        event = _event(magnitude=5.4)
 
         async def get_channels():
             return {1: 100}
@@ -317,7 +317,7 @@ class JmaEewAlertTests(unittest.IsolatedAsyncioTestCase):
             return EarthquakeAlertState(channel_id=100)
 
         async def send(_target, _event):
-            raise AssertionError("M4.0 미만은 보내면 안 됩니다.")
+            raise AssertionError("M5.5 미만은 보내면 안 됩니다.")
 
         results = await process_jma_eew_event(
             object(),

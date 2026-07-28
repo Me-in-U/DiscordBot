@@ -288,7 +288,7 @@ class LoopTasks(commands.Cog):
 
     @tasks.loop(seconds=5)
     async def jma_eew_stream(self):
-        """일본 JMA M4.0 이상 긴급지진속보를 실시간 수신합니다."""
+        """일본 JMA M5.5 이상 긴급지진속보를 실시간 수신합니다."""
         try:
             await run_jma_eew_stream(self.bot)
         except Exception:
