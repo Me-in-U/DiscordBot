@@ -45,6 +45,13 @@ This repository hosts a modular Discord bot built with `discord.py`. Follow thes
 - `DISCORD_CLIENT.PARTY_LIST`: Tracks dynamic voice channels/categories.
 - Access global state via `self.bot` in Cogs.
 
+### 4. Notification Delivery Pairing
+- Every guild notification feature with a configurable Discord destination must expose both a dedicated slash command and a matching choice in `/채널설정`.
+- The dedicated command enables notifications in the channel where it is invoked and disables them with a boolean `상태` option. Restrict this configuration to guild administrators.
+- Both command surfaces must use `util/guild/channel_settings.py` with the same `channel_type` key so `/채널설정확인` always reports the effective destination.
+- When changing or removing a notification channel, reset or seed the related `setting_data` state as needed to prevent stale edits or historical alerts.
+- Update `/도움`, `README.md`, and focused tests whenever either side of this pair changes.
+
 ## Developer Workflows
 
 - **Dependency Management**:

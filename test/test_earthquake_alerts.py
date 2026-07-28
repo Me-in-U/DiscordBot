@@ -5,10 +5,13 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
 
 import aiohttp
 
+from cogs.earthquake_alert import EarthquakeAlertCommands
 from util.earthquake.alerts import (
+    EARTHQUAKE_ALERT_CHANNEL_TYPE,
     build_jma_eew_embed,
     process_jma_eew_event,
 )
@@ -26,7 +29,11 @@ from util.earthquake.stream import consume_jma_eew_messages
 
 
 CHANNEL_SETTINGS_PATH = Path("cogs/channel_settings/__init__.py")
+EARTHQUAKE_COG_PATH = Path("cogs/earthquake_alert/__init__.py")
+HELP_PATH = Path("cogs/custom_help/__init__.py")
 LOOP_PATH = Path("cogs/loop/__init__.py")
+README_PATH = Path("README.md")
+AGENTS_PATH = Path("AGENTS.md")
 NOW = datetime.now(timezone.utc)
 
 
@@ -124,6 +131,19 @@ class JmaEewParserTests(unittest.TestCase):
         self.assertIn('"jma_eew_stream"', loop_source)
         self.assertIn("run_jma_eew_stream(self.bot)", loop_source)
 
+    def test_exposes_alert_command_and_documents_delivery_pair(self):
+        cog_source = EARTHQUAKE_COG_PATH.read_text(encoding="utf-8")
+        help_source = HELP_PATH.read_text(encoding="utf-8")
+        readme_source = README_PATH.read_text(encoding="utf-8")
+        agents_source = AGENTS_PATH.read_text(encoding="utf-8")
+
+        self.assertIn('name="지진알림"', cog_source)
+        self.assertIn('status="true면 현재 채널로 알림을 받고', cog_source)
+        self.assertIn("/지진알림", help_source)
+        self.assertIn("/지진알림", readme_source)
+        self.assertIn("Notification Delivery Pairing", agents_source)
+        self.assertIn("same `channel_type` key", agents_source)
+
 
 class EarthquakeStateTests(unittest.TestCase):
     def test_remembers_latest_serial_and_message(self):
@@ -146,6 +166,91 @@ class EarthquakeStateTests(unittest.TestCase):
         self.assertEqual(record.serial, 2)
         self.assertEqual(record.message_id, 900)
         self.assertEqual(len(state.records), 1)
+
+
+class EarthquakeAlertCommandTests(unittest.IsolatedAsyncioTestCase):
+    def _interaction(self, *, channel_id: int | None = 456):
+        return SimpleNamespace(
+            guild_id=123,
+            channel_id=channel_id,
+            response=SimpleNamespace(
+                defer=AsyncMock(),
+                send_message=AsyncMock(),
+            ),
+            followup=SimpleNamespace(send=AsyncMock()),
+        )
+
+    async def test_enable_uses_current_channel_and_resets_state(self):
+        interaction = self._interaction()
+        cog = EarthquakeAlertCommands(SimpleNamespace())
+
+        with patch.object(
+            cog,
+            "_require_guild_admin",
+            new=AsyncMock(return_value=True),
+        ):
+            with patch(
+                "cogs.earthquake_alert.set_channel",
+                new=AsyncMock(),
+            ) as set_channel:
+                with patch(
+                    "cogs.earthquake_alert.delete_earthquake_alert_state",
+                    new=AsyncMock(),
+                ) as delete_state:
+                    await cog.configure_earthquake_alert.callback(
+                        cog,
+                        interaction,
+                        True,
+                    )
+
+        set_channel.assert_awaited_once_with(
+            123,
+            EARTHQUAKE_ALERT_CHANNEL_TYPE,
+            456,
+        )
+        delete_state.assert_awaited_once_with(123)
+        interaction.response.defer.assert_awaited_once_with(
+            ephemeral=True,
+            thinking=True,
+        )
+        self.assertIn(
+            "알림 채널: <#456>",
+            interaction.followup.send.await_args.args[0],
+        )
+
+    async def test_disable_clears_channel_and_state(self):
+        interaction = self._interaction()
+        cog = EarthquakeAlertCommands(SimpleNamespace())
+
+        with patch.object(
+            cog,
+            "_require_guild_admin",
+            new=AsyncMock(return_value=True),
+        ):
+            with patch(
+                "cogs.earthquake_alert.set_channel",
+                new=AsyncMock(),
+            ) as set_channel:
+                with patch(
+                    "cogs.earthquake_alert.delete_earthquake_alert_state",
+                    new=AsyncMock(),
+                ) as delete_state:
+                    await cog.configure_earthquake_alert.callback(
+                        cog,
+                        interaction,
+                        False,
+                    )
+
+        set_channel.assert_awaited_once_with(
+            123,
+            EARTHQUAKE_ALERT_CHANNEL_TYPE,
+            None,
+        )
+        delete_state.assert_awaited_once_with(123)
+        self.assertIn(
+            "알림을 해제했습니다",
+            interaction.response.send_message.await_args.args[0],
+        )
 
 
 class JmaEewAlertTests(unittest.IsolatedAsyncioTestCase):
