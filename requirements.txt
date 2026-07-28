@@ -9,6 +9,7 @@ google-api-python-client
 holidays
 matplotlib
 openai
+Pillow
 python-dotenv
 pytube
 pyttsx3

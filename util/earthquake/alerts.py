@@ -11,6 +11,11 @@ from util.earthquake.jma_eew import (
     JmaEewEvent,
     is_recent_jma_eew,
 )
+from util.earthquake.map_image import (
+    EARTHQUAKE_MAP_FILENAME,
+    build_jma_eew_map_file,
+    build_openstreetmap_url,
+)
 from util.earthquake.state import (
     EarthquakeAlertState,
     find_jma_eew_record,
@@ -266,10 +271,15 @@ async def send_jma_eew_alert(
     target: object,
     event: JmaEewEvent,
 ) -> int | None:
-    message = await target.send(
-        embed=build_jma_eew_embed(event),
-        allowed_mentions=discord.AllowedMentions.none(),
-    )
+    map_file = await build_jma_eew_map_file(event)
+    embed = build_jma_eew_embed(event, include_map=map_file is not None)
+    send_options = {
+        "embed": embed,
+        "allowed_mentions": discord.AllowedMentions.none(),
+    }
+    if map_file is not None:
+        send_options["file"] = map_file
+    message = await target.send(**send_options)
     return getattr(message, "id", None)
 
 
@@ -282,14 +292,37 @@ async def edit_jma_eew_alert(
         message = await target.fetch_message(int(message_id))
     except discord.NotFound:
         return await send_jma_eew_alert(target, event)
-    await message.edit(
-        embed=build_jma_eew_embed(event),
-        allowed_mentions=discord.AllowedMentions.none(),
+
+    map_file = await build_jma_eew_map_file(event)
+    existing_map = next(
+        (
+            attachment
+            for attachment in getattr(message, "attachments", ())
+            if getattr(attachment, "filename", None)
+            == EARTHQUAKE_MAP_FILENAME
+        ),
+        None,
     )
+    edit_options = {
+        "embed": build_jma_eew_embed(
+            event,
+            include_map=map_file is not None or existing_map is not None,
+        ),
+        "allowed_mentions": discord.AllowedMentions.none(),
+    }
+    if map_file is not None:
+        edit_options["attachments"] = [map_file]
+    elif existing_map is not None:
+        edit_options["attachments"] = [existing_map]
+    await message.edit(**edit_options)
     return getattr(message, "id", int(message_id))
 
 
-def build_jma_eew_embed(event: JmaEewEvent) -> discord.Embed:
+def build_jma_eew_embed(
+    event: JmaEewEvent,
+    *,
+    include_map: bool = False,
+) -> discord.Embed:
     if event.is_cancelled:
         report_type = "취소"
     elif event.is_warning:
@@ -342,18 +375,14 @@ def build_jma_eew_embed(event: JmaEewEvent) -> discord.Embed:
         inline=True,
     )
     if event.latitude is not None and event.longitude is not None:
-        coordinates_url = (
-            "https://www.google.com/maps/search/?api=1&query="
-            f"{event.latitude:.4f},{event.longitude:.4f}"
-        )
+        coordinates_url = build_openstreetmap_url(event)
         embed.add_field(
             name="추정 진원",
-            value=(
-                f"[{event.latitude:.4f}, {event.longitude:.4f}]"
-                f"({coordinates_url})"
-            ),
+            value=f"[지도에서 크게 보기]({coordinates_url})",
             inline=False,
         )
+        if include_map:
+            embed.set_image(url=f"attachment://{EARTHQUAKE_MAP_FILENAME}")
     if event.warn_areas:
         embed.add_field(
             name="예상 지역",

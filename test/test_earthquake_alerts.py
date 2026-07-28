@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import io
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -9,17 +10,26 @@ from unittest.mock import AsyncMock, patch
 
 import aiohttp
 import discord
+from PIL import Image
 
 from cogs.earthquake_alert import EarthquakeAlertCommands
 from util.earthquake.alerts import (
     EARTHQUAKE_ALERT_CHANNEL_TYPE,
     build_jma_eew_embed,
+    edit_jma_eew_alert,
     process_jma_eew_event,
+    send_jma_eew_alert,
 )
 from util.earthquake.jma_eew import (
     JmaEewEvent,
     is_recent_jma_eew,
     parse_jma_eew_message,
+)
+from util.earthquake.map_image import (
+    EARTHQUAKE_MAP_FILENAME,
+    EARTHQUAKE_MAP_HEIGHT,
+    EARTHQUAKE_MAP_WIDTH,
+    build_jma_eew_map_file,
 )
 from util.earthquake.state import (
     EarthquakeAlertState,
@@ -419,6 +429,105 @@ class JmaEewAlertTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(
             any(field.name == "예상 지역" for field in embed.fields)
         )
+
+    def test_embed_uses_readable_map_link_and_attachment(self):
+        embed = build_jma_eew_embed(_event(), include_map=True)
+        hypocenter_field = next(
+            field for field in embed.fields if field.name == "추정 진원"
+        )
+
+        self.assertIn("지도에서 크게 보기", hypocenter_field.value)
+        self.assertIn("openstreetmap.org", hypocenter_field.value)
+        self.assertNotIn("32.7000, 130.7000", hypocenter_field.value)
+        self.assertEqual(
+            embed.image.url,
+            f"attachment://{EARTHQUAKE_MAP_FILENAME}",
+        )
+
+    async def test_builds_map_attachment_with_epicenter_marker(self):
+        tile = Image.new("RGB", (256, 256), "#dce8d5")
+        tile_output = io.BytesIO()
+        tile.save(tile_output, format="PNG")
+        tile_bytes = tile_output.getvalue()
+
+        async def load_tile(_zoom, _tile_x, _tile_y):
+            return tile_bytes
+
+        map_file = await build_jma_eew_map_file(
+            _event(),
+            load_tile=load_tile,
+        )
+
+        self.assertIsNotNone(map_file)
+        self.assertEqual(map_file.filename, EARTHQUAKE_MAP_FILENAME)
+        with Image.open(map_file.fp) as rendered:
+            self.assertEqual(
+                rendered.size,
+                (EARTHQUAKE_MAP_WIDTH, EARTHQUAKE_MAP_HEIGHT),
+            )
+            center = rendered.convert("RGB").getpixel(
+                (EARTHQUAKE_MAP_WIDTH // 2, EARTHQUAKE_MAP_HEIGHT // 2)
+            )
+            self.assertGreater(center[0], center[1])
+        map_file.close()
+
+    async def test_send_attaches_map_image(self):
+        target = SimpleNamespace(
+            send=AsyncMock(return_value=SimpleNamespace(id=900))
+        )
+        fake_map = discord.File(
+            io.BytesIO(b"map"),
+            filename=EARTHQUAKE_MAP_FILENAME,
+        )
+
+        with patch(
+            "util.earthquake.alerts.build_jma_eew_map_file",
+            new=AsyncMock(return_value=fake_map),
+        ):
+            message_id = await send_jma_eew_alert(target, _event())
+
+        self.assertEqual(message_id, 900)
+        send_options = target.send.await_args.kwargs
+        self.assertIs(send_options["file"], fake_map)
+        self.assertEqual(
+            send_options["embed"].image.url,
+            f"attachment://{EARTHQUAKE_MAP_FILENAME}",
+        )
+        fake_map.close()
+
+    async def test_edit_replaces_map_image_for_followup_report(self):
+        existing_map = SimpleNamespace(filename=EARTHQUAKE_MAP_FILENAME)
+        message = SimpleNamespace(
+            id=900,
+            attachments=[existing_map],
+            edit=AsyncMock(),
+        )
+        target = SimpleNamespace(
+            fetch_message=AsyncMock(return_value=message)
+        )
+        updated_map = discord.File(
+            io.BytesIO(b"updated-map"),
+            filename=EARTHQUAKE_MAP_FILENAME,
+        )
+
+        with patch(
+            "util.earthquake.alerts.build_jma_eew_map_file",
+            new=AsyncMock(return_value=updated_map),
+        ):
+            message_id = await edit_jma_eew_alert(
+                target,
+                900,
+                _event(serial=2),
+            )
+
+        self.assertEqual(message_id, 900)
+        edit_options = message.edit.await_args.kwargs
+        self.assertEqual(edit_options["attachments"], [updated_map])
+        self.assertEqual(
+            edit_options["embed"].image.url,
+            f"attachment://{EARTHQUAKE_MAP_FILENAME}",
+        )
+        updated_map.close()
 
     def test_embed_border_color_follows_magnitude_thresholds(self):
         cases = [
