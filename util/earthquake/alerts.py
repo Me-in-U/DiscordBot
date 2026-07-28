@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import logging
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 
 import discord
@@ -24,6 +25,7 @@ from util.earthquake.state import (
     reset_earthquake_alert_state,
     save_earthquake_alert_state,
 )
+from util.earthquake.translation import translate_jma_eew_terms
 
 
 EARTHQUAKE_ALERT_CHANNEL_TYPE = "earthquake_alert"
@@ -271,8 +273,15 @@ async def send_jma_eew_alert(
     target: object,
     event: JmaEewEvent,
 ) -> int | None:
-    map_file = await build_jma_eew_map_file(event)
-    embed = build_jma_eew_embed(event, include_map=map_file is not None)
+    map_file, translated_terms = await asyncio.gather(
+        build_jma_eew_map_file(event),
+        translate_jma_eew_terms(event),
+    )
+    embed = build_jma_eew_embed(
+        event,
+        include_map=map_file is not None,
+        translated_terms=translated_terms,
+    )
     send_options = {
         "embed": embed,
         "allowed_mentions": discord.AllowedMentions.none(),
@@ -293,7 +302,10 @@ async def edit_jma_eew_alert(
     except discord.NotFound:
         return await send_jma_eew_alert(target, event)
 
-    map_file = await build_jma_eew_map_file(event)
+    map_file, translated_terms = await asyncio.gather(
+        build_jma_eew_map_file(event),
+        translate_jma_eew_terms(event),
+    )
     existing_map = next(
         (
             attachment
@@ -307,6 +319,7 @@ async def edit_jma_eew_alert(
         "embed": build_jma_eew_embed(
             event,
             include_map=map_file is not None or existing_map is not None,
+            translated_terms=translated_terms,
         ),
         "allowed_mentions": discord.AllowedMentions.none(),
     }
@@ -322,6 +335,7 @@ def build_jma_eew_embed(
     event: JmaEewEvent,
     *,
     include_map: bool = False,
+    translated_terms: Mapping[str, str] | None = None,
 ) -> discord.Embed:
     if event.is_cancelled:
         report_type = "취소"
@@ -332,7 +346,9 @@ def build_jma_eew_embed(
 
     embed = discord.Embed(
         title=f"JMA 긴급지진속보 {report_type} | {_magnitude_text(event)}",
-        description=f"**{event.hypocenter}**",
+        description=(
+            f"**{_bilingual_text(event.hypocenter, translated_terms)}**"
+        ),
         color=_jma_eew_color(event),
         timestamp=event.announced_at,
     )
@@ -386,7 +402,7 @@ def build_jma_eew_embed(
     if event.warn_areas:
         embed.add_field(
             name="예상 지역",
-            value=_warn_area_text(event),
+            value=_warn_area_text(event, translated_terms),
             inline=False,
         )
     if event.is_cancelled:
@@ -425,15 +441,35 @@ def _discord_time(value: object) -> str:
     return f"<t:{timestamp}:f>\n<t:{timestamp}:R>"
 
 
-def _warn_area_text(event: JmaEewEvent) -> str:
+def _warn_area_text(
+    event: JmaEewEvent,
+    translated_terms: Mapping[str, str] | None = None,
+) -> str:
     lines = []
     for area in event.warn_areas[:10]:
         intensity = area.maximum_intensity or area.minimum_intensity or "미상"
-        arrival = f" | {area.arrival_status}" if area.arrival_status else ""
-        lines.append(f"{area.name}: 진도 {intensity}{arrival}")
+        area_name = _bilingual_text(area.name, translated_terms)
+        arrival = (
+            f" | {_bilingual_text(area.arrival_status, translated_terms)}"
+            if area.arrival_status
+            else ""
+        )
+        lines.append(f"{area_name}: 진도 {intensity}{arrival}")
     if len(event.warn_areas) > 10:
         lines.append(f"외 {len(event.warn_areas) - 10}개 지역")
     return "\n".join(lines)
+
+
+def _bilingual_text(
+    original: str,
+    translated_terms: Mapping[str, str] | None,
+) -> str:
+    if not translated_terms:
+        return original
+    translated = str(translated_terms.get(original) or "").strip()
+    if not translated or translated == original:
+        return original
+    return f"{original}({translated})"
 
 
 def _jma_eew_color(event: JmaEewEvent) -> discord.Color:

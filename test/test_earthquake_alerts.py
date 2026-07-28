@@ -37,6 +37,10 @@ from util.earthquake.state import (
     remember_jma_eew_message,
 )
 from util.earthquake.stream import consume_jma_eew_messages
+from util.earthquake.translation import (
+    _extract_google_translation,
+    translate_jma_eew_terms,
+)
 
 
 CHANNEL_SETTINGS_PATH = Path("cogs/channel_settings/__init__.py")
@@ -484,7 +488,11 @@ class JmaEewAlertTests(unittest.IsolatedAsyncioTestCase):
             "util.earthquake.alerts.build_jma_eew_map_file",
             new=AsyncMock(return_value=fake_map),
         ):
-            message_id = await send_jma_eew_alert(target, _event())
+            with patch(
+                "util.earthquake.alerts.translate_jma_eew_terms",
+                new=AsyncMock(return_value={}),
+            ):
+                message_id = await send_jma_eew_alert(target, _event())
 
         self.assertEqual(message_id, 900)
         send_options = target.send.await_args.kwargs
@@ -514,11 +522,15 @@ class JmaEewAlertTests(unittest.IsolatedAsyncioTestCase):
             "util.earthquake.alerts.build_jma_eew_map_file",
             new=AsyncMock(return_value=updated_map),
         ):
-            message_id = await edit_jma_eew_alert(
-                target,
-                900,
-                _event(serial=2),
-            )
+            with patch(
+                "util.earthquake.alerts.translate_jma_eew_terms",
+                new=AsyncMock(return_value={}),
+            ):
+                message_id = await edit_jma_eew_alert(
+                    target,
+                    900,
+                    _event(serial=2),
+                )
 
         self.assertEqual(message_id, 900)
         edit_options = message.edit.await_args.kwargs
@@ -528,6 +540,71 @@ class JmaEewAlertTests(unittest.IsolatedAsyncioTestCase):
             f"attachment://{EARTHQUAKE_MAP_FILENAME}",
         )
         updated_map.close()
+
+    async def test_translates_displayed_japanese_terms_in_one_batch(self):
+        requested = []
+
+        async def translate_texts(texts):
+            requested.append(texts)
+            return {
+                "熊本県熊本地方": "구마모토현 구마모토 지방",
+                "熊本県熊本": "구마모토현 구마모토",
+                "既に到達と予測": "이미 도달했을 것으로 예상",
+            }
+
+        event = _event()
+        translated = await translate_jma_eew_terms(
+            event,
+            translate_texts=translate_texts,
+        )
+        embed = build_jma_eew_embed(
+            event,
+            translated_terms=translated,
+        )
+        expected_area_terms = (
+            "熊本県熊本地方",
+            "熊本県熊本",
+            "既に到達と予測",
+        )
+
+        self.assertEqual(requested, [expected_area_terms])
+        self.assertEqual(
+            embed.description,
+            "**熊本県熊本地方(구마모토현 구마모토 지방)**",
+        )
+        expected_area = next(
+            field.value
+            for field in embed.fields
+            if field.name == "예상 지역"
+        )
+        self.assertIn(
+            "熊本県熊本(구마모토현 구마모토)",
+            expected_area,
+        )
+        self.assertIn(
+            "既に到達と予測(이미 도달했을 것으로 예상)",
+            expected_area,
+        )
+
+    def test_translation_failure_keeps_original_japanese_text(self):
+        embed = build_jma_eew_embed(_event(), translated_terms={})
+
+        self.assertEqual(embed.description, "**熊本県熊本地方**")
+
+    def test_extracts_keyless_google_translation_segments(self):
+        payload = [
+            [
+                ["구마모토현 ", "熊本県", None, None, 3],
+                ["구마모토 지방", "熊本地方", None, None, 3],
+            ],
+            None,
+            "ja",
+        ]
+
+        self.assertEqual(
+            _extract_google_translation(payload),
+            "구마모토현 구마모토 지방",
+        )
 
     def test_embed_border_color_follows_magnitude_thresholds(self):
         cases = [
