@@ -291,24 +291,23 @@ async def edit_jma_eew_alert(
 
 def build_jma_eew_embed(event: JmaEewEvent) -> discord.Embed:
     if event.is_cancelled:
-        title = "JMA 긴급지진속보 취소"
+        report_type = "취소"
     elif event.is_warning:
-        title = f"JMA 긴급지진속보 경보 {_magnitude_text(event)}"
+        report_type = "경보"
     else:
-        title = f"JMA 긴급지진속보 예보 {_magnitude_text(event)}"
+        report_type = "예보"
 
     embed = discord.Embed(
-        title=title,
-        description=event.hypocenter,
+        title=f"JMA 긴급지진속보 {report_type} | {_magnitude_text(event)}",
+        description=f"**{event.hypocenter}**",
         color=_jma_eew_color(event),
         timestamp=event.announced_at,
     )
     embed.add_field(
-        name="발표",
-        value=f"제 {event.serial}보" + (" | 최종보" if event.is_final else ""),
+        name="규모",
+        value=f"**{_magnitude_text(event)}**",
         inline=True,
     )
-    embed.add_field(name="규모", value=_magnitude_text(event), inline=True)
     embed.add_field(
         name="깊이",
         value=(
@@ -324,16 +323,24 @@ def build_jma_eew_embed(event: JmaEewEvent) -> discord.Embed:
         inline=True,
     )
     embed.add_field(
+        name="발표 단계",
+        value=f"제 {event.serial}보" + ("\n최종보" if event.is_final else ""),
+        inline=True,
+    )
+    embed.add_field(
         name="발표 시각",
         value=_discord_time(event.announced_at),
-        inline=False,
+        inline=True,
     )
-    if event.origin_at is not None:
-        embed.add_field(
-            name="발생 추정 시각",
-            value=_discord_time(event.origin_at),
-            inline=False,
-        )
+    embed.add_field(
+        name="발생 추정",
+        value=(
+            _discord_time(event.origin_at)
+            if event.origin_at is not None
+            else "미상"
+        ),
+        inline=True,
+    )
     if event.latitude is not None and event.longitude is not None:
         coordinates_url = (
             "https://www.google.com/maps/search/?api=1&query="
@@ -386,7 +393,7 @@ def _magnitude_text(event: JmaEewEvent) -> str:
 
 def _discord_time(value: object) -> str:
     timestamp = int(value.timestamp())
-    return f"<t:{timestamp}:F>\n<t:{timestamp}:R>"
+    return f"<t:{timestamp}:f>\n<t:{timestamp}:R>"
 
 
 def _warn_area_text(event: JmaEewEvent) -> str:
@@ -403,11 +410,15 @@ def _warn_area_text(event: JmaEewEvent) -> str:
 def _jma_eew_color(event: JmaEewEvent) -> discord.Color:
     if event.is_cancelled:
         return discord.Color.light_grey()
-    if event.is_warning:
-        return discord.Color.red()
     if event.magnitude is not None and event.magnitude >= 6.0:
+        return discord.Color.red()
+    if event.magnitude is not None and event.magnitude >= 5.0:
         return discord.Color.orange()
-    return discord.Color.gold()
+    if event.magnitude is not None and event.magnitude >= 4.0:
+        return discord.Color.yellow()
+    if event.magnitude is not None and event.magnitude >= 3.0:
+        return discord.Color.green()
+    return discord.Color.light_grey()
 
 
 def _skipped_result(

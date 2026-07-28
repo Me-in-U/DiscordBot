@@ -8,6 +8,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import aiohttp
+import discord
 
 from cogs.earthquake_alert import EarthquakeAlertCommands
 from util.earthquake.alerts import (
@@ -401,10 +402,42 @@ class JmaEewAlertTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertIn("M4.3", embed.title)
-        self.assertIn("제 8보", embed.fields[0].value)
+        self.assertEqual(
+            [field.name for field in embed.fields[:6]],
+            [
+                "규모",
+                "깊이",
+                "최대 예상 진도",
+                "발표 단계",
+                "발표 시각",
+                "발생 추정",
+            ],
+        )
+        self.assertTrue(all(field.inline for field in embed.fields[:6]))
+        self.assertIn("제 8보", embed.fields[3].value)
+        self.assertIn("최종보", embed.fields[3].value)
         self.assertTrue(
             any(field.name == "예상 지역" for field in embed.fields)
         )
+
+    def test_embed_border_color_follows_magnitude_thresholds(self):
+        cases = [
+            (2.9, discord.Color.light_grey()),
+            (3.0, discord.Color.green()),
+            (4.0, discord.Color.yellow()),
+            (5.0, discord.Color.orange()),
+            (6.0, discord.Color.red()),
+        ]
+
+        for magnitude, expected_color in cases:
+            with self.subTest(magnitude=magnitude):
+                embed = build_jma_eew_embed(_event(magnitude=magnitude))
+                self.assertEqual(embed.color, expected_color)
+
+        cancelled = build_jma_eew_embed(
+            _event(magnitude=6.0, is_cancelled=True)
+        )
+        self.assertEqual(cancelled.color, discord.Color.light_grey())
 
 
 class JmaEewStreamTests(unittest.IsolatedAsyncioTestCase):
