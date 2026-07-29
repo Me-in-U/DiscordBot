@@ -15,6 +15,7 @@ class JmaEewMessageRecord:
     event_id: str
     serial: int
     message_id: int
+    everyone_notified: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,6 +60,7 @@ async def save_earthquake_alert_state(
                 "eventId": record.event_id,
                 "serial": record.serial,
                 "messageId": record.message_id,
+                "everyoneNotified": record.everyone_notified,
             }
             for record in state.records[-MAX_JMA_EEW_RECORDS:]
         ],
@@ -105,11 +107,19 @@ def remember_jma_eew_message(
     event_id: str,
     serial: int,
     message_id: int,
+    everyone_notified: bool | None = None,
 ) -> EarthquakeAlertState:
+    existing_record = find_jma_eew_record(state, event_id)
+    resolved_everyone_notified = (
+        existing_record.everyone_notified
+        if everyone_notified is None and existing_record is not None
+        else bool(everyone_notified)
+    )
     record = JmaEewMessageRecord(
         event_id=event_id.strip(),
         serial=int(serial),
         message_id=int(message_id),
+        everyone_notified=resolved_everyone_notified,
     )
     records = [
         existing
@@ -151,6 +161,7 @@ def _decode_record(value: object) -> JmaEewMessageRecord | None:
         event_id=event_id,
         serial=serial,
         message_id=message_id,
+        everyone_notified=bool(value.get("everyoneNotified", False)),
     )
 
 

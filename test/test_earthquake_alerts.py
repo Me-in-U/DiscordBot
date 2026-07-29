@@ -156,6 +156,8 @@ class JmaEewParserTests(unittest.TestCase):
         self.assertIn('status="true면 현재 채널로 알림을 받고', cog_source)
         self.assertIn("/지진알림", help_source)
         self.assertIn("/지진알림", readme_source)
+        self.assertIn("@everyone", help_source)
+        self.assertIn("@everyone", readme_source)
         self.assertIn("Notification Delivery Pairing", agents_source)
         self.assertIn("same `channel_type` key", agents_source)
 
@@ -168,6 +170,7 @@ class EarthquakeStateTests(unittest.TestCase):
             event_id="event-1",
             serial=1,
             message_id=900,
+            everyone_notified=True,
         )
         state = remember_jma_eew_message(
             state,
@@ -180,6 +183,7 @@ class EarthquakeStateTests(unittest.TestCase):
         self.assertIsNotNone(record)
         self.assertEqual(record.serial, 2)
         self.assertEqual(record.message_id, 900)
+        self.assertTrue(record.everyone_notified)
         self.assertEqual(len(state.records), 1)
 
 
@@ -286,8 +290,9 @@ class JmaEewAlertTests(unittest.IsolatedAsyncioTestCase):
         async def resolve(_bot, _channel_id):
             return object()
 
-        async def send(_target, sent_event):
+        async def send(_target, sent_event, notify_everyone):
             sent_events.append(sent_event)
+            self.assertFalse(notify_everyone)
             return 900
 
         results = await process_jma_eew_event(
@@ -316,7 +321,7 @@ class JmaEewAlertTests(unittest.IsolatedAsyncioTestCase):
         async def load(_guild_id):
             return EarthquakeAlertState(channel_id=100)
 
-        async def send(_target, _event):
+        async def send(_target, _event, _notify_everyone):
             raise AssertionError("M5.5 미만은 보내면 안 됩니다.")
 
         results = await process_jma_eew_event(
@@ -353,8 +358,13 @@ class JmaEewAlertTests(unittest.IsolatedAsyncioTestCase):
         async def resolve(_bot, _channel_id):
             return object()
 
-        async def edit(_target, message_id, edited_event):
-            edited.append((message_id, edited_event))
+        async def edit(
+            _target,
+            message_id,
+            edited_event,
+            notify_everyone,
+        ):
+            edited.append((message_id, edited_event, notify_everyone))
             return message_id
 
         results = await process_jma_eew_event(
@@ -368,7 +378,7 @@ class JmaEewAlertTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(results[0].action, "edited")
-        self.assertEqual(edited, [(900, event)])
+        self.assertEqual(edited, [(900, event, False)])
         self.assertEqual(
             find_jma_eew_record(saved_states[0], event.event_id).serial,
             2,
@@ -395,7 +405,12 @@ class JmaEewAlertTests(unittest.IsolatedAsyncioTestCase):
         async def resolve(_bot, _channel_id):
             return object()
 
-        async def edit(_target, message_id, _event):
+        async def edit(
+            _target,
+            message_id,
+            _event,
+            _notify_everyone,
+        ):
             return message_id
 
         results = await process_jma_eew_event(
@@ -409,6 +424,135 @@ class JmaEewAlertTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(results[0].action, "cancelled")
+
+    async def test_magnitude_seven_notifies_everyone_once(self):
+        event = _event(magnitude=7.0)
+        saved_states = []
+        notifications = []
+
+        async def get_channels():
+            return {1: 100}
+
+        async def load(_guild_id):
+            return EarthquakeAlertState(channel_id=100)
+
+        async def save(_guild_id, state):
+            saved_states.append(state)
+
+        async def resolve(_bot, _channel_id):
+            return object()
+
+        async def send(_target, _event, notify_everyone):
+            notifications.append(notify_everyone)
+            return 900
+
+        await process_jma_eew_event(
+            object(),
+            event,
+            get_channels=get_channels,
+            load_state=load,
+            save_state=save,
+            resolve_channel=resolve,
+            send_alert=send,
+        )
+
+        self.assertEqual(notifications, [True])
+        record = find_jma_eew_record(saved_states[0], event.event_id)
+        self.assertTrue(record.everyone_notified)
+
+    async def test_followup_crossing_magnitude_seven_notifies_once(self):
+        event = _event(serial=2, magnitude=7.0)
+        initial_state = remember_jma_eew_message(
+            EarthquakeAlertState(channel_id=100),
+            event_id=event.event_id,
+            serial=1,
+            message_id=900,
+        )
+        saved_states = []
+        notifications = []
+
+        async def get_channels():
+            return {1: 100}
+
+        async def load(_guild_id):
+            return initial_state
+
+        async def save(_guild_id, state):
+            saved_states.append(state)
+
+        async def resolve(_bot, _channel_id):
+            return object()
+
+        async def edit(
+            _target,
+            _message_id,
+            _event,
+            notify_everyone,
+        ):
+            notifications.append(notify_everyone)
+            return 901
+
+        await process_jma_eew_event(
+            object(),
+            event,
+            get_channels=get_channels,
+            load_state=load,
+            save_state=save,
+            resolve_channel=resolve,
+            edit_alert=edit,
+        )
+
+        self.assertEqual(notifications, [True])
+        record = find_jma_eew_record(saved_states[0], event.event_id)
+        self.assertEqual(record.message_id, 901)
+        self.assertTrue(record.everyone_notified)
+
+    async def test_later_magnitude_seven_followup_does_not_renotify(self):
+        event = _event(serial=3, magnitude=7.1)
+        initial_state = remember_jma_eew_message(
+            EarthquakeAlertState(channel_id=100),
+            event_id=event.event_id,
+            serial=2,
+            message_id=900,
+            everyone_notified=True,
+        )
+        saved_states = []
+        notifications = []
+
+        async def get_channels():
+            return {1: 100}
+
+        async def load(_guild_id):
+            return initial_state
+
+        async def save(_guild_id, state):
+            saved_states.append(state)
+
+        async def resolve(_bot, _channel_id):
+            return object()
+
+        async def edit(
+            _target,
+            _message_id,
+            _event,
+            notify_everyone,
+        ):
+            notifications.append(notify_everyone)
+            return 900
+
+        await process_jma_eew_event(
+            object(),
+            event,
+            get_channels=get_channels,
+            load_state=load,
+            save_state=save,
+            resolve_channel=resolve,
+            edit_alert=edit,
+        )
+
+        self.assertEqual(notifications, [False])
+        record = find_jma_eew_record(saved_states[0], event.event_id)
+        self.assertTrue(record.everyone_notified)
 
     def test_builds_eew_embed(self):
         embed = build_jma_eew_embed(
@@ -497,11 +641,38 @@ class JmaEewAlertTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(message_id, 900)
         send_options = target.send.await_args.kwargs
         self.assertIs(send_options["file"], fake_map)
+        self.assertNotIn("content", send_options)
+        self.assertFalse(send_options["allowed_mentions"].everyone)
         self.assertEqual(
             send_options["embed"].image.url,
             f"attachment://{EARTHQUAKE_MAP_FILENAME}",
         )
         fake_map.close()
+
+    async def test_send_mentions_everyone_for_magnitude_seven(self):
+        target = SimpleNamespace(
+            send=AsyncMock(return_value=SimpleNamespace(id=900))
+        )
+
+        with patch(
+            "util.earthquake.alerts.build_jma_eew_map_file",
+            new=AsyncMock(return_value=None),
+        ):
+            with patch(
+                "util.earthquake.alerts.translate_jma_eew_terms",
+                new=AsyncMock(return_value={}),
+            ):
+                message_id = await send_jma_eew_alert(
+                    target,
+                    _event(magnitude=7.0),
+                )
+
+        self.assertEqual(message_id, 900)
+        send_options = target.send.await_args.kwargs
+        self.assertEqual(send_options["content"], "@everyone")
+        self.assertTrue(send_options["allowed_mentions"].everyone)
+        self.assertFalse(send_options["allowed_mentions"].users)
+        self.assertFalse(send_options["allowed_mentions"].roles)
 
     async def test_edit_replaces_map_image_for_followup_report(self):
         existing_map = SimpleNamespace(filename=EARTHQUAKE_MAP_FILENAME)
@@ -540,6 +711,38 @@ class JmaEewAlertTests(unittest.IsolatedAsyncioTestCase):
             f"attachment://{EARTHQUAKE_MAP_FILENAME}",
         )
         updated_map.close()
+
+    async def test_edit_replaces_message_when_everyone_must_be_notified(self):
+        message = SimpleNamespace(
+            id=900,
+            attachments=[],
+            delete=AsyncMock(),
+        )
+        target = SimpleNamespace(
+            fetch_message=AsyncMock(return_value=message),
+            send=AsyncMock(return_value=SimpleNamespace(id=901)),
+        )
+
+        with patch(
+            "util.earthquake.alerts.build_jma_eew_map_file",
+            new=AsyncMock(return_value=None),
+        ):
+            with patch(
+                "util.earthquake.alerts.translate_jma_eew_terms",
+                new=AsyncMock(return_value={}),
+            ):
+                message_id = await edit_jma_eew_alert(
+                    target,
+                    900,
+                    _event(serial=2, magnitude=7.0),
+                    notify_everyone=True,
+                )
+
+        self.assertEqual(message_id, 901)
+        message.delete.assert_awaited_once_with()
+        send_options = target.send.await_args.kwargs
+        self.assertEqual(send_options["content"], "@everyone")
+        self.assertTrue(send_options["allowed_mentions"].everyone)
 
     async def test_translates_displayed_japanese_terms_in_one_batch(self):
         requested = []

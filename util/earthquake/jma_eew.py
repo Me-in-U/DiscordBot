@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 
 WOLFX_JMA_EEW_WEBSOCKET_URL = "wss://ws-api.wolfx.jp/jma_eew"
 JMA_EEW_MIN_MAGNITUDE = 5.5
+JMA_EEW_EVERYONE_MAGNITUDE = 7.0
 JST = timezone(timedelta(hours=9))
 
 

@@ -8,6 +8,7 @@ from dataclasses import dataclass
 import discord
 
 from util.earthquake.jma_eew import (
+    JMA_EEW_EVERYONE_MAGNITUDE,
     JMA_EEW_MIN_MAGNITUDE,
     JmaEewEvent,
     is_recent_jma_eew,
@@ -35,8 +36,8 @@ GetChannels = Callable[[], Awaitable[dict[int, int]]]
 LoadState = Callable[[int], Awaitable[EarthquakeAlertState]]
 SaveState = Callable[[int, EarthquakeAlertState], Awaitable[None]]
 ResolveChannel = Callable[[object, int], Awaitable[object | None]]
-SendAlert = Callable[[object, JmaEewEvent], Awaitable[int | None]]
-EditAlert = Callable[[object, int, JmaEewEvent], Awaitable[int | None]]
+SendAlert = Callable[[object, JmaEewEvent, bool], Awaitable[int | None]]
+EditAlert = Callable[[object, int, JmaEewEvent, bool], Awaitable[int | None]]
 
 
 @dataclass(frozen=True, slots=True)
@@ -169,12 +170,20 @@ async def process_jma_eew_event(
             )
             continue
 
+        notify_everyone = _should_show_everyone(event) and not (
+            record is not None and record.everyone_notified
+        )
         try:
             if record is None:
-                message_id = await send(target, event)
+                message_id = await send(target, event, notify_everyone)
                 action = "sent"
             else:
-                message_id = await edit(target, record.message_id, event)
+                message_id = await edit(
+                    target,
+                    record.message_id,
+                    event,
+                    notify_everyone,
+                )
                 action = "cancelled" if event.is_cancelled else "edited"
         except Exception as exc:
             logger.warning(
@@ -217,6 +226,10 @@ async def process_jma_eew_event(
             event_id=event.event_id,
             serial=event.serial,
             message_id=message_id,
+            everyone_notified=(
+                (record.everyone_notified if record is not None else False)
+                or notify_everyone
+            ),
         )
         try:
             await save(guild_id, updated_state)
@@ -272,6 +285,7 @@ async def resolve_earthquake_alert_channel(
 async def send_jma_eew_alert(
     target: object,
     event: JmaEewEvent,
+    notify_everyone: bool | None = None,
 ) -> int | None:
     map_file, translated_terms = await asyncio.gather(
         build_jma_eew_map_file(event),
@@ -282,10 +296,18 @@ async def send_jma_eew_alert(
         include_map=map_file is not None,
         translated_terms=translated_terms,
     )
+    show_everyone = _should_show_everyone(event)
+    should_notify = (
+        show_everyone
+        if notify_everyone is None
+        else show_everyone and bool(notify_everyone)
+    )
     send_options = {
         "embed": embed,
-        "allowed_mentions": discord.AllowedMentions.none(),
+        "allowed_mentions": _allowed_mentions(should_notify),
     }
+    if show_everyone:
+        send_options["content"] = "@everyone"
     if map_file is not None:
         send_options["file"] = map_file
     message = await target.send(**send_options)
@@ -296,11 +318,32 @@ async def edit_jma_eew_alert(
     target: object,
     message_id: int,
     event: JmaEewEvent,
+    notify_everyone: bool = False,
 ) -> int | None:
     try:
         message = await target.fetch_message(int(message_id))
     except discord.NotFound:
-        return await send_jma_eew_alert(target, event)
+        return await send_jma_eew_alert(
+            target,
+            event,
+            notify_everyone=notify_everyone,
+        )
+
+    if notify_everyone and _should_show_everyone(event):
+        replacement_message_id = await send_jma_eew_alert(
+            target,
+            event,
+            notify_everyone=True,
+        )
+        try:
+            await message.delete()
+        except discord.DiscordException:
+            logger.warning(
+                "M7.0 이상 일본 EEW 기존 메시지 삭제 실패: message=%s",
+                message_id,
+                exc_info=True,
+            )
+        return replacement_message_id
 
     map_file, translated_terms = await asyncio.gather(
         build_jma_eew_map_file(event),
@@ -316,6 +359,7 @@ async def edit_jma_eew_alert(
         None,
     )
     edit_options = {
+        "content": "@everyone" if _should_show_everyone(event) else None,
         "embed": build_jma_eew_embed(
             event,
             include_map=map_file is not None or existing_map is not None,
@@ -329,6 +373,25 @@ async def edit_jma_eew_alert(
         edit_options["attachments"] = [existing_map]
     await message.edit(**edit_options)
     return getattr(message, "id", int(message_id))
+
+
+def _should_show_everyone(event: JmaEewEvent) -> bool:
+    return (
+        not event.is_cancelled
+        and event.magnitude is not None
+        and event.magnitude >= JMA_EEW_EVERYONE_MAGNITUDE
+    )
+
+
+def _allowed_mentions(notify_everyone: bool) -> discord.AllowedMentions:
+    if not notify_everyone:
+        return discord.AllowedMentions.none()
+    return discord.AllowedMentions(
+        everyone=True,
+        users=False,
+        roles=False,
+        replied_user=False,
+    )
 
 
 def build_jma_eew_embed(

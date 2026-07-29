@@ -40,7 +40,7 @@ class EarthquakeAlertCommands(commands.Cog):
 
     @app_commands.command(
         name="지진알림",
-        description="현재 채널에서 일본 M5.5 이상 긴급지진속보 알림을 받거나 해제합니다.",
+        description="일본 M5.5 이상 지진을 알리고 M7.0 이상은 @everyone으로 전송합니다.",
     )
     @app_commands.describe(
         status="true면 현재 채널로 알림을 받고 false면 알림을 해제합니다."
@@ -82,7 +82,8 @@ class EarthquakeAlertCommands(commands.Cog):
         await interaction.followup.send(
             "일본 지진 알림을 설정했습니다.\n"
             f"알림 채널: <#{channel_id}>\n"
-            "일본 M5.5 이상 긴급지진속보부터 실시간으로 알립니다.",
+            "일본 M5.5 이상 긴급지진속보부터 실시간으로 알립니다.\n"
+            "M7.0 이상은 @everyone을 함께 전송합니다.",
             ephemeral=True,
         )
 
