@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import logging
 import math
 
 import discord
 from discord import app_commands
 from discord.ext import commands
 
+from common.discord_ui import SafeView
 from util.guild.channel_settings import get_channel
+from util.logging_utils import user_error_message
 from util.youtube.channel_resolver import resolve_youtube_channel_input
 from util.youtube.subscriptions import (
     YouTubeSubscription,
@@ -20,6 +23,7 @@ from util.youtube.community import fetch_latest_youtube_community_posts
 
 
 YOUTUBE_CHANNEL_TYPE = "youtube"
+logger = logging.getLogger(__name__)
 
 
 class YouTubeSubscriptionDeleteSelect(discord.ui.Select):
@@ -49,7 +53,7 @@ class YouTubeSubscriptionDeleteSelect(discord.ui.Select):
         await parent.delete_selected(interaction, int(self.values[0]))
 
 
-class YouTubeSubscriptionDeleteView(discord.ui.View):
+class YouTubeSubscriptionDeleteView(SafeView):
     def __init__(
         self,
         *,
@@ -204,7 +208,7 @@ class YouTubeSubscriptionAlertSettingsSelect(discord.ui.Select):
         )
 
 
-class YouTubeSubscriptionAlertSettingsView(discord.ui.View):
+class YouTubeSubscriptionAlertSettingsView(SafeView):
     def __init__(
         self,
         *,
@@ -373,10 +377,10 @@ class YouTubeSubscriptionAlertSettingsView(discord.ui.View):
                     upload_alert_enabled=updated.upload_alert_enabled,
                     community_alert_enabled=updated.community_alert_enabled,
                 )
-            except Exception as error:
-                print(
-                    "유튜브 커뮤니티 초기 게시물 상태 저장 실패: "
-                    f"channel={updated.channel_id} error={error}"
+            except Exception:
+                logger.exception(
+                    "유튜브 커뮤니티 초기 게시물 상태 저장 실패: channel=%s",
+                    updated.channel_id,
                 )
 
         self.subscriptions = [
@@ -505,7 +509,11 @@ class YouTubeSubscriptionsCog(commands.Cog):
                 message += "\n⚠️ WebSub callback 설정을 확인해 주세요."
             await interaction.followup.send(message, ephemeral=False)
         except Exception as error:
-            await interaction.followup.send(f"오류: {error}", ephemeral=False)
+            logger.exception("유튜브 구독 추가 실패")
+            await interaction.followup.send(
+                user_error_message("유튜브 구독 추가", error),
+                ephemeral=False,
+            )
 
     @youtube_subscription.command(
         name="알림설정",

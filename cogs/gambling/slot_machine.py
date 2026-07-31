@@ -7,6 +7,7 @@ from typing import Sequence
 
 import discord
 
+from common.discord_ui import SafeView
 from .constants import BET_AMOUNT_REQUIRED, SEOUL_TZ
 from .services import BalanceService
 
@@ -34,7 +35,7 @@ PROBABILITY_TABLE = "\n".join(
 )
 
 
-class SlotMachineView(discord.ui.View):
+class SlotMachineView(SafeView):
     def __init__(
         self,
         *,

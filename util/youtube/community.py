@@ -7,6 +7,7 @@ from typing import Any
 
 import aiohttp
 
+from common.http import EXTERNAL_HTTP_TIMEOUT
 
 YOUTUBE_COMMUNITY_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
@@ -68,6 +69,7 @@ async def fetch_latest_youtube_community_posts(
     url = build_youtube_community_posts_url(channel_id)
     async with aiohttp.ClientSession(
         headers=YOUTUBE_COMMUNITY_HEADERS,
+        timeout=EXTERNAL_HTTP_TIMEOUT,
         trust_env=False,
     ) as session:
         async with session.get(url) as response:

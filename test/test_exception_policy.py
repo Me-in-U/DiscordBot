@@ -76,6 +76,17 @@ class ExceptionPolicyTests(unittest.TestCase):
         self.assertIn('logger.exception("메이플스토리 공지 확인 오류")', text)
         self.assertIn('logger.exception("YouTube WebSub 구독 갱신 오류")', text)
 
+    def test_rank_and_youtube_subscription_errors_do_not_expose_raw_details(self):
+        rank_source = Path("cogs/rank/__init__.py").read_text(encoding="utf-8")
+        youtube_source = Path(
+            "cogs/youtube_subscriptions/__init__.py"
+        ).read_text(encoding="utf-8")
+
+        self.assertNotIn("str(e)", rank_source)
+        self.assertNotIn('f"오류: {error}"', youtube_source)
+        self.assertIn("user_error_message", rank_source)
+        self.assertIn("user_error_message", youtube_source)
+
 
 if __name__ == "__main__":
     unittest.main()

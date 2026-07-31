@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 
 import aiohttp
 
+from common.http import EXTERNAL_HTTP_TIMEOUT
 from util.youtube.subscriptions import (
     YouTubeSubscription,
     get_youtube_subscription,
@@ -120,7 +121,10 @@ async def request_youtube_websub_subscription(
         lease_seconds=lease_seconds,
     )
 
-    async with session_factory(trust_env=False) as session:
+    async with session_factory(
+        timeout=EXTERNAL_HTTP_TIMEOUT,
+        trust_env=False,
+    ) as session:
         async with session.post(hub_url, data=data) as response:
             if response.status < 200 or response.status >= 300:
                 body = await response.text()

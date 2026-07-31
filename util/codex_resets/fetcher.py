@@ -7,6 +7,7 @@ from typing import Any
 
 import aiohttp
 
+from common.http import EXTERNAL_HTTP_TIMEOUT
 
 CODEX_RESETS_API_URL = "https://codex-resets.com/api/resets"
 CODEX_RESETS_REQUEST_TIMEOUT_SECONDS = 15
@@ -64,7 +65,10 @@ async def fetch_codex_reset_snapshot(
         return parse_codex_resets_payload(await fetch_json())
 
     timeout = aiohttp.ClientTimeout(total=CODEX_RESETS_REQUEST_TIMEOUT_SECONDS)
-    async with aiohttp.ClientSession(headers=CODEX_RESETS_HEADERS) as session:
+    async with aiohttp.ClientSession(
+        headers=CODEX_RESETS_HEADERS,
+        timeout=EXTERNAL_HTTP_TIMEOUT,
+    ) as session:
         async with session.get(CODEX_RESETS_API_URL, timeout=timeout) as response:
             response.raise_for_status()
             payload = await response.json(content_type=None)

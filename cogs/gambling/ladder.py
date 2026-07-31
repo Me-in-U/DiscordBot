@@ -7,6 +7,7 @@ from typing import List, Tuple
 
 import discord
 
+from common.discord_ui import SafeView
 from .constants import BET_AMOUNT_REQUIRED, SEOUL_TZ
 from .services import BalanceService
 
@@ -70,7 +71,7 @@ async def run_ladder_game(
     await interaction.response.send_message(embed=embed, view=view)
 
 
-class LadderView(discord.ui.View):
+class LadderView(SafeView):
     def __init__(
         self,
         *,

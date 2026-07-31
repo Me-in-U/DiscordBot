@@ -173,7 +173,10 @@ class SchedulerCog(commands.Cog):
         try:
             trigger_time = calculate_recurring_trigger_time(now, repeat_type, value)
         except ValueError as exc:
-            await interaction.response.send_message(f"❌ 반복 예약 값이 올바르지 않습니다. {exc}", ephemeral=True)
+            await interaction.response.send_message(
+                f"❌ 반복 예약 값이 올바르지 않습니다. {exc}",
+                ephemeral=True,
+            )
             return
 
         uid = str(uuid.uuid4())
@@ -216,9 +219,16 @@ class SchedulerCog(commands.Cog):
 
     @tasks.loop(seconds=30)
     async def check_schedule_task(self) -> None:
+        await self._run_schedule_check()
+
+    async def _run_schedule_check(self) -> None:
         now = datetime.now(SEOUL_TZ)
         query = "SELECT * FROM scheduled_messages WHERE trigger_time <= %s"
-        rows = await fetch_all(query, (now,))
+        try:
+            rows = await fetch_all(query, (now,))
+        except Exception:
+            logger.exception("예약 메시지 조회 실패")
+            return
 
         if not rows:
             return
@@ -226,28 +236,42 @@ class SchedulerCog(commands.Cog):
         for row in rows:
             try:
                 channel = self.bot.get_channel(int(row["channel_id"]))
-                if channel:
-                    prefix = "🔄" if row["is_recurring"] else "⏰"
-                    await channel.send(
-                        f"{prefix} 예약 메시지 (<@{row['user_id']}>):\n{row['message']}"
+                if channel is None:
+                    logger.warning(
+                        "예약 메시지 채널을 찾지 못해 재시도합니다: "
+                        "schedule_id=%s channel_id=%s",
+                        row.get("id"),
+                        row.get("channel_id"),
                     )
-            except Exception:
-                logger.exception("Message send error: row=%s", row)
+                    continue
 
-            if row["is_recurring"]:
-                next_run = self.calculate_next_run(row, row["trigger_time"])
-                if next_run:
-                    await execute_query(
-                        "UPDATE scheduled_messages SET trigger_time = %s WHERE id = %s",
-                        (next_run, row["id"]),
-                    )
+                prefix = "🔄" if row["is_recurring"] else "⏰"
+                await channel.send(
+                    f"{prefix} 예약 메시지 (<@{row['user_id']}>):\n{row['message']}"
+                )
+
+                if row["is_recurring"]:
+                    next_run = self.calculate_next_run(row, row["trigger_time"])
+                    if next_run:
+                        await execute_query(
+                            "UPDATE scheduled_messages SET trigger_time = %s "
+                            "WHERE id = %s",
+                            (next_run, row["id"]),
+                        )
+                    else:
+                        await execute_query(
+                            "DELETE FROM scheduled_messages WHERE id = %s",
+                            (row["id"],),
+                        )
                 else:
                     await execute_query(
-                        "DELETE FROM scheduled_messages WHERE id = %s", (row["id"],)
+                        "DELETE FROM scheduled_messages WHERE id = %s",
+                        (row["id"],),
                     )
-            else:
-                await execute_query(
-                    "DELETE FROM scheduled_messages WHERE id = %s", (row["id"],)
+            except Exception:
+                logger.exception(
+                    "예약 메시지 전송 또는 상태 갱신 실패: schedule_id=%s",
+                    row.get("id"),
                 )
 
     @check_schedule_task.before_loop

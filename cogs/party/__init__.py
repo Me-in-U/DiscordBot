@@ -4,13 +4,14 @@ import asyncio
 import discord
 from discord import app_commands
 from discord.ext import commands
-from discord.ui import View, button
+from discord.ui import button
 
+from common.discord_ui import SafeView
 
 logger = logging.getLogger(__name__)
 
 
-class JoinView(View):
+class JoinView(SafeView):
     def __init__(self, party_name: str, category: discord.CategoryChannel):
         super().__init__(timeout=None)
         self.party_name = party_name
@@ -77,10 +78,35 @@ class Party(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
+        self._background_tasks: set[asyncio.Task] = set()
         # self.bot.PARTY_LIST는 봇 초기화 시 빈 딕셔너리로 설정되어 있어야 합니다.
         # 예: DISCORD_CLIENT.PARTY_LIST = {}
         self.join_requests = {}
         print("Party Cog : init 로드 완료!")
+
+    def _spawn_background_task(self, coroutine) -> asyncio.Task:
+        task = asyncio.create_task(coroutine)
+        self._background_tasks.add(task)
+
+        def finish(done_task: asyncio.Task) -> None:
+            self._background_tasks.discard(done_task)
+            try:
+                error = done_task.exception()
+            except asyncio.CancelledError:
+                return
+            if error is not None:
+                logger.error(
+                    "파티 백그라운드 작업 실패",
+                    exc_info=(type(error), error, error.__traceback__),
+                )
+
+        task.add_done_callback(finish)
+        return task
+
+    def cog_unload(self) -> None:
+        for task in list(self._background_tasks):
+            task.cancel()
+        self._background_tasks.clear()
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -185,7 +211,7 @@ class Party(commands.Cog):
             # 새 카테고리만 해당 위치로 이동
             await category.edit(position=ref_idx)
 
-        asyncio.create_task(relocate())
+        self._spawn_background_task(relocate())
 
     @app_commands.command(
         name="파티초대",

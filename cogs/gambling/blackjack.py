@@ -7,6 +7,7 @@ from typing import List, Tuple
 
 import discord
 
+from common.discord_ui import SafeView
 from .constants import BET_AMOUNT_REQUIRED, SEOUL_TZ
 from .services import BalanceService
 
@@ -149,7 +150,7 @@ def _render_cards_ascii(cards: List[Card], *, hidden_index: int | None = None) -
     return "```\n" + "\n".join(lines_joined) + "\n```"
 
 
-class BlackjackView(discord.ui.View):
+class BlackjackView(SafeView):
     def __init__(
         self,
         *,

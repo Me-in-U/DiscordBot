@@ -6,6 +6,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from api.chatGPT import custom_prompt_model
+from common.discord_ui import SafeView
 from common.openai_prompt import build_prompt, build_single_image_content
 from util.message.context import (
     build_message_action_target,
@@ -101,7 +102,7 @@ class TranslationSelect(discord.ui.Select):
         await self.view.translate_callback(interaction)
 
 
-class TranslationSelectView(discord.ui.View):
+class TranslationSelectView(SafeView):
     def __init__(self, options_data):
         super().__init__(timeout=60)
         self.selected_message = None  # 선택된 메시지 정보 (dict: content, image_url)

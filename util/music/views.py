@@ -3,8 +3,9 @@ from __future__ import annotations
 from typing import Any
 
 import discord
-from discord.ui import Button, View
+from discord.ui import Button
 
+from common.discord_ui import SafeView
 from util.music.favorites import (
     MUSIC_FAVORITE_SLOT_MAX,
     MusicFavorite,
@@ -21,7 +22,7 @@ def _favorite_by_slot(favorites: list[MusicFavorite]) -> dict[int, MusicFavorite
     return {favorite.slot: favorite for favorite in favorites}
 
 
-class SearchResultView(View):
+class SearchResultView(SafeView):
     def __init__(
         self,
         cog: Any,
@@ -161,7 +162,7 @@ class MusicFavoriteSlotSelect(discord.ui.Select):
         )
 
 
-class MusicFavoriteManageView(View):
+class MusicFavoriteManageView(SafeView):
     def __init__(
         self,
         cog: Any,
@@ -222,7 +223,7 @@ class MusicFavoriteManageView(View):
         )
 
 
-class MusicHelperView(View):
+class MusicHelperView(SafeView):
     def __init__(
         self,
         cog: Any,
@@ -257,7 +258,7 @@ class MusicHelperView(View):
         await self.cog._open_music_favorite_manager(interaction)
 
 
-class MusicControlView(View):
+class MusicControlView(SafeView):
     def __init__(
         self,
         cog: Any,

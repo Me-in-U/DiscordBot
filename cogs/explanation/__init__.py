@@ -7,6 +7,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from api.chatGPT import custom_prompt_model
+from common.discord_ui import SafeView
 from common.openai_prompt import build_prompt, build_single_image_content
 from util.message.context import (
     build_message_action_target,
@@ -200,7 +201,7 @@ class ExplanationSelect(discord.ui.Select):
         await self.view.explain_callback(interaction)
 
 
-class ExplanationSelectView(discord.ui.View):
+class ExplanationSelectView(SafeView):
     def __init__(self, options_data):
         super().__init__(timeout=60)
         self.selected_message = None

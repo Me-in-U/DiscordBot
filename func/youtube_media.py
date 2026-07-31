@@ -14,6 +14,7 @@ from pytube.exceptions import VideoUnavailable
 from yt_dlp import YoutubeDL
 from yt_dlp.utils import DownloadError
 
+from common.http import EXTERNAL_HTTP_TIMEOUT
 from func.youtube_links import normalize_youtube_link
 from func.youtube_workspace import subtitle_output_template
 
@@ -57,8 +58,13 @@ def build_headers_str(headers: dict) -> str:
 
 
 async def fetch_stream_info(page_url: str) -> tuple[str, dict]:
-    async with aiohttp.ClientSession(headers=HEADERS, trust_env=False) as session:
+    async with aiohttp.ClientSession(
+        headers=HEADERS,
+        timeout=EXTERNAL_HTTP_TIMEOUT,
+        trust_env=False,
+    ) as session:
         async with session.get(page_url) as resp:
+            resp.raise_for_status()
             text = await resp.text()
     match = re.search(r"ytInitialPlayerResponse\s*=\s*(\{[^;]+\});", text)
     if not match:

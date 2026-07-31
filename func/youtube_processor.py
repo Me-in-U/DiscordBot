@@ -7,6 +7,7 @@ import aiohttp
 from yt_dlp.utils import DownloadError
 
 from api.chatGPT import OpenAIModelError
+from common.http import EXTERNAL_HTTP_TIMEOUT
 from func.youtube_api import YouTubeApiError, fetch_youtube_comments, is_live_video
 from func.youtube_links import (
     YOUTUBE_POST_KIND,
@@ -38,7 +39,11 @@ class YouTubeSummaryError(Exception):
 
 async def fetch_youtube_post(url: str) -> YouTubePostInfo:
     normalized_url = normalize_youtube_link(url)
-    async with aiohttp.ClientSession(headers=HEADERS, trust_env=False) as session:
+    async with aiohttp.ClientSession(
+        headers=HEADERS,
+        timeout=EXTERNAL_HTTP_TIMEOUT,
+        trust_env=False,
+    ) as session:
         async with session.get(normalized_url) as response:
             response.raise_for_status()
             html = await response.text()

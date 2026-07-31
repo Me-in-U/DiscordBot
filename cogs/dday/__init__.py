@@ -6,6 +6,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from common.discord_ui import SafeView
 from util.celebration.dday import (
     DdayEvent,
     build_dday_list_embed,
@@ -47,7 +48,7 @@ class DdayDeleteSelect(discord.ui.Select):
         await parent.delete_selected(interaction, int(self.values[0]))
 
 
-class DdayDeleteView(discord.ui.View):
+class DdayDeleteView(SafeView):
     def __init__(
         self,
         *,

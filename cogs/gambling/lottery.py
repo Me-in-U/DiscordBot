@@ -8,6 +8,7 @@ from typing import Dict, List, Tuple
 
 import discord
 
+from common.discord_ui import SafeView
 from .constants import SEOUL_TZ
 from .services import BalanceService
 
@@ -15,7 +16,7 @@ from .services import BalanceService
 logger = logging.getLogger(__name__)
 
 
-class WeeklyLotteryView(discord.ui.View):
+class WeeklyLotteryView(SafeView):
     """주중 복주머니 인터랙션 뷰."""
 
     def __init__(

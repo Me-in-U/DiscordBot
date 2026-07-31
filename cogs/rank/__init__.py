@@ -14,8 +14,18 @@ from bot import SONPANNO_GUILD_ID, SEOUL_TZ
 
 
 from util.db import fetch_one, execute_query
+from util.logging_utils import user_error_message
 
 logger = logging.getLogger(__name__)
+
+
+def parse_rank_settings_value(value: Any) -> dict[str, Any]:
+    if not value:
+        return {}
+    parsed = json.loads(value) if isinstance(value, str) else value
+    if not isinstance(parsed, Mapping):
+        raise ValueError("dailySoloRank 설정은 JSON 객체여야 합니다.")
+    return dict(parsed)
 
 
 class RankCommands(commands.Cog):
@@ -31,6 +41,9 @@ class RankCommands(commands.Cog):
     async def cog_load(self) -> None:
         await self.load_settings()
 
+    def cog_unload(self) -> None:
+        self.update_rank_data.cancel()
+
     @commands.Cog.listener()
     async def on_ready(self) -> None:
         """봇이 준비되었을 때 호출됩니다."""
@@ -42,8 +55,10 @@ class RankCommands(commands.Cog):
         )
         row = await fetch_one(query)
         if row and row["setting_value"]:
-            val = row["setting_value"]
-            return json.loads(val) if isinstance(val, str) else val
+            try:
+                return parse_rank_settings_value(row["setting_value"])
+            except (TypeError, ValueError):
+                logger.warning("일일 랭크 설정 형식 오류, 기본값 사용", exc_info=True)
         return {}
 
     async def load_settings(self) -> None:
@@ -109,9 +124,10 @@ class RankCommands(commands.Cog):
                 json_str = json.dumps(settings, ensure_ascii=False)
                 await execute_query(query, ("dailySoloRank", json_str, json_str))
 
-            except RiotRankLookupError as e:
+            except RiotRankLookupError:
+                logger.warning("일일 랭크 Riot 조회 실패", exc_info=True)
                 await target_channel.send(
-                    f"❌ 랭킹 정보를 가져오지 못했습니다. 닉네임#태그를 확인해주세요.\n{e}"
+                    "❌ 랭킹 정보를 가져오지 못했습니다. 닉네임#태그를 확인해주세요."
                 )
             except Exception:
                 logger.exception("일일 랭크 업데이트 중 예외 발생")
@@ -132,9 +148,16 @@ class RankCommands(commands.Cog):
         try:
             rank_data = await get_rank_data(game_name, tag_line, "solo")
             await interaction.response.send_message(self.print_rank_data(rank_data))
-        except RiotRankLookupError as exc:
+        except RiotRankLookupError:
+            logger.warning("솔로 랭크 조회 실패", exc_info=True)
             await interaction.response.send_message(
-                f"❌ 랭크 정보를 가져오지 못했습니다. 닉네임#태그를 확인해주세요.\n{exc}"
+                "❌ 랭크 정보를 가져오지 못했습니다. 닉네임#태그를 확인해주세요."
+            )
+        except Exception as exc:
+            logger.exception("솔로 랭크 명령 처리 실패")
+            await interaction.response.send_message(
+                user_error_message("솔로 랭크 조회", exc),
+                ephemeral=True,
             )
 
     @app_commands.command(
@@ -152,9 +175,16 @@ class RankCommands(commands.Cog):
         try:
             rank_data = await get_rank_data(game_name, tag_line, "flex")
             await interaction.response.send_message(self.print_rank_data(rank_data))
-        except RiotRankLookupError as exc:
+        except RiotRankLookupError:
+            logger.warning("자유 랭크 조회 실패", exc_info=True)
             await interaction.response.send_message(
-                f"❌ 랭크 정보를 가져오지 못했습니다. 닉네임#태그를 확인해주세요.\n{exc}"
+                "❌ 랭크 정보를 가져오지 못했습니다. 닉네임#태그를 확인해주세요."
+            )
+        except Exception as exc:
+            logger.exception("자유 랭크 명령 처리 실패")
+            await interaction.response.send_message(
+                user_error_message("자유 랭크 조회", exc),
+                ephemeral=True,
             )
 
     @app_commands.command(
@@ -192,10 +222,11 @@ class RankCommands(commands.Cog):
             await interaction.response.send_message(
                 "올바른 형식으로 입력해주세요. 예: !일일랭크변경 닉네임#태그"
             )
-        except Exception as e:
+        except Exception as exc:
             logger.exception("일일 랭크 설정 업데이트 중 예외 발생")
             await interaction.response.send_message(
-                f"⚠️ **업데이트 중 오류가 발생했습니다.**\n{str(e)}"
+                user_error_message("일일 랭크 설정 업데이트", exc),
+                ephemeral=True,
             )
 
     @app_commands.command(
@@ -218,11 +249,16 @@ class RankCommands(commands.Cog):
             await interaction.response.send_message(
                 "올바른 형식으로 입력해주세요. 예: !일일랭크루프 true/false"
             )
-        except Exception as e:
+        except Exception as exc:
             logger.exception("일일 랭크 루프 상태 변경 중 예외 발생")
             await interaction.response.send_message(
-                f"⚠️ **루프 상태 변경 중 오류가 발생했습니다.**\n{str(e)}"
+                user_error_message("일일 랭크 루프 설정", exc),
+                ephemeral=True,
             )
+
+    @update_rank_data.before_loop
+    async def before_update_rank_data(self) -> None:
+        await self.bot.wait_until_ready()
 
     def print_rank_data(
         self,

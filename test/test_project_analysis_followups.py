@@ -4,6 +4,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 os.environ.setdefault("DISCORD_TOKEN", "test-token")
@@ -146,6 +147,96 @@ class StartupGuardTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNot(first, second)
 
 
+class RuntimeReliabilityGuardTests(unittest.IsolatedAsyncioTestCase):
+    def test_message_cache_keeps_only_latest_entries_per_author(self):
+        import bot
+
+        guild_map = {}
+        for index in range(5):
+            bot.append_cached_message(
+                guild_map,
+                "tester",
+                {"time": str(index)},
+                limit=3,
+            )
+
+        self.assertEqual(
+            ["2", "3", "4"],
+            [message["time"] for message in guild_map["tester"]],
+        )
+
+    async def test_youtube_prompt_failure_is_isolated(self):
+        import bot
+
+        message = SimpleNamespace(
+            guild=SimpleNamespace(id=1),
+            channel=SimpleNamespace(id=2),
+        )
+        with (
+            patch(
+                "bot.check_youtube_link",
+                new=AsyncMock(side_effect=RuntimeError("failed")),
+            ) as check_youtube_link,
+            self.assertLogs("bot", level="ERROR"),
+        ):
+            await bot.check_youtube_link_safely(message)
+
+        check_youtube_link.assert_awaited_once_with(message)
+
+    async def test_app_command_error_uses_initial_response_when_available(self):
+        import bot
+
+        interaction = SimpleNamespace(
+            response=SimpleNamespace(
+                is_done=lambda: False,
+                send_message=AsyncMock(),
+            ),
+            followup=SimpleNamespace(send=AsyncMock()),
+            command=None,
+            guild_id=1,
+        )
+
+        await bot.send_app_command_error_response(
+            interaction,
+            RuntimeError("internal-secret"),
+        )
+
+        interaction.response.send_message.assert_awaited_once()
+        sent_message = interaction.response.send_message.await_args.args[0]
+        self.assertNotIn("internal-secret", sent_message)
+        interaction.followup.send.assert_not_awaited()
+
+    async def test_app_command_error_uses_followup_after_defer(self):
+        import bot
+
+        interaction = SimpleNamespace(
+            response=SimpleNamespace(
+                is_done=lambda: True,
+                send_message=AsyncMock(),
+            ),
+            followup=SimpleNamespace(send=AsyncMock()),
+            command=None,
+            guild_id=1,
+        )
+
+        await bot.send_app_command_error_response(
+            interaction,
+            RuntimeError("internal-secret"),
+        )
+
+        interaction.followup.send.assert_awaited_once()
+        interaction.response.send_message.assert_not_awaited()
+
+    async def test_prefix_ping_uses_context_send(self):
+        import bot
+
+        ctx = SimpleNamespace(send=AsyncMock())
+
+        await bot.ping.callback(ctx)
+
+        ctx.send.assert_awaited_once()
+
+
 class DbMigrationContractTests(unittest.IsolatedAsyncioTestCase):
     async def test_startup_validates_schema_without_running_migrations(self):
         import bot
@@ -176,6 +267,12 @@ class DbMigrationContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("asyncio.run", source)
         self.assertIn("run_schema_migrations", source)
         self.assertIn("close_db_pool", source)
+
+    def test_bot_closes_database_pool_during_shutdown(self):
+        source = Path("bot.py").read_text(encoding="utf-8")
+
+        self.assertIn("finally:", source)
+        self.assertIn("await close_db_pool()", source)
 
     def test_migration_script_bootstraps_repo_root_for_direct_path_execution(self):
         script_path = Path("scripts/migrate_db.py").resolve()

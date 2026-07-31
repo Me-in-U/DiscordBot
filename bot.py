@@ -8,14 +8,15 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import discord
+from discord import app_commands
 from discord.ext import commands
 from dotenv import load_dotenv
 
 from func.find1557 import find1557
 from func.youtube_summary import check_youtube_link
-from util.db import ensure_schema_ready, upsert_guild, upsert_user
+from util.db import close_db_pool, ensure_schema_ready, upsert_guild, upsert_user
 from util.env_utils import getenv_clean, sanitize_environment
-from util.logging_utils import configure_logging
+from util.logging_utils import configure_logging, user_error_message
 
 configure_logging()
 logger = logging.getLogger(__name__)
@@ -26,6 +27,7 @@ StoredMessage = dict[str, Any]
 UserMessages = dict[int, dict[str, list[StoredMessage]]]
 PartyList = dict[int, list[discord.CategoryChannel]]
 REQUIRED_COGS = frozenset({"cogs.status_api"})
+MAX_CACHED_MESSAGES_PER_AUTHOR = 100
 
 # Client 설정, 변수
 intents = discord.Intents.default()
@@ -51,6 +53,121 @@ SEOUL_TZ = timezone(timedelta(hours=9))  # 서울 시간대 설정 (UTC+9)
 
 class RequiredCogLoadError(RuntimeError):
     """Raised when a startup-critical Cog cannot be loaded."""
+
+
+def append_cached_message(
+    guild_map: dict[str, list[StoredMessage]],
+    author_key: str,
+    message: StoredMessage,
+    *,
+    limit: int = MAX_CACHED_MESSAGES_PER_AUTHOR,
+) -> None:
+    """Append a message while keeping each author's in-memory history bounded."""
+    messages = guild_map.setdefault(author_key, [])
+    if not isinstance(messages, list):
+        messages = []
+        guild_map[author_key] = messages
+
+    messages.append(message)
+    if limit > 0 and len(messages) > limit:
+        del messages[:-limit]
+
+
+async def check_youtube_link_safely(message: discord.Message) -> None:
+    """Keep optional YouTube prompting from blocking other message features."""
+    try:
+        await check_youtube_link(message)
+    except (discord.Forbidden, discord.NotFound, discord.HTTPException):
+        logger.warning(
+            "YouTube 링크 안내 전송 실패: guild_id=%s channel_id=%s",
+            getattr(getattr(message, "guild", None), "id", None),
+            getattr(getattr(message, "channel", None), "id", None),
+            exc_info=True,
+        )
+    except Exception:
+        logger.exception(
+            "YouTube 링크 처리 실패: guild_id=%s channel_id=%s",
+            getattr(getattr(message, "guild", None), "id", None),
+            getattr(getattr(message, "channel", None), "id", None),
+        )
+
+
+async def send_app_command_error_response(
+    interaction: discord.Interaction,
+    error: BaseException,
+) -> None:
+    """Send one safe response for otherwise unhandled slash-command failures."""
+    if isinstance(error, app_commands.CommandOnCooldown):
+        message = f"⚠️ 잠시 후 다시 시도해주세요. ({error.retry_after:.1f}초)"
+    elif isinstance(error, app_commands.NoPrivateMessage):
+        message = "⚠️ 서버에서만 사용할 수 있는 명령어입니다."
+    elif isinstance(error, app_commands.BotMissingPermissions):
+        message = "⚠️ 봇에 이 명령어를 실행할 권한이 부족합니다."
+    elif isinstance(error, app_commands.MissingPermissions):
+        message = "⚠️ 이 명령어를 실행할 권한이 부족합니다."
+    elif isinstance(error, app_commands.TransformerError):
+        message = "⚠️ 입력값을 확인해주세요."
+    elif isinstance(error, app_commands.CheckFailure):
+        message = "⚠️ 이 명령어를 실행할 수 없습니다."
+    else:
+        message = user_error_message("명령 처리", error)
+
+    try:
+        if interaction.response.is_done():
+            await interaction.followup.send(message, ephemeral=True)
+        else:
+            await interaction.response.send_message(message, ephemeral=True)
+    except (discord.Forbidden, discord.NotFound, discord.HTTPException):
+        logger.warning(
+            "명령 오류 응답 전송 실패: command=%s guild_id=%s",
+            getattr(getattr(interaction, "command", None), "qualified_name", None),
+            getattr(interaction, "guild_id", None),
+            exc_info=True,
+        )
+
+
+@DISCORD_CLIENT.tree.error
+async def on_app_command_error(
+    interaction: discord.Interaction,
+    error: app_commands.AppCommandError,
+) -> None:
+    root_error = getattr(error, "original", error)
+    logger.error(
+        "처리되지 않은 슬래시 명령 오류: command=%s guild_id=%s",
+        getattr(getattr(interaction, "command", None), "qualified_name", None),
+        getattr(interaction, "guild_id", None),
+        exc_info=(
+            type(root_error),
+            root_error,
+            root_error.__traceback__,
+        ),
+    )
+    await send_app_command_error_response(interaction, root_error)
+
+
+@DISCORD_CLIENT.event
+async def on_command_error(
+    ctx: commands.Context,
+    error: commands.CommandError,
+) -> None:
+    if isinstance(error, commands.CommandNotFound):
+        return
+
+    root_error = getattr(error, "original", error)
+    logger.error(
+        "처리되지 않은 접두사 명령 오류: command=%s guild_id=%s",
+        getattr(getattr(ctx, "command", None), "qualified_name", None),
+        getattr(getattr(ctx, "guild", None), "id", None),
+        exc_info=(
+            type(root_error),
+            root_error,
+            root_error.__traceback__,
+        ),
+    )
+    try:
+        await ctx.send(user_error_message("명령 처리", root_error))
+    except (discord.Forbidden, discord.NotFound, discord.HTTPException):
+        logger.warning("접두사 명령 오류 응답 전송 실패", exc_info=True)
 
 
 def discover_cog_extensions(cogs_path: str | None = None) -> list[str]:
@@ -265,12 +382,11 @@ async def on_message(message: discord.Message) -> None:
     if guild_id not in DISCORD_CLIENT.USER_MESSAGES:
         DISCORD_CLIENT.USER_MESSAGES[guild_id] = {}
     guild_map = DISCORD_CLIENT.USER_MESSAGES[guild_id]
-    if author_key not in guild_map:
-        guild_map[author_key] = []
-
     #! 봇 메시지는 이하 명령 무시 / 단순 채팅 저장만
     if message.author == DISCORD_CLIENT.user:
-        guild_map[author_key].append(
+        append_cached_message(
+            guild_map,
+            author_key,
             {
                 "author": author_key,
                 "role": "assistant",
@@ -282,12 +398,14 @@ async def on_message(message: discord.Message) -> None:
                     },
                 ],
                 "time": timestamp,
-            }
+            },
         )
         return  # client 스스로가 보낸 메세지는 무시
     else:
         if image_url:
-            guild_map[author_key].append(
+            append_cached_message(
+                guild_map,
+                author_key,
                 {
                     "author": author_key,
                     "role": "user",
@@ -299,10 +417,12 @@ async def on_message(message: discord.Message) -> None:
                         },
                     ],
                     "time": timestamp,
-                }
+                },
             )
         else:
-            guild_map[author_key].append(
+            append_cached_message(
+                guild_map,
+                author_key,
                 {
                     "author": author_key,
                     "role": "user",
@@ -310,11 +430,11 @@ async def on_message(message: discord.Message) -> None:
                         {"type": "input_text", "text": message.content},
                     ],
                     "time": timestamp,
-                }
+                },
             )
 
     #! 유튜브 링크 처리
-    await check_youtube_link(message)
+    await check_youtube_link_safely(message)
 
     # !명령어 처리 루틴 호출
     await DISCORD_CLIENT.process_commands(message)
@@ -358,7 +478,7 @@ async def echo(ctx: commands.Context, *, text: str | None = None) -> None:
     help="봇 레이턴시 측정",
 )
 async def ping(ctx: commands.Context) -> None:
-    await ctx.respond(f"퐁! Latency is {DISCORD_CLIENT.latency}")
+    await ctx.send(f"퐁! Latency is {DISCORD_CLIENT.latency}")
 
 
 async def load_recent_messages(guild_id: int | None = None) -> None:
@@ -393,9 +513,6 @@ async def load_recent_messages(guild_id: int | None = None) -> None:
                         author_key = message.author.name
 
                     guild_map = DISCORD_CLIENT.USER_MESSAGES[guild.id]
-                    if author_key not in guild_map:
-                        guild_map[author_key] = []
-
                     # content 파츠 구성
                     parts: list[MessagePart] = []
                     text = (message.content or "").strip()
@@ -426,7 +543,9 @@ async def load_recent_messages(guild_id: int | None = None) -> None:
                     role = (
                         "assistant" if message.author == DISCORD_CLIENT.user else "user"
                     )
-                    guild_map[author_key].append(
+                    append_cached_message(
+                        guild_map,
+                        author_key,
                         {
                             "author": author_key,
                             "role": role,
@@ -434,7 +553,7 @@ async def load_recent_messages(guild_id: int | None = None) -> None:
                                 parts if parts else [{"type": "input_text", "text": ""}]
                             ),
                             "time": message_timestamp,
-                        }
+                        },
                     )
             except Exception:
                 # 채널 접근 권한 없음 등은 무시
@@ -466,9 +585,12 @@ async def load_recent_messages(guild_id: int | None = None) -> None:
 
 
 async def main() -> None:
-    async with DISCORD_CLIENT:
-        await load_cogs()
-        await DISCORD_CLIENT.start(DISCORD_TOKEN)
+    try:
+        async with DISCORD_CLIENT:
+            await load_cogs()
+            await DISCORD_CLIENT.start(DISCORD_TOKEN)
+    finally:
+        await close_db_pool()
 
 
 if __name__ == "__main__":

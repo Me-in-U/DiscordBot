@@ -13,6 +13,7 @@ import aiohttp
 import discord
 import yt_dlp as youtube_dl
 
+from common.http import EXTERNAL_HTTP_TIMEOUT
 from util.music.extractor import (
     resolve_search_result_url,
     select_best_audio_format,
@@ -138,8 +139,12 @@ def build_ffmpeg_options(
 
 async def fetch_stream_url(page_url: str) -> str:
     dbg(f"fetch_stream_url: page_url={page_url}")
-    async with aiohttp.ClientSession(headers=HEADERS) as session:
+    async with aiohttp.ClientSession(
+        headers=HEADERS,
+        timeout=EXTERNAL_HTTP_TIMEOUT,
+    ) as session:
         async with session.get(page_url) as resp:
+            resp.raise_for_status()
             text = await resp.text()
 
     data = extract_initial_player_response(text)
@@ -227,8 +232,12 @@ def _extract_info_with_fallback(url: str) -> dict[str, Any]:
 
 async def fetch_stream_info(page_url: str) -> tuple[str, dict[str, Any]]:
     dbg(f"fetch_stream_info: page_url={page_url}")
-    async with aiohttp.ClientSession(headers=HEADERS) as session:
+    async with aiohttp.ClientSession(
+        headers=HEADERS,
+        timeout=EXTERNAL_HTTP_TIMEOUT,
+    ) as session:
         async with session.get(page_url) as resp:
+            resp.raise_for_status()
             text = await resp.text()
 
     player_response = extract_initial_player_response(text)

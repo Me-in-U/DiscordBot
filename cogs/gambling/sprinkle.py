@@ -8,6 +8,7 @@ import discord
 
 from datetime import datetime
 
+from common.discord_ui import SafeView
 from .constants import SEOUL_TZ
 from .services import BalanceService
 
@@ -15,7 +16,7 @@ from .services import BalanceService
 logger = logging.getLogger(__name__)
 
 
-class SprinkleView(discord.ui.View):
+class SprinkleView(SafeView):
     """랜덤 금액 배분 뷰."""
 
     def __init__(

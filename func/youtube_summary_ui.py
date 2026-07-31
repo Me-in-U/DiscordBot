@@ -6,6 +6,7 @@ from collections.abc import Awaitable, Callable
 
 import discord
 
+from common.discord_ui import SafeView
 from func.youtube_links import (
     YOUTUBE_POST_KIND,
     YOUTUBE_VIDEO_KIND,
@@ -31,7 +32,7 @@ def get_youtube_summary_title(link_kind: str) -> str:
     return "**[영상 3줄 요약]**"
 
 
-class YouTubeSummaryView(discord.ui.View):
+class YouTubeSummaryView(SafeView):
     def __init__(
         self,
         youtube_url: str,

@@ -6,6 +6,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from api.chatGPT import custom_prompt_model
+from common.discord_ui import SafeView
 from common.openai_prompt import build_prompt
 from func.youtube_summary import (
     YOUTUBE_POST_KIND,
@@ -109,7 +110,7 @@ class YouTubeSummarySelect(discord.ui.Select):
         self.view.stop()
 
 
-class YouTubeSummarySelectionView(discord.ui.View):
+class YouTubeSummarySelectionView(SafeView):
     def __init__(
         self,
         candidates: list[YouTubeLinkCandidate],

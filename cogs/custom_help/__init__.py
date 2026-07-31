@@ -3,7 +3,9 @@ import random
 import discord
 from discord import app_commands
 from discord.ext import commands
-from discord.ui import View, Select
+from discord.ui import Select
+
+from common.discord_ui import SafeView
 
 
 class HelpSelect(Select):
@@ -32,7 +34,7 @@ class HelpSelect(Select):
         await interaction.response.edit_message(embed=embed, view=self.view)
 
 
-class HelpView(View):
+class HelpView(SafeView):
     def __init__(self, categories):
         super().__init__(timeout=None)
         self.add_item(HelpSelect(categories))

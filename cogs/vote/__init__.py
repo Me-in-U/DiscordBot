@@ -7,6 +7,9 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from common.discord_ui import SafeView
+
+
 STATUS_RUNNING = "투표 진행 중"
 STATUS_COMPLETED = "투표 완료"
 STATUS_TIMEOUT = "시간 초과"
@@ -27,7 +30,7 @@ class VoteButton(discord.ui.Button["VoteView"]):
         await self.view_ref.handle_vote(interaction, self.index)
 
 
-class VoteView(discord.ui.View):
+class VoteView(SafeView):
     def __init__(
         self,
         cog: "VoteCog",

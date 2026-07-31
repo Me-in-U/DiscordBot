@@ -1,6 +1,10 @@
 import ast
+import asyncio
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+
+from cogs.party import Party
 
 
 PARTY_COG_PATH = Path("cogs/party/__init__.py")
@@ -55,6 +59,36 @@ class PartyCogLayoutTests(unittest.TestCase):
                 "파티탈퇴",
             }.issubset(command_names)
         )
+
+
+class PartyBackgroundTaskTests(unittest.IsolatedAsyncioTestCase):
+    async def test_background_task_failure_is_logged_and_released(self):
+        cog = Party(SimpleNamespace())
+
+        async def fail():
+            raise RuntimeError("relocate failed")
+
+        with self.assertLogs("cogs.party", level="ERROR"):
+            task = cog._spawn_background_task(fail())
+            await asyncio.gather(task, return_exceptions=True)
+            await asyncio.sleep(0)
+
+        self.assertEqual(set(), cog._background_tasks)
+
+    async def test_cog_unload_cancels_background_tasks(self):
+        cog = Party(SimpleNamespace())
+
+        async def wait_forever():
+            await asyncio.Event().wait()
+
+        task = cog._spawn_background_task(wait_forever())
+        await asyncio.sleep(0)
+
+        cog.cog_unload()
+        await asyncio.gather(task, return_exceptions=True)
+
+        self.assertTrue(task.cancelled())
+        self.assertEqual(set(), cog._background_tasks)
 
 
 if __name__ == "__main__":

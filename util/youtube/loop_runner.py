@@ -4,6 +4,7 @@ from typing import Protocol
 
 import aiohttp
 
+from common.http import EXTERNAL_HTTP_TIMEOUT
 from util.youtube.notification_state import touch_pending_youtube_video_check
 from util.youtube.subscriptions import (
     YouTubeSubscription,
@@ -46,7 +47,10 @@ class YouTubeCommunityOwner(Protocol):
 async def run_youtube_notification_candidates(owner: YouTubeNotificationOwner) -> None:
     await owner._delete_legacy_youtube_live_checker_setting_once()
     subscriptions = await list_all_youtube_subscriptions()
-    async with aiohttp.ClientSession(trust_env=False) as session:
+    async with aiohttp.ClientSession(
+        timeout=EXTERNAL_HTTP_TIMEOUT,
+        trust_env=False,
+    ) as session:
         for subscription in subscriptions:
             subscription = await owner._poll_youtube_feed_fallback(
                 subscription,
