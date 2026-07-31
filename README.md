@@ -116,6 +116,7 @@ OpenAI 호출은 `api/chatGPT.py`에서 감싸며, hosted prompt payload는 `com
 | `/대화종료` | 음성 대화 종료 및 퇴장 |
 
 음성 처리는 `discord-ext-voice-recv` sink, PCM buffer, silence detection, `faster-whisper` STT, `pyttsx3` TTS 경로를 사용합니다. Windows 로컬 실행에서는 `bin/` 또는 PATH의 ffmpeg를 사용합니다.
+STT는 기본적으로 `tiny` 모델을 CPU `int8`로 실행합니다. CUDA 모델은 GPU 런타임을 실제로 준비한 환경에서만 `VOICE_CHAT_WHISPER_DEVICE=cuda`와 모델 및 연산 형식을 명시해 활성화합니다.
 
 ### YouTube
 
@@ -325,6 +326,11 @@ DB_PASSWORD=...
 API_PORT=1557
 CELEBRATION_UPDATE_API_KEY=...
 
+VOICE_CHAT_WHISPER_DEVICE=cpu
+VOICE_CHAT_WHISPER_MODEL=tiny
+VOICE_CHAT_WHISPER_COMPUTE_TYPE=int8
+TZ=Asia/Seoul
+
 YOUTUBE_WEBSUB_CALLBACK_URL=https://example.com/youtube/websub
 YOUTUBE_WEBSUB_VERIFY_TOKEN=...
 ```
@@ -363,7 +369,7 @@ docker compose --env-file .env up -d --build
 docker compose --env-file .env ps
 ```
 
-Compose는 `127.0.0.1:1557:1557`로 Status API를 노출하고, 컨테이너에서 호스트 DB 접근을 위해 `host.docker.internal` host gateway를 추가합니다.
+Compose는 `127.0.0.1:1557:1557`로 Status API를 노출하고, 컨테이너에서 호스트 DB 접근을 위해 `host.docker.internal` host gateway를 추가합니다. Whisper 다운로드는 `whisper-model-cache` named volume에 보존되므로 애플리케이션 컨테이너 교체 때 같은 모델을 다시 받지 않습니다.
 
 ## 검증
 

@@ -6,6 +6,11 @@ from collections.abc import Mapping
 from typing import Any
 
 
+NOISY_LOGGER_LEVELS = {
+    "discord.ext.voice_recv.gateway": logging.WARNING,
+}
+
+
 def _iter_exception_chain(exc: BaseException | None):
     seen: set[int] = set()
     pending = [exc]
@@ -67,11 +72,12 @@ def log_user_error(
 def configure_logging(level: int = logging.INFO) -> None:
     """Configure process-wide console logging once."""
     root_logger = logging.getLogger()
-    if root_logger.handlers:
-        return
+    if not root_logger.handlers:
+        logging.basicConfig(
+            level=level,
+            format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+            stream=sys.stdout,
+        )
 
-    logging.basicConfig(
-        level=level,
-        format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
-        stream=sys.stdout,
-    )
+    for logger_name, logger_level in NOISY_LOGGER_LEVELS.items():
+        logging.getLogger(logger_name).setLevel(logger_level)

@@ -2,12 +2,22 @@ import logging
 import os
 import unittest
 
-from util.logging_utils import log_user_error, user_error_message
+from util.logging_utils import configure_logging, log_user_error, user_error_message
 
 os.environ.setdefault("OPENAI_KEY", "test-key")
 
 
 class ErrorHandlingHelperTests(unittest.TestCase):
+    def test_voice_gateway_protocol_noise_is_hidden_at_info_level(self):
+        gateway_logger = logging.getLogger("discord.ext.voice_recv.gateway")
+        original_level = gateway_logger.level
+
+        try:
+            configure_logging()
+            self.assertEqual(logging.WARNING, gateway_logger.level)
+        finally:
+            gateway_logger.setLevel(original_level)
+
     def test_user_error_message_does_not_include_raw_exception(self):
         message = user_error_message("검색", RuntimeError("secret-token HTTP 500"))
 

@@ -15,6 +15,10 @@ services:
     environment:
       - API_PORT=1557
       - ENV_FILE=${ENV_FILE:-.env}
+      - HF_HOME=/var/cache/discordbot/huggingface
+      - TZ=${TZ:-Asia/Seoul}
+    volumes:
+      - whisper-model-cache:/var/cache/discordbot/huggingface
     ports:
       - "127.0.0.1:1557:1557"
     extra_hosts:
@@ -27,3 +31,6 @@ services:
       start_period: 30s
     labels:
       - bot.display_name=discord bot 神
+
+volumes:
+  whisper-model-cache:

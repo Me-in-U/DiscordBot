@@ -12,7 +12,12 @@ from collections import deque
 from discord.ext import commands
 from discord import app_commands
 from faster_whisper import WhisperModel
-import pyttsx3
+
+from .settings import (
+    WhisperSettings,
+    cpu_fallback_settings,
+    resolve_whisper_settings,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +30,7 @@ except ImportError:
 
 class StreamingSink(voice_recv.AudioSink if voice_recv else object):
     def __init__(self, cog, command_user, vc) -> None:
+        super().__init__()
         self.cog = cog
         self.command_user = command_user
         self.vc = vc
@@ -44,8 +50,13 @@ class StreamingSink(voice_recv.AudioSink if voice_recv else object):
         return False
 
     def write(self, user, data) -> None:
+        if user is None or not data.pcm:
+            return
+
         # Calculate RMS
         pcm_data = np.frombuffer(data.pcm, dtype=np.int16).astype(np.float32)
+        if pcm_data.size == 0:
+            return
         rms = np.sqrt(np.mean(pcm_data**2))
         now = time.time()
 
@@ -130,20 +141,29 @@ class VoiceChat(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
         self.model = None
+        self.model_settings: WhisperSettings | None = None
         self.chat_data = {}  # guild_id -> {queue, message, task}
-        self.active_chats = {}  # user_id -> task
+        self.active_chats = {}  # guild_id -> task
+        self.model_load_lock = asyncio.Lock()
         self.transcribe_lock = asyncio.Lock()
 
     async def load_model(self) -> None:
+        settings = resolve_whisper_settings()
+
         # Ensure ffmpeg is in PATH
         ffmpeg_path = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "..", "bin")
+            os.path.join(os.path.dirname(__file__), "..", "..", "bin")
         )
-        if ffmpeg_path not in os.environ["PATH"]:
-            os.environ["PATH"] += os.pathsep + ffmpeg_path
+        process_path = os.environ.get("PATH", "")
+        if ffmpeg_path not in process_path.split(os.pathsep):
+            os.environ["PATH"] = (
+                process_path + os.pathsep + ffmpeg_path
+                if process_path
+                else ffmpeg_path
+            )
 
         # Add NVIDIA library paths to PATH for Windows
-        if os.name == "nt":
+        if settings.device == "cuda" and os.name == "nt":
             try:
                 import nvidia.cublas
                 import nvidia.cudnn
@@ -169,36 +189,66 @@ class VoiceChat(commands.Cog):
             if not os.path.exists(os.path.join(ffmpeg_path, "ffmpeg.exe")):
                 logger.error("ffmpeg.exe not found in %s", ffmpeg_path)
 
-        if self.model is None:
-            print("Loading Whisper model...")
-            loop = asyncio.get_event_loop()
+        async with self.model_load_lock:
+            if self.model is not None:
+                return
 
-            def _load_model():
+            logger.info(
+                "Whisper model loading: model=%s device=%s compute_type=%s",
+                settings.model,
+                settings.device,
+                settings.compute_type,
+            )
+            loop = asyncio.get_running_loop()
+
+            def _load_model() -> tuple[object, WhisperSettings]:
                 try:
-                    print("Attempting to load Whisper model on GPU...")
-                    return WhisperModel(
-                        "deepdml/faster-whisper-large-v3-turbo-ct2",
-                        device="cuda",
-                        compute_type="float16",
+                    return (
+                        WhisperModel(
+                            settings.model,
+                            device=settings.device,
+                            compute_type=settings.compute_type,
+                        ),
+                        settings,
                     )
                 except Exception:
+                    if settings.device != "cuda":
+                        raise
+
+                    fallback = cpu_fallback_settings()
                     logger.warning(
-                        "GPU load failed. Falling back to CPU (tiny model).",
+                        "Configured GPU model load failed. Falling back to "
+                        "model=%s device=%s compute_type=%s.",
+                        fallback.model,
+                        fallback.device,
+                        fallback.compute_type,
                         exc_info=True,
                     )
-                    return WhisperModel(
-                        "tiny",
-                        device="cpu",
-                        compute_type="int8",
+                    return (
+                        WhisperModel(
+                            fallback.model,
+                            device=fallback.device,
+                            compute_type=fallback.compute_type,
+                        ),
+                        fallback,
                     )
 
-            self.model = await loop.run_in_executor(None, _load_model)
-            print("Whisper model loaded.")
+            self.model, self.model_settings = await loop.run_in_executor(
+                None,
+                _load_model,
+            )
+            logger.info(
+                "Whisper model loaded: model=%s device=%s compute_type=%s",
+                self.model_settings.model,
+                self.model_settings.device,
+                self.model_settings.compute_type,
+            )
 
     @app_commands.command(
         name="대화",
         description="음성 채널에 봇을 초대하여 실시간 대화를 시작합니다.",
     )
+    @app_commands.guild_only()
     async def start_chat(self, interaction: discord.Interaction) -> None:
         if voice_recv is None:
             await interaction.response.send_message(
@@ -206,72 +256,166 @@ class VoiceChat(commands.Cog):
             )
             return
 
-        if not interaction.user.voice:
+        if interaction.guild is None:
+            await interaction.response.send_message(
+                "서버에서만 사용할 수 있는 명령어입니다.", ephemeral=True
+            )
+            return
+
+        voice_state = getattr(interaction.user, "voice", None)
+        if voice_state is None:
             await interaction.response.send_message(
                 "음성 채널에 먼저 입장해주세요.", ephemeral=True
             )
             return
 
-        channel = interaction.user.voice.channel
+        channel = voice_state.channel
+        guild = interaction.guild
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        vc = None
 
-        # Connect with VoiceRecvClient
-        if interaction.guild.voice_client:
-            if not isinstance(
-                interaction.guild.voice_client, voice_recv.VoiceRecvClient
-            ):
-                await interaction.guild.voice_client.disconnect()
-                vc = await channel.connect(cls=voice_recv.VoiceRecvClient)
+        try:
+            # Connect with VoiceRecvClient
+            if guild.voice_client:
+                if not isinstance(guild.voice_client, voice_recv.VoiceRecvClient):
+                    await guild.voice_client.disconnect()
+                    vc = await channel.connect(cls=voice_recv.VoiceRecvClient)
+                else:
+                    if guild.voice_client.channel != channel:
+                        await guild.voice_client.move_to(channel)
+                    vc = guild.voice_client
             else:
-                if interaction.guild.voice_client.channel != channel:
-                    await interaction.guild.voice_client.move_to(channel)
-                vc = interaction.guild.voice_client
-        else:
-            vc = await channel.connect(cls=voice_recv.VoiceRecvClient)
+                vc = await channel.connect(cls=voice_recv.VoiceRecvClient)
 
-        # Initialize chat data
-        status_msg = await interaction.channel.send("🎙️ **대화 시작**\n(대기 중...)")
-        self.chat_data[interaction.guild.id] = {
-            "queue": deque(maxlen=10),
-            "message": status_msg,
-            "task": self.bot.loop.create_task(self.display_loop(interaction.guild.id)),
-        }
+            self._cancel_guild_tasks(guild.id)
+            if vc.is_listening():
+                vc.stop_listening()
 
-        if interaction.user.id in self.active_chats:
-            self.active_chats[interaction.user.id].cancel()
+            status_msg = await interaction.channel.send(
+                "🎙️ **대화 시작**\n(음성 인식 모델 준비 중...)"
+            )
+            self.chat_data[guild.id] = {
+                "queue": deque(maxlen=10),
+                "message": status_msg,
+                "task": self.bot.loop.create_task(self.display_loop(guild.id)),
+            }
 
-        task = self.bot.loop.create_task(self.chat_loop(interaction.user, vc))
-        self.active_chats[interaction.user.id] = task
+            task = self.bot.loop.create_task(
+                self.chat_loop(interaction.user, vc, guild.id)
+            )
+            self.active_chats[guild.id] = task
+        except Exception:
+            self._cancel_guild_tasks(guild.id)
+            if vc is not None:
+                try:
+                    await vc.disconnect()
+                except Exception:
+                    logger.warning(
+                        "실패한 음성 대화 연결 정리 실패: guild_id=%s",
+                        guild.id,
+                        exc_info=True,
+                    )
+            logger.exception(
+                "음성 대화 시작 실패: guild_id=%s channel_id=%s",
+                guild.id,
+                getattr(channel, "id", None),
+            )
+            try:
+                await interaction.followup.send(
+                    "음성 채널 연결 또는 대화 준비에 실패했습니다. "
+                    "봇의 연결 및 말하기 권한을 확인해주세요.",
+                    ephemeral=True,
+                )
+            except discord.HTTPException:
+                logger.warning(
+                    "음성 대화 시작 실패 응답 전송 실패: guild_id=%s",
+                    guild.id,
+                    exc_info=True,
+                )
+            return
+
+        try:
+            await interaction.followup.send(
+                "음성 채널에 입장했습니다. 음성 인식 모델을 준비하고 있습니다.",
+                ephemeral=True,
+            )
+        except discord.HTTPException:
+            logger.warning(
+                "음성 대화 시작 응답 전송 실패: guild_id=%s",
+                guild.id,
+                exc_info=True,
+            )
 
     @app_commands.command(
         name="대화종료", description="실시간 대화를 종료하고 봇을 퇴장시킵니다."
     )
+    @app_commands.guild_only()
     async def stop_chat(self, interaction: discord.Interaction) -> None:
-        if interaction.user.id in self.active_chats:
-            self.active_chats[interaction.user.id].cancel()
-            del self.active_chats[interaction.user.id]
-
-        # Cleanup chat data
-        if interaction.guild.id in self.chat_data:
-            data = self.chat_data[interaction.guild.id]
-            if "task" in data:
-                data["task"].cancel()
-            del self.chat_data[interaction.guild.id]
-
-        if interaction.guild.voice_client:
-            await interaction.guild.voice_client.disconnect()
+        if interaction.guild is None:
             await interaction.response.send_message(
-                "대화를 종료했습니다.", ephemeral=True
+                "서버에서만 사용할 수 있는 명령어입니다.", ephemeral=True
             )
-        else:
+            return
+
+        guild = interaction.guild
+        voice_client = guild.voice_client
+        if voice_client is None and guild.id not in self.active_chats:
             await interaction.response.send_message(
                 "봇이 음성 채널에 없습니다.", ephemeral=True
             )
+            return
 
-    async def chat_loop(self, command_user, vc) -> None:
-        await self.load_model()
-        print(f"[DEBUG] chat_loop started for {command_user.name}")
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        self._cancel_guild_tasks(guild.id)
 
         try:
+            if voice_client is not None:
+                if (
+                    isinstance(voice_client, voice_recv.VoiceRecvClient)
+                    and voice_client.is_listening()
+                ):
+                    voice_client.stop_listening()
+                await voice_client.disconnect()
+        except Exception:
+            logger.exception("음성 대화 종료 실패: guild_id=%s", guild.id)
+            await interaction.followup.send(
+                "음성 대화를 정리하는 중 오류가 발생했습니다.",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.followup.send("대화를 종료했습니다.", ephemeral=True)
+
+    def _cancel_guild_tasks(self, guild_id: int) -> None:
+        chat_task = self.active_chats.pop(guild_id, None)
+        if chat_task is not None:
+            chat_task.cancel()
+
+        data = self.chat_data.pop(guild_id, None)
+        if data is not None:
+            display_task = data.get("task")
+            if display_task is not None:
+                display_task.cancel()
+
+    async def chat_loop(self, command_user, vc, guild_id: int) -> None:
+        current_task = asyncio.current_task()
+
+        try:
+            await self.load_model()
+            data = self.chat_data.get(guild_id)
+            if data is not None:
+                try:
+                    await data["message"].edit(
+                        content="🎙️ **대화 시작**\n(대기 중...)"
+                    )
+                except discord.HTTPException:
+                    logger.warning(
+                        "음성 대화 준비 상태 메시지 수정 실패: guild_id=%s",
+                        guild_id,
+                        exc_info=True,
+                    )
+
+            print(f"[DEBUG] chat_loop started for {command_user.name}")
             while vc.is_connected():
                 print("[DEBUG] Starting recording cycle")
 
@@ -287,10 +431,43 @@ class VoiceChat(commands.Cog):
             print("[DEBUG] chat_loop cancelled")
             if vc.is_listening():
                 vc.stop_listening()
+            raise
         except Exception:
-            logger.exception("[DEBUG] Chat loop error")
+            logger.exception("음성 대화 처리 실패: guild_id=%s", guild_id)
             if vc.is_listening():
                 vc.stop_listening()
+            data = self.chat_data.get(guild_id)
+            if data is not None:
+                try:
+                    await data["message"].edit(
+                        content=(
+                            "🎙️ **대화 종료**\n"
+                            "(음성 인식 모델 또는 수신 처리에 실패했습니다.)"
+                        )
+                    )
+                except discord.HTTPException:
+                    logger.warning(
+                        "음성 대화 오류 상태 메시지 수정 실패: guild_id=%s",
+                        guild_id,
+                        exc_info=True,
+                    )
+            if vc.is_connected():
+                try:
+                    await vc.disconnect()
+                except Exception:
+                    logger.warning(
+                        "오류 발생 후 음성 연결 해제 실패: guild_id=%s",
+                        guild_id,
+                        exc_info=True,
+                    )
+        finally:
+            if self.active_chats.get(guild_id) is current_task:
+                self.active_chats.pop(guild_id, None)
+                data = self.chat_data.pop(guild_id, None)
+                if data is not None:
+                    display_task = data.get("task")
+                    if display_task is not None:
+                        display_task.cancel()
 
     async def process_audio(self, filepath: str, speaker, recipient, vc) -> None:
         print(
@@ -428,6 +605,8 @@ class VoiceChat(commands.Cog):
         loop = asyncio.get_event_loop()
 
         def _create_tts():
+            import pyttsx3
+
             with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
                 temp_filename = f.name
 
