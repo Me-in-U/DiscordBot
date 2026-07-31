@@ -4,6 +4,7 @@ import asyncio
 import logging
 import os
 import tempfile
+import uuid
 import wave
 import discord
 import davey
@@ -30,11 +31,11 @@ except ImportError:
 
 
 class StreamingSink(voice_recv.AudioSink if voice_recv else object):
-    def __init__(self, cog, command_user, vc) -> None:
+    def __init__(self, cog, vc, session_id: str) -> None:
         super().__init__()
         self.cog = cog
-        self.command_user = command_user
         self.vc = vc
+        self.session_id = session_id
         self.user_buffers = {}  # user -> bytearray
         self.user_silence_start = {}  # user -> timestamp
         self.user_speaking = {}  # user -> bool
@@ -197,7 +198,12 @@ class StreamingSink(voice_recv.AudioSink if voice_recv else object):
 
             # Trigger processing
             asyncio.run_coroutine_threadsafe(
-                self.cog.process_audio(f.name, user, self.command_user, self.vc),
+                self.cog.process_audio(
+                    f.name,
+                    user,
+                    self.vc,
+                    self.session_id,
+                ),
                 self.cog.bot.loop,
             )
 
@@ -219,7 +225,7 @@ class VoiceChat(commands.Cog):
         self.bot = bot
         self.model = None
         self.model_settings: WhisperSettings | None = None
-        self.chat_data = {}  # guild_id -> {queue, message, task}
+        self.chat_data = {}  # guild_id -> {session_id, queue, message, task}
         self.active_chats = {}  # guild_id -> task
         self.model_load_lock = asyncio.Lock()
         self.transcribe_lock = asyncio.Lock()
@@ -371,14 +377,18 @@ class VoiceChat(commands.Cog):
             status_msg = await interaction.channel.send(
                 "🎙️ **대화 시작**\n(음성 인식 모델 준비 중...)"
             )
+            session_id = uuid.uuid4().hex
             self.chat_data[guild.id] = {
+                "session_id": session_id,
                 "queue": deque(maxlen=10),
                 "message": status_msg,
-                "task": self.bot.loop.create_task(self.display_loop(guild.id)),
+                "task": self.bot.loop.create_task(
+                    self.display_loop(guild.id, session_id)
+                ),
             }
 
             task = self.bot.loop.create_task(
-                self.chat_loop(interaction.user, vc, guild.id)
+                self.chat_loop(interaction.user, vc, guild.id, session_id)
             )
             self.active_chats[guild.id] = task
         except Exception:
@@ -474,29 +484,43 @@ class VoiceChat(commands.Cog):
             if display_task is not None:
                 display_task.cancel()
 
-    async def chat_loop(self, command_user, vc, guild_id: int) -> None:
+    def _get_chat_session(self, guild_id: int, session_id: str):
+        data = self.chat_data.get(guild_id)
+        if data is None or data.get("session_id") != session_id:
+            return None
+        return data
+
+    async def chat_loop(
+        self,
+        command_user,
+        vc,
+        guild_id: int,
+        session_id: str,
+    ) -> None:
         current_task = asyncio.current_task()
 
         try:
             await self.load_model()
-            data = self.chat_data.get(guild_id)
-            if data is not None:
-                try:
-                    await data["message"].edit(
-                        content="🎙️ **대화 시작**\n(대기 중...)"
-                    )
-                except discord.HTTPException:
-                    logger.warning(
-                        "음성 대화 준비 상태 메시지 수정 실패: guild_id=%s",
-                        guild_id,
-                        exc_info=True,
-                    )
+            data = self._get_chat_session(guild_id, session_id)
+            if data is None:
+                return
+
+            try:
+                await data["message"].edit(
+                    content="🎙️ **대화 시작**\n(대기 중...)"
+                )
+            except discord.HTTPException:
+                logger.warning(
+                    "음성 대화 준비 상태 메시지 수정 실패: guild_id=%s",
+                    guild_id,
+                    exc_info=True,
+                )
 
             print(f"[DEBUG] chat_loop started for {command_user.name}")
             while vc.is_connected():
                 print("[DEBUG] Starting recording cycle")
 
-                sink = StreamingSink(self, command_user, vc)
+                sink = StreamingSink(self, vc, session_id)
                 receive_error = []
 
                 def after_receive(error):
@@ -529,7 +553,7 @@ class VoiceChat(commands.Cog):
             logger.exception("음성 대화 처리 실패: guild_id=%s", guild_id)
             if vc.is_listening():
                 vc.stop_listening()
-            data = self.chat_data.get(guild_id)
+            data = self._get_chat_session(guild_id, session_id)
             if data is not None:
                 try:
                     await data["message"].edit(
@@ -562,11 +586,25 @@ class VoiceChat(commands.Cog):
                     if display_task is not None:
                         display_task.cancel()
 
-    async def process_audio(self, filepath: str, speaker, recipient, vc) -> None:
+    async def process_audio(
+        self,
+        filepath: str,
+        speaker,
+        vc,
+        session_id: str,
+    ) -> None:
         print(
             f"[DEBUG] process_audio started. File: {filepath}, Speaker: {speaker.name}"
         )
         try:
+            guild_id = vc.guild.id
+            if self._get_chat_session(guild_id, session_id) is None:
+                logger.debug(
+                    "종료된 음성 대화의 전사 시작을 폐기합니다: guild_id=%s",
+                    guild_id,
+                )
+                return
+
             # Check if file has data (header is 44 bytes)
             file_size = os.path.getsize(filepath)
             print(f"[DEBUG] File size: {file_size} bytes")
@@ -600,18 +638,17 @@ class VoiceChat(commands.Cog):
                     )
                     return
 
-                # Add to queue instead of DM
-                guild_id = vc.guild.id
-                if guild_id in self.chat_data:
-                    queue = self.chat_data[guild_id]["queue"]
-                    timestamp = time.strftime("%H:%M:%S")
-                    queue.append(f"[{timestamp}] **{speaker.display_name}**: {text}")
-                else:
-                    # Fallback to DM if chat data is missing
-                    try:
-                        await recipient.send(f"[{speaker.display_name}] STT: {text}")
-                    except discord.Forbidden:
-                        print(f"Cannot send DM to {recipient.name}")
+                data = self._get_chat_session(guild_id, session_id)
+                if data is None:
+                    logger.debug(
+                        "종료된 음성 대화의 전사 결과를 폐기합니다: guild_id=%s",
+                        guild_id,
+                    )
+                    return
+
+                queue = data["queue"]
+                timestamp = time.strftime("%H:%M:%S")
+                queue.append(f"[{timestamp}] **{speaker.display_name}**: {text}")
 
                 # TTS Playback (Commented out)
                 # ...
@@ -666,13 +703,15 @@ class VoiceChat(commands.Cog):
             text = await loop.run_in_executor(None, _transcribe)
         return text
 
-    async def display_loop(self, guild_id: int) -> None:
+    async def display_loop(self, guild_id: int, session_id: str) -> None:
         """Updates the status message every 3 seconds with the latest STT queue."""
         print(f"[DEBUG] display_loop started for guild {guild_id}")
         last_content = ""
         try:
-            while guild_id in self.chat_data:
-                data = self.chat_data[guild_id]
+            while True:
+                data = self._get_chat_session(guild_id, session_id)
+                if data is None:
+                    break
                 queue = data["queue"]
                 message = data["message"]
 

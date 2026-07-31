@@ -89,8 +89,7 @@ class StreamingSinkTests(unittest.TestCase):
             _connection=connection,
         )
         cog = SimpleNamespace(bot=SimpleNamespace(loop=Mock()))
-        command_user = SimpleNamespace(id=100)
-        return StreamingSink(cog, command_user, vc), session
+        return StreamingSink(cog, vc, "session-1"), session
 
     def test_sink_accepts_opus_to_decrypt_dave_before_decoding(self):
         sink, session = self.build_sink()
@@ -259,6 +258,14 @@ class VoiceChatRuntimeTests(unittest.IsolatedAsyncioTestCase):
         interaction.followup.send.assert_awaited_once()
         self.assertIn(guild.id, self.cog.active_chats)
         self.assertNotIn(interaction.user.id, self.cog.active_chats)
+        session_id = self.cog.chat_data[guild.id]["session_id"]
+        self.cog.chat_loop.assert_called_once_with(
+            interaction.user,
+            voice_client,
+            guild.id,
+            session_id,
+        )
+        self.cog.display_loop.assert_called_once_with(guild.id, session_id)
 
     async def test_start_chat_reports_voice_connection_failure(self):
         voice_channel = SimpleNamespace(id=200)
@@ -313,11 +320,83 @@ class VoiceChatRuntimeTests(unittest.IsolatedAsyncioTestCase):
         vc.listen.side_effect = invoke_after
         self.cog.load_model = AsyncMock()
         command_user = SimpleNamespace(name="tester")
+        session_id = "session-1"
+        self.cog.chat_data[300] = {
+            "session_id": session_id,
+            "queue": [],
+            "message": SimpleNamespace(edit=AsyncMock()),
+            "task": None,
+        }
 
-        await self.cog.chat_loop(command_user, vc, guild_id=300)
+        await self.cog.chat_loop(
+            command_user,
+            vc,
+            guild_id=300,
+            session_id=session_id,
+        )
 
         vc.listen.assert_called_once()
         vc.disconnect.assert_awaited_once()
+        self.cog.chat_data.pop(300, None)
+
+    async def test_process_audio_discards_result_when_session_ends(self):
+        session_id = "session-1"
+        queue = []
+        self.cog.chat_data[300] = {
+            "session_id": session_id,
+            "queue": queue,
+            "message": SimpleNamespace(edit=AsyncMock()),
+            "task": None,
+        }
+        speaker = SimpleNamespace(name="speaker", display_name="Speaker")
+        vc = SimpleNamespace(guild=SimpleNamespace(id=300))
+
+        async def transcribe_and_stop(_filepath):
+            self.cog.chat_data.pop(300, None)
+            return "종료 뒤 결과"
+
+        self.cog.transcribe = AsyncMock(side_effect=transcribe_and_stop)
+
+        with (
+            patch.object(os.path, "getsize", return_value=192044),
+            patch.object(os.path, "exists", return_value=False),
+        ):
+            await self.cog.process_audio(
+                "voice.wav",
+                speaker,
+                vc,
+                session_id,
+            )
+
+        self.assertEqual([], queue)
+
+    async def test_process_audio_queues_result_for_current_session(self):
+        session_id = "session-1"
+        queue = []
+        self.cog.chat_data[300] = {
+            "session_id": session_id,
+            "queue": queue,
+            "message": SimpleNamespace(edit=AsyncMock()),
+            "task": None,
+        }
+        speaker = SimpleNamespace(name="speaker", display_name="Speaker")
+        vc = SimpleNamespace(guild=SimpleNamespace(id=300))
+        self.cog.transcribe = AsyncMock(return_value="안녕하세요")
+
+        with (
+            patch.object(os.path, "getsize", return_value=192044),
+            patch.object(os.path, "exists", return_value=False),
+        ):
+            await self.cog.process_audio(
+                "voice.wav",
+                speaker,
+                vc,
+                session_id,
+            )
+
+        self.assertEqual(1, len(queue))
+        self.assertIn("안녕하세요", queue[0])
+        self.cog.chat_data.pop(300, None)
 
 
 if __name__ == "__main__":
