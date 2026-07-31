@@ -115,7 +115,7 @@ OpenAI 호출은 `api/chatGPT.py`에서 감싸며, hosted prompt payload는 `com
 | `/대화` | 음성 채널에 참여해 실시간 음성 대화 시작 |
 | `/대화종료` | 음성 대화 종료 및 퇴장 |
 
-음성 처리는 `discord-ext-voice-recv` sink, PCM buffer, silence detection, `faster-whisper` STT, `pyttsx3` TTS 경로를 사용합니다. Windows 로컬 실행에서는 `bin/` 또는 PATH의 ffmpeg를 사용합니다.
+음성 처리는 `discord-ext-voice-recv` Opus sink에서 Discord DAVE payload를 먼저 해독한 뒤 사용자별 Opus decoder로 PCM을 만들고, silence detection, `faster-whisper` STT, `pyttsx3` TTS 경로를 사용합니다. 손상된 음성 frame은 해당 사용자 decoder에서만 폐기하므로 전체 수신 loop를 중단하지 않습니다. Windows 로컬 실행에서는 `bin/` 또는 PATH의 ffmpeg를 사용합니다.
 STT는 기본적으로 `tiny` 모델을 CPU `int8`로 실행합니다. CUDA 모델은 GPU 런타임을 실제로 준비한 환경에서만 `VOICE_CHAT_WHISPER_DEVICE=cuda`와 모델 및 연산 형식을 명시해 활성화합니다.
 
 ### YouTube

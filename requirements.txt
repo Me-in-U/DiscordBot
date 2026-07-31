@@ -2,8 +2,9 @@ PyNaCl
 aiomysql
 aiohttp
 cryptography
+davey==0.1.5
 discord-ext-voice-recv==0.5.2a179
-discord.py[voice]
+discord.py[voice]==2.7.1
 faster-whisper
 google-api-python-client
 holidays

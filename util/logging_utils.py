@@ -2,13 +2,27 @@ from __future__ import annotations
 
 import logging
 import sys
+import time
 from collections.abc import Mapping
 from typing import Any
 
 
 NOISY_LOGGER_LEVELS = {
     "discord.ext.voice_recv.gateway": logging.WARNING,
+    "discord.ext.voice_recv.reader": logging.WARNING,
+    "aiohttp.access": logging.WARNING,
+    "httpx": logging.WARNING,
 }
+
+KST_OFFSET_SECONDS = 9 * 60 * 60
+
+
+class KoreaStandardTimeFormatter(logging.Formatter):
+    """Format log timestamps in Korea Standard Time regardless of host TZ."""
+
+    converter = staticmethod(
+        lambda timestamp: time.gmtime(timestamp + KST_OFFSET_SECONDS)
+    )
 
 
 def _iter_exception_chain(exc: BaseException | None):
@@ -73,11 +87,14 @@ def configure_logging(level: int = logging.INFO) -> None:
     """Configure process-wide console logging once."""
     root_logger = logging.getLogger()
     if not root_logger.handlers:
-        logging.basicConfig(
-            level=level,
-            format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
-            stream=sys.stdout,
+        handler = logging.StreamHandler(sys.stdout)
+        handler.setFormatter(
+            KoreaStandardTimeFormatter(
+                "%(asctime)s %(levelname)s [%(name)s] %(message)s"
+            )
         )
+        root_logger.addHandler(handler)
+        root_logger.setLevel(level)
 
     for logger_name, logger_level in NOISY_LOGGER_LEVELS.items():
         logging.getLogger(logger_name).setLevel(logger_level)

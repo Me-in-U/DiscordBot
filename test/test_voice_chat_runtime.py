@@ -5,7 +5,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
 
 import cogs.voice_chat as voice_chat_module
-from cogs.voice_chat import VoiceChat
+from cogs.voice_chat import StreamingSink, VoiceChat
 from cogs.voice_chat.settings import (
     CPU_WHISPER_COMPUTE_TYPE,
     CPU_WHISPER_MODEL,
@@ -75,6 +75,126 @@ class VoiceChatSettingsTests(unittest.TestCase):
         self.assertEqual(CPU_WHISPER_MODEL, settings.model)
         self.assertEqual("cpu", settings.device)
         self.assertEqual(CPU_WHISPER_COMPUTE_TYPE, settings.compute_type)
+
+
+class StreamingSinkTests(unittest.TestCase):
+    def build_sink(self, *, dave_protocol_version=1):
+        session = Mock()
+        connection = SimpleNamespace(
+            dave_session=session,
+            dave_protocol_version=dave_protocol_version,
+        )
+        vc = SimpleNamespace(
+            guild=SimpleNamespace(id=300),
+            _connection=connection,
+        )
+        cog = SimpleNamespace(bot=SimpleNamespace(loop=Mock()))
+        command_user = SimpleNamespace(id=100)
+        return StreamingSink(cog, command_user, vc), session
+
+    def test_sink_accepts_opus_to_decrypt_dave_before_decoding(self):
+        sink, session = self.build_sink()
+        user = SimpleNamespace(id=101)
+        data = SimpleNamespace(
+            packet=SimpleNamespace(ssrc=55),
+            opus=b"encrypted-opus",
+        )
+        decoder = Mock()
+        decoder.decode.return_value = b"decoded-pcm"
+        session.decrypt.return_value = b"plain-opus"
+
+        with patch.object(
+            voice_chat_module.discord.opus,
+            "Decoder",
+            return_value=decoder,
+        ):
+            pcm = sink._decode_voice_packet(user, data)
+
+        self.assertTrue(sink.wants_opus())
+        session.decrypt.assert_called_once_with(
+            user.id,
+            voice_chat_module.davey.MediaType.audio,
+            b"encrypted-opus",
+        )
+        decoder.decode.assert_called_once_with(b"plain-opus", fec=False)
+        self.assertEqual(b"decoded-pcm", pcm)
+
+    def test_sink_skips_dave_decryption_when_protocol_is_disabled(self):
+        sink, session = self.build_sink(dave_protocol_version=0)
+        user = SimpleNamespace(id=101)
+        data = SimpleNamespace(
+            packet=SimpleNamespace(ssrc=55),
+            opus=b"plain-opus",
+        )
+        decoder = Mock()
+        decoder.decode.return_value = b"decoded-pcm"
+
+        with patch.object(
+            voice_chat_module.discord.opus,
+            "Decoder",
+            return_value=decoder,
+        ):
+            pcm = sink._decode_voice_packet(user, data)
+
+        session.decrypt.assert_not_called()
+        decoder.decode.assert_called_once_with(b"plain-opus", fec=False)
+        self.assertEqual(b"decoded-pcm", pcm)
+
+    def test_sink_does_not_decrypt_fabricated_loss_packet(self):
+        class FakeLossPacket:
+            ssrc = 55
+
+            def __bool__(self):
+                return False
+
+        sink, session = self.build_sink()
+        user = SimpleNamespace(id=101)
+        data = SimpleNamespace(packet=FakeLossPacket(), opus=b"opus-silence")
+        decoder = Mock()
+        decoder.decode.return_value = b"decoded-pcm"
+
+        with patch.object(
+            voice_chat_module.discord.opus,
+            "Decoder",
+            return_value=decoder,
+        ):
+            pcm = sink._decode_voice_packet(user, data)
+
+        session.decrypt.assert_not_called()
+        decoder.decode.assert_called_once_with(b"opus-silence", fec=False)
+        self.assertEqual(b"decoded-pcm", pcm)
+
+    def test_corrupt_opus_packet_is_dropped_without_raising(self):
+        class FakeOpusError(Exception):
+            pass
+
+        sink, session = self.build_sink()
+        user = SimpleNamespace(id=101)
+        data = SimpleNamespace(
+            packet=SimpleNamespace(ssrc=55),
+            opus=b"encrypted-opus",
+        )
+        decoder = Mock()
+        decoder.decode.side_effect = FakeOpusError("corrupt stream")
+        session.decrypt.return_value = b"corrupt-opus"
+
+        with (
+            patch.object(
+                voice_chat_module.discord.opus,
+                "Decoder",
+                return_value=decoder,
+            ),
+            patch.object(
+                voice_chat_module.discord.opus,
+                "OpusError",
+                FakeOpusError,
+            ),
+        ):
+            pcm = sink._decode_voice_packet(user, data)
+
+        self.assertIsNone(pcm)
+        self.assertNotIn(55, sink.opus_decoders)
+        self.assertEqual(1, sink.decode_error_counts["opus"])
 
 
 class VoiceChatRuntimeTests(unittest.IsolatedAsyncioTestCase):
@@ -177,6 +297,27 @@ class VoiceChatRuntimeTests(unittest.IsolatedAsyncioTestCase):
             ephemeral=True,
         )
         interaction.response.defer.assert_not_awaited()
+
+    async def test_chat_loop_disconnects_when_receiver_stops_unexpectedly(self):
+        receive_error = RuntimeError("receiver failed")
+        vc = SimpleNamespace(
+            is_connected=Mock(return_value=True),
+            is_listening=Mock(return_value=False),
+            listen=Mock(),
+            disconnect=AsyncMock(),
+        )
+
+        def invoke_after(_sink, *, after):
+            after(receive_error)
+
+        vc.listen.side_effect = invoke_after
+        self.cog.load_model = AsyncMock()
+        command_user = SimpleNamespace(name="tester")
+
+        await self.cog.chat_loop(command_user, vc, guild_id=300)
+
+        vc.listen.assert_called_once()
+        vc.disconnect.assert_awaited_once()
 
 
 if __name__ == "__main__":

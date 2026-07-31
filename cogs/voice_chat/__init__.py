@@ -6,6 +6,7 @@ import os
 import tempfile
 import wave
 import discord
+import davey
 import time
 import numpy as np
 from collections import deque
@@ -38,6 +39,9 @@ class StreamingSink(voice_recv.AudioSink if voice_recv else object):
         self.user_silence_start = {}  # user -> timestamp
         self.user_speaking = {}  # user -> bool
         self.user_pre_speech_buffer = {}  # user -> deque of bytes (ring buffer)
+        self.opus_decoders = {}  # SSRC -> decoder
+        self.decode_error_counts = {}
+        self.decode_error_last_logged = {}
 
         # VAD Constants
         self.SILENCE_THRESHOLD = 700  # 600~800 추천 (환경 잡음 따라)
@@ -47,14 +51,83 @@ class StreamingSink(voice_recv.AudioSink if voice_recv else object):
         self.POST_SPEECH_BUFFER_DURATION = 0.2  # 0.2초 포스트롤
 
     def wants_opus(self) -> bool:
-        return False
+        # voice_recv does not currently decrypt Discord DAVE media before
+        # handing packets to its internal Opus decoder. Accept Opus here so
+        # DAVE can be removed before decoding.
+        return True
+
+    def _record_decode_error(self, kind, user, ssrc, exc) -> None:
+        count = self.decode_error_counts.get(kind, 0) + 1
+        self.decode_error_counts[kind] = count
+
+        now = time.monotonic()
+        last_logged = self.decode_error_last_logged.get(kind, 0.0)
+        if count != 1 and now - last_logged < 30:
+            return
+
+        self.decode_error_last_logged[kind] = now
+        logger.warning(
+            "Voice packet dropped: guild_id=%s user_id=%s ssrc=%s "
+            "stage=%s error=%s count=%s",
+            getattr(getattr(self.vc, "guild", None), "id", None),
+            getattr(user, "id", None),
+            ssrc,
+            kind,
+            type(exc).__name__,
+            count,
+        )
+
+    def _decode_voice_packet(self, user, data) -> bytes | None:
+        if user is None:
+            return None
+
+        packet = getattr(data, "packet", None)
+        opus_data = getattr(data, "opus", None)
+        if packet is None or not opus_data:
+            return None
+
+        ssrc = getattr(packet, "ssrc", None)
+        if ssrc is None:
+            return None
+
+        connection = getattr(self.vc, "_connection", None)
+        dave_session = getattr(connection, "dave_session", None)
+        dave_protocol_version = getattr(connection, "dave_protocol_version", 0)
+        if bool(packet) and dave_session is not None and dave_protocol_version:
+            try:
+                opus_data = dave_session.decrypt(
+                    user.id,
+                    davey.MediaType.audio,
+                    opus_data,
+                )
+            except Exception as exc:
+                self._record_decode_error("dave", user, ssrc, exc)
+                return None
+
+        if not opus_data:
+            return None
+
+        decoder = self.opus_decoders.get(ssrc)
+        if decoder is None:
+            decoder = discord.opus.Decoder()
+            self.opus_decoders[ssrc] = decoder
+
+        try:
+            return decoder.decode(opus_data, fec=False)
+        except discord.opus.OpusError as exc:
+            # A single malformed or out-of-order frame must not terminate the
+            # shared packet router. Recreate only the affected user's decoder.
+            self.opus_decoders.pop(ssrc, None)
+            self._record_decode_error("opus", user, ssrc, exc)
+            return None
 
     def write(self, user, data) -> None:
-        if user is None or not data.pcm:
+        pcm = self._decode_voice_packet(user, data)
+        if not pcm:
             return
 
         # Calculate RMS
-        pcm_data = np.frombuffer(data.pcm, dtype=np.int16).astype(np.float32)
+        pcm_data = np.frombuffer(pcm, dtype=np.int16).astype(np.float32)
         if pcm_data.size == 0:
             return
         rms = np.sqrt(np.mean(pcm_data**2))
@@ -79,12 +152,12 @@ class StreamingSink(voice_recv.AudioSink if voice_recv else object):
                 self.user_pre_speech_buffer[user].clear()
 
             self.user_silence_start[user] = now
-            self.user_buffers[user].extend(data.pcm)
+            self.user_buffers[user].extend(pcm)
         else:
             # Silence
             if self.user_speaking[user]:
                 # Was speaking, now silent. Keep recording for a bit (buffer silence)
-                self.user_buffers[user].extend(data.pcm)
+                self.user_buffers[user].extend(pcm)
 
                 # Check if silence exceeded threshold + post-roll duration
                 if now - self.user_silence_start[user] > self.SILENCE_DURATION:
@@ -103,7 +176,7 @@ class StreamingSink(voice_recv.AudioSink if voice_recv else object):
             else:
                 # Was silent, still silent.
                 # Add to pre-speech ring buffer (frame)
-                self.user_pre_speech_buffer[user].append(data.pcm)
+                self.user_pre_speech_buffer[user].append(pcm)
 
     def flush_user(self, user) -> None:
         buffer = self.user_buffers[user]
@@ -134,7 +207,11 @@ class StreamingSink(voice_recv.AudioSink if voice_recv else object):
         self.user_pre_speech_buffer[user].clear()
 
     def cleanup(self) -> None:
-        pass
+        self.opus_decoders.clear()
+        self.user_buffers.clear()
+        self.user_silence_start.clear()
+        self.user_speaking.clear()
+        self.user_pre_speech_buffer.clear()
 
 
 class VoiceChat(commands.Cog):
@@ -420,12 +497,28 @@ class VoiceChat(commands.Cog):
                 print("[DEBUG] Starting recording cycle")
 
                 sink = StreamingSink(self, command_user, vc)
-                vc.listen(sink)
+                receive_error = []
+
+                def after_receive(error):
+                    if error is not None:
+                        receive_error.append(error)
+
+                vc.listen(sink, after=after_receive)
                 print("[DEBUG] vc.listen(sink) called with VAD")
 
                 # Keep running until disconnected or cancelled
-                while vc.is_connected():
+                while vc.is_connected() and vc.is_listening():
                     await asyncio.sleep(1)
+
+                if vc.is_connected():
+                    error = (
+                        receive_error[-1]
+                        if receive_error
+                        else RuntimeError("voice receiver stopped")
+                    )
+                    raise RuntimeError(
+                        "Voice receive loop stopped unexpectedly"
+                    ) from error
 
         except asyncio.CancelledError:
             print("[DEBUG] chat_loop cancelled")

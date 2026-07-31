@@ -2,21 +2,53 @@ import logging
 import os
 import unittest
 
-from util.logging_utils import configure_logging, log_user_error, user_error_message
+from util.logging_utils import (
+    KoreaStandardTimeFormatter,
+    configure_logging,
+    log_user_error,
+    user_error_message,
+)
 
 os.environ.setdefault("OPENAI_KEY", "test-key")
 
 
 class ErrorHandlingHelperTests(unittest.TestCase):
-    def test_voice_gateway_protocol_noise_is_hidden_at_info_level(self):
-        gateway_logger = logging.getLogger("discord.ext.voice_recv.gateway")
-        original_level = gateway_logger.level
+    def test_voice_receive_protocol_noise_is_hidden_at_info_level(self):
+        logger_names = (
+            "discord.ext.voice_recv.gateway",
+            "discord.ext.voice_recv.reader",
+        )
+        original_levels = {
+            name: logging.getLogger(name).level for name in logger_names
+        }
 
         try:
             configure_logging()
-            self.assertEqual(logging.WARNING, gateway_logger.level)
+            for logger_name in logger_names:
+                self.assertEqual(
+                    logging.WARNING,
+                    logging.getLogger(logger_name).level,
+                )
         finally:
-            gateway_logger.setLevel(original_level)
+            for logger_name, original_level in original_levels.items():
+                logging.getLogger(logger_name).setLevel(original_level)
+
+    def test_log_formatter_uses_korea_standard_time(self):
+        formatter = KoreaStandardTimeFormatter("%(asctime)s %(message)s")
+        record = logging.LogRecord(
+            "test",
+            logging.INFO,
+            __file__,
+            1,
+            "message",
+            (),
+            None,
+        )
+        record.created = 0
+
+        formatted = formatter.format(record)
+
+        self.assertTrue(formatted.startswith("1970-01-01 09:00:00"))
 
     def test_user_error_message_does_not_include_raw_exception(self):
         message = user_error_message("검색", RuntimeError("secret-token HTTP 500"))
