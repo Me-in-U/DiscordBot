@@ -149,6 +149,7 @@ class JmaEewParserTests(unittest.TestCase):
     def test_exposes_alert_command_and_documents_delivery_pair(self):
         cog_source = EARTHQUAKE_COG_PATH.read_text(encoding="utf-8")
         help_source = HELP_PATH.read_text(encoding="utf-8")
+        loop_source = LOOP_PATH.read_text(encoding="utf-8")
         readme_source = README_PATH.read_text(encoding="utf-8")
         agents_source = AGENTS_PATH.read_text(encoding="utf-8")
 
@@ -158,6 +159,8 @@ class JmaEewParserTests(unittest.TestCase):
         self.assertIn("/지진알림", readme_source)
         self.assertIn("@everyone", help_source)
         self.assertIn("@everyone", readme_source)
+        for source in (cog_source, help_source, loop_source, readme_source):
+            self.assertIn("M5.9", source)
         self.assertIn("Notification Delivery Pairing", agents_source)
         self.assertIn("same `channel_type` key", agents_source)
 
@@ -273,8 +276,8 @@ class EarthquakeAlertCommandTests(unittest.IsolatedAsyncioTestCase):
 
 
 class JmaEewAlertTests(unittest.IsolatedAsyncioTestCase):
-    async def test_sends_first_magnitude_five_point_five_report(self):
-        event = _event(magnitude=5.5)
+    async def test_sends_first_magnitude_five_point_nine_report(self):
+        event = _event(magnitude=5.9)
         saved_states = []
         sent_events = []
 
@@ -312,8 +315,8 @@ class JmaEewAlertTests(unittest.IsolatedAsyncioTestCase):
             900,
         )
 
-    async def test_skips_first_report_below_magnitude_five_point_five(self):
-        event = _event(magnitude=5.4)
+    async def test_skips_first_report_below_magnitude_five_point_nine(self):
+        event = _event(magnitude=5.8)
 
         async def get_channels():
             return {1: 100}
@@ -322,7 +325,7 @@ class JmaEewAlertTests(unittest.IsolatedAsyncioTestCase):
             return EarthquakeAlertState(channel_id=100)
 
         async def send(_target, _event, _notify_everyone):
-            raise AssertionError("M5.5 미만은 보내면 안 됩니다.")
+            raise AssertionError("M5.9 미만은 보내면 안 됩니다.")
 
         results = await process_jma_eew_event(
             object(),
