@@ -33,14 +33,14 @@ class EarthquakeAlertCommands(commands.Cog):
         if interaction.user.guild_permissions.administrator:
             return True
         await interaction.response.send_message(
-            "관리자 권한이 있는 사용자만 일본 지진 알림을 설정할 수 있습니다.",
+            "관리자 권한이 있는 사용자만 지진 알림을 설정할 수 있습니다.",
             ephemeral=True,
         )
         return False
 
     @app_commands.command(
         name="지진알림",
-        description="일본 M5.9 이상 지진을 알리고 M7.0 이상은 @everyone으로 전송합니다.",
+        description="일본 JMA M5.9, 한국 EMSC M5.0, 기타 EMSC M6.5 이상 알림을 설정합니다.",
     )
     @app_commands.describe(
         status="true면 현재 채널로 알림을 받고 false면 알림을 해제합니다."
@@ -59,7 +59,7 @@ class EarthquakeAlertCommands(commands.Cog):
             await set_channel(guild_id, EARTHQUAKE_ALERT_CHANNEL_TYPE, None)
             await delete_earthquake_alert_state(guild_id)
             await interaction.response.send_message(
-                "일본 지진 알림을 해제했습니다.",
+                "지진 알림을 해제했습니다.",
                 ephemeral=True,
             )
             return
@@ -80,10 +80,10 @@ class EarthquakeAlertCommands(commands.Cog):
         )
         await delete_earthquake_alert_state(guild_id)
         await interaction.followup.send(
-            "일본 지진 알림을 설정했습니다.\n"
+            "지진 알림을 설정했습니다.\n"
             f"알림 채널: <#{channel_id}>\n"
-            "일본 M5.9 이상 긴급지진속보부터 실시간으로 알립니다.\n"
-            "M7.0 이상은 @everyone을 함께 전송합니다.",
+            "일본 JMA M5.9 이상, 한국 EMSC M5.0 이상, 기타 EMSC M6.5 이상 지진을 알립니다.\n"
+            "일본 M7.0 이상과 한국 M5.5 이상은 사건당 한 번 @everyone을 전송합니다.",
             ephemeral=True,
         )
 

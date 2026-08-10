@@ -12,6 +12,7 @@ from bot import (
     load_recent_messages,
 )
 from util.codex_resets.loop_runner import run_codex_reset_notification_loop
+from util.earthquake.emsc_stream import run_emsc_stream
 from util.earthquake.stream import run_jma_eew_stream
 from util.loop.daily_refresh_runner import run_daily_refreshes
 from util.env_utils import getenv_clean
@@ -71,6 +72,7 @@ LOOP_TASK_NAMES = (
     "maplestory_notice_check",
     "codex_reset_notification_check",
     "jma_eew_stream",
+    "emsc_earthquake_stream",
     "youtube_websub_renewal",
 )
 logger = logging.getLogger(__name__)
@@ -294,6 +296,14 @@ class LoopTasks(commands.Cog):
         except Exception:
             logger.exception("일본 JMA EEW 스트림 오류")
 
+    @tasks.loop(seconds=5)
+    async def emsc_earthquake_stream(self):
+        """한국 M5.0 이상과 기타 국가 M6.5 이상 EMSC 지진을 수신합니다."""
+        try:
+            await run_emsc_stream(self.bot)
+        except Exception:
+            logger.exception("EMSC 전 세계 지진 스트림 오류")
+
     @tasks.loop(hours=12)
     async def youtube_websub_renewal(self):
         """YouTube WebSub 구독을 주기적으로 갱신합니다."""
@@ -325,6 +335,11 @@ class LoopTasks(commands.Cog):
     @jma_eew_stream.before_loop
     async def before_jma_eew_stream(self):
         print("-------------일본 JMA EEW 스트림 대기중...---------------")
+        await self.bot.wait_until_ready()
+
+    @emsc_earthquake_stream.before_loop
+    async def before_emsc_earthquake_stream(self):
+        print("-------------EMSC 전 세계 지진 스트림 대기중...---------------")
         await self.bot.wait_until_ready()
 
     @youtube_websub_renewal.before_loop

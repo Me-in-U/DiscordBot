@@ -1,60 +1,52 @@
 from __future__ import annotations
 
-import asyncio
 import logging
-from collections.abc import Awaitable, Callable, Mapping
-from dataclasses import dataclass
+from collections.abc import Awaitable, Callable
 
 import discord
 
-from util.earthquake.jma_eew import (
-    JMA_EEW_EVERYONE_MAGNITUDE,
-    JMA_EEW_MIN_MAGNITUDE,
-    JmaEewEvent,
-    is_recent_jma_eew,
+from util.earthquake.alerts import (
+    EarthquakeAlertResult,
+    get_earthquake_alert_channels,
+    resolve_earthquake_alert_channel,
+)
+from util.earthquake.emsc import (
+    EMSC_CREATE_ACTIONS,
+    EMSC_KOREA_EVERYONE_MAGNITUDE,
+    EmscEvent,
+    is_earthquake_emsc_event,
+    is_japan_emsc_event,
+    is_korea_emsc_event,
+    minimum_magnitude_for_emsc_event,
 )
 from util.earthquake.map_image import (
     EARTHQUAKE_MAP_FILENAME,
-    build_jma_eew_map_file,
+    build_earthquake_map_file,
     build_openstreetmap_url,
 )
 from util.earthquake.state import (
-    EarthquakeAlertState,
-    find_jma_eew_record,
-    load_earthquake_alert_state,
-    remember_jma_eew_message,
-    reset_earthquake_alert_state,
-    save_earthquake_alert_state,
+    EmscAlertState,
+    find_emsc_record,
+    load_emsc_alert_state,
+    remember_emsc_message,
+    reset_emsc_alert_state,
+    save_emsc_alert_state,
 )
-from util.earthquake.translation import translate_jma_eew_terms
 
 
-EARTHQUAKE_ALERT_CHANNEL_TYPE = "earthquake_alert"
 logger = logging.getLogger(__name__)
 
 GetChannels = Callable[[], Awaitable[dict[int, int]]]
-LoadState = Callable[[int], Awaitable[EarthquakeAlertState]]
-SaveState = Callable[[int, EarthquakeAlertState], Awaitable[None]]
+LoadState = Callable[[int], Awaitable[EmscAlertState]]
+SaveState = Callable[[int, EmscAlertState], Awaitable[None]]
 ResolveChannel = Callable[[object, int], Awaitable[object | None]]
-SendAlert = Callable[[object, JmaEewEvent, bool], Awaitable[int | None]]
-EditAlert = Callable[[object, int, JmaEewEvent, bool], Awaitable[int | None]]
+SendAlert = Callable[[object, EmscEvent, bool], Awaitable[int | None]]
+EditAlert = Callable[[object, int, EmscEvent, bool], Awaitable[int | None]]
 
 
-@dataclass(frozen=True, slots=True)
-class EarthquakeAlertResult:
-    guild_id: int
-    channel_id: int | None = None
-    event_id: str | None = None
-    serial: int | None = None
-    message_id: int | None = None
-    status: str = "ok"
-    action: str | None = None
-    error: str | None = None
-
-
-async def process_jma_eew_event(
+async def process_emsc_event(
     bot: object,
-    event: JmaEewEvent,
+    event: EmscEvent,
     *,
     get_channels: GetChannels | None = None,
     load_state: LoadState | None = None,
@@ -67,25 +59,22 @@ async def process_jma_eew_event(
     channels = await get_configured_channels()
     if not channels:
         return []
+    if not is_earthquake_emsc_event(event):
+        return _skip_all(channels, event, "non_earthquake")
+    if is_japan_emsc_event(event):
+        return _skip_all(channels, event, "japan_duplicate")
+    minimum_magnitude = minimum_magnitude_for_emsc_event(event)
+    if (
+        event.action in EMSC_CREATE_ACTIONS
+        and not event.is_at_least_magnitude(minimum_magnitude)
+    ):
+        return _skip_all(channels, event, "below_threshold")
 
-    if event.is_training:
-        return [
-            EarthquakeAlertResult(
-                guild_id=guild_id,
-                channel_id=channel_id,
-                event_id=event.event_id,
-                serial=event.serial,
-                status="skipped",
-                action="training",
-            )
-            for guild_id, channel_id in channels.items()
-        ]
-
-    load = load_state or load_earthquake_alert_state
-    save = save_state or save_earthquake_alert_state
+    load = load_state or load_emsc_alert_state
+    save = save_state or save_emsc_alert_state
     resolve = resolve_channel or resolve_earthquake_alert_channel
-    send = send_alert or send_jma_eew_alert
-    edit = edit_alert or edit_jma_eew_alert
+    send = send_alert or send_emsc_alert
+    edit = edit_alert or edit_emsc_alert
     results: list[EarthquakeAlertResult] = []
 
     for guild_id, channel_id in channels.items():
@@ -93,7 +82,7 @@ async def process_jma_eew_event(
             state = await load(guild_id)
         except Exception as exc:
             logger.warning(
-                "일본 EEW 상태 조회 실패: guild=%s",
+                "EMSC 지진 상태 조회 실패: guild=%s",
                 guild_id,
                 exc_info=True,
             )
@@ -109,10 +98,10 @@ async def process_jma_eew_event(
             continue
 
         if state.channel_id != int(channel_id):
-            state = reset_earthquake_alert_state(channel_id)
+            state = reset_emsc_alert_state(channel_id)
 
-        record = find_jma_eew_record(state, event.event_id)
-        if record is not None and event.serial <= record.serial:
+        record = find_emsc_record(state, event.event_id)
+        if record is not None and record.revision >= event.revision:
             results.append(
                 _skipped_result(
                     guild_id,
@@ -124,33 +113,23 @@ async def process_jma_eew_event(
             continue
 
         if record is None:
-            if event.is_cancelled:
+            if event.is_deleted:
                 results.append(
                     _skipped_result(
                         guild_id,
                         channel_id,
                         event,
-                        "untracked_cancel",
+                        "untracked_delete",
                     )
                 )
                 continue
-            if not event.is_at_least_magnitude(JMA_EEW_MIN_MAGNITUDE):
+            if not event.is_at_least_magnitude(minimum_magnitude):
                 results.append(
                     _skipped_result(
                         guild_id,
                         channel_id,
                         event,
                         "below_threshold",
-                    )
-                )
-                continue
-            if not is_recent_jma_eew(event):
-                results.append(
-                    _skipped_result(
-                        guild_id,
-                        channel_id,
-                        event,
-                        "stale",
                     )
                 )
                 continue
@@ -162,7 +141,6 @@ async def process_jma_eew_event(
                     guild_id=guild_id,
                     channel_id=channel_id,
                     event_id=event.event_id,
-                    serial=event.serial,
                     status="error",
                     action="missing_channel",
                     error="configured channel could not be resolved",
@@ -184,14 +162,13 @@ async def process_jma_eew_event(
                     event,
                     notify_everyone,
                 )
-                action = "cancelled" if event.is_cancelled else "edited"
+                action = "cancelled" if event.is_deleted else "edited"
         except Exception as exc:
             logger.warning(
-                "일본 EEW 알림 처리 실패: guild=%s channel=%s event=%s serial=%s",
+                "EMSC 지진 알림 처리 실패: guild=%s channel=%s event=%s",
                 guild_id,
                 channel_id,
                 event.event_id,
-                event.serial,
                 exc_info=True,
             )
             results.append(
@@ -213,7 +190,6 @@ async def process_jma_eew_event(
                     guild_id=guild_id,
                     channel_id=channel_id,
                     event_id=event.event_id,
-                    serial=event.serial,
                     status="error",
                     action="missing_message_id",
                     error="Discord message ID was not returned",
@@ -221,10 +197,10 @@ async def process_jma_eew_event(
             )
             continue
 
-        updated_state = remember_jma_eew_message(
+        updated_state = remember_emsc_message(
             state,
             event_id=event.event_id,
-            serial=event.serial,
+            revision=event.revision,
             message_id=message_id,
             everyone_notified=(
                 (record.everyone_notified if record is not None else False)
@@ -235,10 +211,9 @@ async def process_jma_eew_event(
             await save(guild_id, updated_state)
         except Exception as exc:
             logger.warning(
-                "일본 EEW 상태 저장 실패: guild=%s event=%s serial=%s",
+                "EMSC 지진 상태 저장 실패: guild=%s event=%s",
                 guild_id,
                 event.event_id,
-                event.serial,
                 exc_info=True,
             )
             results.append(
@@ -258,7 +233,6 @@ async def process_jma_eew_event(
                 guild_id=guild_id,
                 channel_id=channel_id,
                 event_id=event.event_id,
-                serial=event.serial,
                 message_id=message_id,
                 action=action,
             )
@@ -267,35 +241,12 @@ async def process_jma_eew_event(
     return results
 
 
-async def resolve_earthquake_alert_channel(
-    bot: object,
-    channel_id: int,
-) -> object | None:
-    target = bot.get_channel(int(channel_id))
-    if target is None:
-        try:
-            target = await bot.fetch_channel(int(channel_id))
-        except discord.DiscordException:
-            return None
-    if not hasattr(target, "send"):
-        return None
-    return target
-
-
-async def send_jma_eew_alert(
+async def send_emsc_alert(
     target: object,
-    event: JmaEewEvent,
+    event: EmscEvent,
     notify_everyone: bool | None = None,
 ) -> int | None:
-    map_file, translated_terms = await asyncio.gather(
-        build_jma_eew_map_file(event),
-        translate_jma_eew_terms(event),
-    )
-    embed = build_jma_eew_embed(
-        event,
-        include_map=map_file is not None,
-        translated_terms=translated_terms,
-    )
+    map_file = await build_earthquake_map_file(event)
     show_everyone = _should_show_everyone(event)
     should_notify = (
         show_everyone
@@ -303,7 +254,10 @@ async def send_jma_eew_alert(
         else show_everyone and bool(notify_everyone)
     )
     send_options = {
-        "embed": embed,
+        "embed": build_emsc_embed(
+            event,
+            include_map=map_file is not None,
+        ),
         "allowed_mentions": _allowed_mentions(should_notify),
     }
     if show_everyone:
@@ -314,23 +268,23 @@ async def send_jma_eew_alert(
     return getattr(message, "id", None)
 
 
-async def edit_jma_eew_alert(
+async def edit_emsc_alert(
     target: object,
     message_id: int,
-    event: JmaEewEvent,
+    event: EmscEvent,
     notify_everyone: bool = False,
 ) -> int | None:
     try:
         message = await target.fetch_message(int(message_id))
     except discord.NotFound:
-        return await send_jma_eew_alert(
+        return await send_emsc_alert(
             target,
             event,
             notify_everyone=notify_everyone,
         )
 
     if notify_everyone and _should_show_everyone(event):
-        replacement_message_id = await send_jma_eew_alert(
+        replacement_message_id = await send_emsc_alert(
             target,
             event,
             notify_everyone=True,
@@ -339,16 +293,13 @@ async def edit_jma_eew_alert(
             await message.delete()
         except discord.DiscordException:
             logger.warning(
-                "M7.0 이상 일본 EEW 기존 메시지 삭제 실패: message=%s",
+                "한국 M5.5 이상 EMSC 기존 메시지 삭제 실패: message=%s",
                 message_id,
                 exc_info=True,
             )
         return replacement_message_id
 
-    map_file, translated_terms = await asyncio.gather(
-        build_jma_eew_map_file(event),
-        translate_jma_eew_terms(event),
-    )
+    map_file = await build_earthquake_map_file(event)
     existing_map = next(
         (
             attachment
@@ -360,10 +311,9 @@ async def edit_jma_eew_alert(
     )
     edit_options = {
         "content": "@everyone" if _should_show_everyone(event) else None,
-        "embed": build_jma_eew_embed(
+        "embed": build_emsc_embed(
             event,
             include_map=map_file is not None or existing_map is not None,
-            translated_terms=translated_terms,
         ),
         "allowed_mentions": discord.AllowedMentions.none(),
     }
@@ -375,11 +325,83 @@ async def edit_jma_eew_alert(
     return getattr(message, "id", int(message_id))
 
 
-def _should_show_everyone(event: JmaEewEvent) -> bool:
+def build_emsc_embed(
+    event: EmscEvent,
+    *,
+    include_map: bool = False,
+) -> discord.Embed:
+    report_type = _report_type(event)
+    embed = discord.Embed(
+        title=f"EMSC 지진정보 {report_type} | {_magnitude_text(event)}",
+        description=f"**{event.region or '지역 정보 없음'}**",
+        color=_emsc_color(event),
+        timestamp=event.updated_at,
+    )
+    magnitude_value = f"**{_magnitude_text(event)}**"
+    if event.magnitude_type:
+        magnitude_value += f"\n{event.magnitude_type.upper()}"
+    embed.add_field(name="규모", value=magnitude_value, inline=True)
+    embed.add_field(
+        name="깊이",
+        value=(
+            f"{event.depth_km:g} km"
+            if event.depth_km is not None
+            else "미상"
+        ),
+        inline=True,
+    )
+    embed.add_field(
+        name="최대 예상 진도",
+        value="제공 안 함",
+        inline=True,
+    )
+    embed.add_field(
+        name="발표 단계",
+        value=report_type,
+        inline=True,
+    )
+    embed.add_field(
+        name="발표 시각",
+        value=_discord_time(event.updated_at),
+        inline=True,
+    )
+    embed.add_field(
+        name="발생 추정",
+        value=_discord_time(event.occurred_at),
+        inline=True,
+    )
+    if event.latitude is not None and event.longitude is not None:
+        coordinates_url = build_openstreetmap_url(event)
+        embed.add_field(
+            name="추정 진원",
+            value=f"[지도에서 크게 보기]({coordinates_url})",
+            inline=False,
+        )
+        if include_map:
+            embed.set_image(url=f"attachment://{EARTHQUAKE_MAP_FILENAME}")
+    if event.is_deleted:
+        embed.add_field(
+            name="상태",
+            value="EMSC에서 이 지진 정보를 삭제했습니다.",
+            inline=False,
+        )
+    authority = event.authority or "EMSC"
+    embed.set_footer(
+        text=(
+            f"정보 출처: EMSC/CSEM | 원자료 기관: {authority} | "
+            "https://www.emsc-csem.org | 근실시간 예비 정보로 "
+            "수치가 수정되거나 삭제될 수 있습니다."
+        )
+    )
+    return embed
+
+
+def _should_show_everyone(event: EmscEvent) -> bool:
     return (
-        not event.is_cancelled
+        not event.is_deleted
+        and is_korea_emsc_event(event)
         and event.magnitude is not None
-        and event.magnitude >= JMA_EEW_EVERYONE_MAGNITUDE
+        and event.magnitude >= EMSC_KOREA_EVERYONE_MAGNITUDE
     )
 
 
@@ -394,108 +416,15 @@ def _allowed_mentions(notify_everyone: bool) -> discord.AllowedMentions:
     )
 
 
-def build_jma_eew_embed(
-    event: JmaEewEvent,
-    *,
-    include_map: bool = False,
-    translated_terms: Mapping[str, str] | None = None,
-) -> discord.Embed:
-    if event.is_cancelled:
-        report_type = "취소"
-    elif event.is_warning:
-        report_type = "경보"
-    else:
-        report_type = "예보"
-
-    embed = discord.Embed(
-        title=f"JMA 긴급지진속보 {report_type} | {_magnitude_text(event)}",
-        description=(
-            f"**{_bilingual_text(event.hypocenter, translated_terms)}**"
-        ),
-        color=_jma_eew_color(event),
-        timestamp=event.announced_at,
-    )
-    embed.add_field(
-        name="규모",
-        value=f"**{_magnitude_text(event)}**",
-        inline=True,
-    )
-    embed.add_field(
-        name="깊이",
-        value=(
-            f"{event.depth_km:g} km"
-            if event.depth_km is not None
-            else "미상"
-        ),
-        inline=True,
-    )
-    embed.add_field(
-        name="최대 예상 진도",
-        value=event.max_intensity or "미상",
-        inline=True,
-    )
-    embed.add_field(
-        name="발표 단계",
-        value=f"제 {event.serial}보" + ("\n최종보" if event.is_final else ""),
-        inline=True,
-    )
-    embed.add_field(
-        name="발표 시각",
-        value=_discord_time(event.announced_at),
-        inline=True,
-    )
-    embed.add_field(
-        name="발생 추정",
-        value=(
-            _discord_time(event.origin_at)
-            if event.origin_at is not None
-            else "미상"
-        ),
-        inline=True,
-    )
-    if event.latitude is not None and event.longitude is not None:
-        coordinates_url = build_openstreetmap_url(event)
-        embed.add_field(
-            name="추정 진원",
-            value=f"[지도에서 크게 보기]({coordinates_url})",
-            inline=False,
-        )
-        if include_map:
-            embed.set_image(url=f"attachment://{EARTHQUAKE_MAP_FILENAME}")
-    if event.warn_areas:
-        embed.add_field(
-            name="예상 지역",
-            value=_warn_area_text(event, translated_terms),
-            inline=False,
-        )
-    if event.is_cancelled:
-        embed.add_field(
-            name="상태",
-            value="기상청에서 이 긴급지진속보를 취소했습니다.",
-            inline=False,
-        )
-    elif event.is_assumption:
-        embed.add_field(
-            name="분석 상태",
-            value="PLUM법 추정 진원 정보입니다.",
-            inline=False,
-        )
-    embed.set_footer(
-        text=(
-            "정보 출처: 일본 기상청 JMA | 중계: Wolfx 비공식 API | "
-            "속보 수치는 후속 보에서 변경되거나 취소될 수 있습니다."
-        )
-    )
-    return embed
+def _report_type(event: EmscEvent) -> str:
+    if event.is_deleted:
+        return "삭제"
+    if event.action in EMSC_CREATE_ACTIONS:
+        return "신규"
+    return "수정"
 
 
-async def get_earthquake_alert_channels() -> dict[int, int]:
-    from util.guild.channel_settings import get_channels_by_purpose
-
-    return await get_channels_by_purpose(EARTHQUAKE_ALERT_CHANNEL_TYPE)
-
-
-def _magnitude_text(event: JmaEewEvent) -> str:
+def _magnitude_text(event: EmscEvent) -> str:
     return f"M{event.magnitude:.1f}" if event.magnitude is not None else "M 미상"
 
 
@@ -504,39 +433,8 @@ def _discord_time(value: object) -> str:
     return f"<t:{timestamp}:f>\n<t:{timestamp}:R>"
 
 
-def _warn_area_text(
-    event: JmaEewEvent,
-    translated_terms: Mapping[str, str] | None = None,
-) -> str:
-    lines = []
-    for area in event.warn_areas[:10]:
-        intensity = area.maximum_intensity or area.minimum_intensity or "미상"
-        area_name = _bilingual_text(area.name, translated_terms)
-        arrival = (
-            f" | {_bilingual_text(area.arrival_status, translated_terms)}"
-            if area.arrival_status
-            else ""
-        )
-        lines.append(f"{area_name}: 진도 {intensity}{arrival}")
-    if len(event.warn_areas) > 10:
-        lines.append(f"외 {len(event.warn_areas) - 10}개 지역")
-    return "\n".join(lines)
-
-
-def _bilingual_text(
-    original: str,
-    translated_terms: Mapping[str, str] | None,
-) -> str:
-    if not translated_terms:
-        return original
-    translated = str(translated_terms.get(original) or "").strip()
-    if not translated or translated == original:
-        return original
-    return f"{original}({translated})"
-
-
-def _jma_eew_color(event: JmaEewEvent) -> discord.Color:
-    if event.is_cancelled:
+def _emsc_color(event: EmscEvent) -> discord.Color:
+    if event.is_deleted:
         return discord.Color.light_grey()
     if event.magnitude is not None and event.magnitude >= 6.0:
         return discord.Color.red()
@@ -549,17 +447,27 @@ def _jma_eew_color(event: JmaEewEvent) -> discord.Color:
     return discord.Color.light_grey()
 
 
+def _skip_all(
+    channels: dict[int, int],
+    event: EmscEvent,
+    action: str,
+) -> list[EarthquakeAlertResult]:
+    return [
+        _skipped_result(guild_id, channel_id, event, action)
+        for guild_id, channel_id in channels.items()
+    ]
+
+
 def _skipped_result(
     guild_id: int,
     channel_id: int,
-    event: JmaEewEvent,
+    event: EmscEvent,
     action: str,
 ) -> EarthquakeAlertResult:
     return EarthquakeAlertResult(
         guild_id=guild_id,
         channel_id=channel_id,
         event_id=event.event_id,
-        serial=event.serial,
         status="skipped",
         action=action,
     )
@@ -568,7 +476,7 @@ def _skipped_result(
 def _error_result(
     guild_id: int,
     channel_id: int,
-    event: JmaEewEvent,
+    event: EmscEvent,
     action: str,
     error: Exception,
     *,
@@ -578,7 +486,6 @@ def _error_result(
         guild_id=guild_id,
         channel_id=channel_id,
         event_id=event.event_id,
-        serial=event.serial,
         message_id=message_id,
         status="error",
         action=action,

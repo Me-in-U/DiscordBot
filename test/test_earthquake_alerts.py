@@ -20,7 +20,28 @@ from util.earthquake.alerts import (
     process_jma_eew_event,
     send_jma_eew_alert,
 )
+from util.earthquake.emsc import (
+    EMSC_KOREA_EVERYONE_MAGNITUDE,
+    EMSC_KOREA_MIN_MAGNITUDE,
+    EMSC_MIN_MAGNITUDE,
+    EmscEvent,
+    is_japan_emsc_event,
+    is_korea_emsc_event,
+    minimum_magnitude_for_emsc_event,
+    parse_emsc_message,
+)
+from util.earthquake.emsc_alerts import (
+    build_emsc_embed,
+    edit_emsc_alert,
+    process_emsc_event,
+    send_emsc_alert,
+)
+from util.earthquake.emsc_stream import (
+    _recover_emsc_updates,
+    consume_emsc_messages,
+)
 from util.earthquake.jma_eew import (
+    JMA_EEW_MIN_MAGNITUDE,
     JmaEewEvent,
     is_recent_jma_eew,
     parse_jma_eew_message,
@@ -33,7 +54,10 @@ from util.earthquake.map_image import (
 )
 from util.earthquake.state import (
     EarthquakeAlertState,
+    EmscAlertState,
+    find_emsc_record,
     find_jma_eew_record,
+    remember_emsc_message,
     remember_jma_eew_message,
 )
 from util.earthquake.stream import consume_jma_eew_messages
@@ -103,6 +127,53 @@ def _event(**overrides) -> JmaEewEvent:
     return event
 
 
+def _emsc_payload(
+    *,
+    event_id: str = "20260810_0000344",
+    action: str = "create",
+    magnitude: float = 6.5,
+    region: str = "OFF COAST OF TARAPACA, CHILE",
+    latitude: float = -18.63,
+    longitude: float = -71.1,
+    updated_offset_seconds: int = 0,
+    event_type: str = "ke",
+) -> dict:
+    occurred_at = NOW - timedelta(seconds=30)
+    updated_at = NOW + timedelta(seconds=updated_offset_seconds)
+    return {
+        "action": action,
+        "data": {
+            "type": "Feature",
+            "id": event_id,
+            "geometry": {
+                "type": "Point",
+                "coordinates": [longitude, latitude, -28.3],
+            },
+            "properties": {
+                "source_id": "2040866",
+                "source_catalog": "EMSC-RTS",
+                "lastupdate": updated_at.isoformat().replace("+00:00", "Z"),
+                "time": occurred_at.isoformat().replace("+00:00", "Z"),
+                "flynn_region": region,
+                "lat": latitude,
+                "lon": longitude,
+                "depth": 28.3,
+                "evtype": event_type,
+                "auth": "CSN",
+                "mag": magnitude,
+                "magtype": "ml",
+                "unid": event_id,
+            },
+        },
+    }
+
+
+def _emsc_event(**overrides) -> EmscEvent:
+    event = parse_emsc_message(_emsc_payload(**overrides))
+    assert event is not None
+    return event
+
+
 class JmaEewParserTests(unittest.TestCase):
     def test_parses_wolfx_jma_eew_payload(self):
         event = _event(serial=8, magnitude=4.3, is_final=True)
@@ -136,15 +207,17 @@ class JmaEewParserTests(unittest.TestCase):
         loop_source = LOOP_PATH.read_text(encoding="utf-8")
 
         self.assertIn(
-            '"earthquake_alert": "일본지진알림"',
+            '"earthquake_alert": "지진알림"',
             channel_source,
         )
         self.assertIn(
-            'name="일본지진알림"',
+            'name="지진알림"',
             channel_source,
         )
         self.assertIn('"jma_eew_stream"', loop_source)
         self.assertIn("run_jma_eew_stream(self.bot)", loop_source)
+        self.assertIn('"emsc_earthquake_stream"', loop_source)
+        self.assertIn("run_emsc_stream(self.bot)", loop_source)
 
     def test_exposes_alert_command_and_documents_delivery_pair(self):
         cog_source = EARTHQUAKE_COG_PATH.read_text(encoding="utf-8")
@@ -159,10 +232,71 @@ class JmaEewParserTests(unittest.TestCase):
         self.assertIn("/지진알림", readme_source)
         self.assertIn("@everyone", help_source)
         self.assertIn("@everyone", readme_source)
+        self.assertIn("EMSC", cog_source)
+        self.assertIn("EMSC", help_source)
+        self.assertIn("EMSC", readme_source)
+        self.assertNotIn("일본지진알림", help_source)
+        self.assertNotIn("일본지진알림", readme_source)
         for source in (cog_source, help_source, loop_source, readme_source):
             self.assertIn("M5.9", source)
+            self.assertIn("M5.0", source)
+            self.assertIn("M6.5", source)
+        self.assertIn("한국 M5.5 이상은 @everyone", help_source)
+        self.assertIn("한국 M5.5 이상은 사건당 한 번 @everyone", cog_source)
+        self.assertIn("| 한국 및 한반도 인접 해역 | EMSC/CSEM | M5.0 이상 | M5.5 이상 |", readme_source)
+        self.assertIn("그 밖의 국가에서 발생한 EMSC 지진은 규모와 관계없이 멘션하지 않습니다", readme_source)
         self.assertIn("Notification Delivery Pairing", agents_source)
         self.assertIn("same `channel_type` key", agents_source)
+
+
+class EmscParserTests(unittest.TestCase):
+    def test_parses_emsc_standing_order_payload(self):
+        event = _emsc_event(magnitude=6.1)
+
+        self.assertEqual(event.event_id, "20260810_0000344")
+        self.assertEqual(event.magnitude, 6.1)
+        self.assertEqual(event.depth_km, 28.3)
+        self.assertEqual(event.region, "OFF COAST OF TARAPACA, CHILE")
+        self.assertEqual(event.authority, "CSN")
+        self.assertEqual(event.event_type, "ke")
+        self.assertFalse(event.is_deleted)
+
+    def test_uses_higher_send_threshold_than_jma(self):
+        self.assertEqual(JMA_EEW_MIN_MAGNITUDE, 5.9)
+        self.assertEqual(EMSC_KOREA_MIN_MAGNITUDE, 5.0)
+        self.assertEqual(EMSC_KOREA_EVERYONE_MAGNITUDE, 5.5)
+        self.assertEqual(EMSC_MIN_MAGNITUDE, 6.5)
+
+    def test_detects_japan_region_for_duplicate_prevention(self):
+        event = _emsc_event(
+            region="NEAR EAST COAST OF HONSHU, JAPAN",
+        )
+
+        self.assertTrue(is_japan_emsc_event(event))
+
+    def test_detects_korea_by_region_and_coordinates(self):
+        region_event = _emsc_event(region="SOUTH KOREA")
+        coordinate_event = _emsc_event(
+            region="YELLOW SEA",
+            latitude=35.5,
+            longitude=125.8,
+        )
+
+        self.assertTrue(is_korea_emsc_event(region_event))
+        self.assertTrue(is_korea_emsc_event(coordinate_event))
+        self.assertEqual(
+            minimum_magnitude_for_emsc_event(region_event),
+            5.0,
+        )
+        self.assertEqual(
+            minimum_magnitude_for_emsc_event(_emsc_event()),
+            6.5,
+        )
+
+    def test_marks_delete_action(self):
+        event = _emsc_event(action="delete")
+
+        self.assertTrue(event.is_deleted)
 
 
 class EarthquakeStateTests(unittest.TestCase):
@@ -186,6 +320,29 @@ class EarthquakeStateTests(unittest.TestCase):
         self.assertIsNotNone(record)
         self.assertEqual(record.serial, 2)
         self.assertEqual(record.message_id, 900)
+        self.assertTrue(record.everyone_notified)
+        self.assertEqual(len(state.records), 1)
+
+    def test_remembers_latest_emsc_revision_and_message(self):
+        state = EmscAlertState(channel_id=100)
+        state = remember_emsc_message(
+            state,
+            event_id="event-1",
+            revision="2026-08-10T10:00:00+00:00",
+            message_id=900,
+            everyone_notified=True,
+        )
+        state = remember_emsc_message(
+            state,
+            event_id="event-1",
+            revision="2026-08-10T10:01:00+00:00",
+            message_id=901,
+        )
+
+        record = find_emsc_record(state, "event-1")
+        self.assertIsNotNone(record)
+        self.assertEqual(record.revision, "2026-08-10T10:01:00+00:00")
+        self.assertEqual(record.message_id, 901)
         self.assertTrue(record.everyone_notified)
         self.assertEqual(len(state.records), 1)
 
@@ -832,6 +989,492 @@ class JmaEewAlertTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(cancelled.color, discord.Color.light_grey())
 
 
+class EmscAlertTests(unittest.IsolatedAsyncioTestCase):
+    async def test_sends_first_korea_magnitude_five_event(self):
+        event = _emsc_event(
+            magnitude=5.0,
+            region="SOUTH KOREA",
+        )
+        sent_events = []
+
+        async def get_channels():
+            return {1: 100}
+
+        async def load(_guild_id):
+            return EmscAlertState(channel_id=100)
+
+        async def save(_guild_id, _state):
+            return None
+
+        async def resolve(_bot, _channel_id):
+            return object()
+
+        async def send(_target, sent_event, notify_everyone):
+            sent_events.append(sent_event)
+            self.assertFalse(notify_everyone)
+            return 900
+
+        results = await process_emsc_event(
+            object(),
+            event,
+            get_channels=get_channels,
+            load_state=load,
+            save_state=save,
+            resolve_channel=resolve,
+            send_alert=send,
+        )
+
+        self.assertEqual(results[0].action, "sent")
+        self.assertEqual(sent_events, [event])
+
+    async def test_skips_first_korea_event_below_magnitude_five(self):
+        event = _emsc_event(
+            magnitude=4.9,
+            region="SOUTH KOREA",
+        )
+
+        async def get_channels():
+            return {1: 100}
+
+        async def send(_target, _event, _notify_everyone):
+            raise AssertionError("한국 EMSC M5.0 미만은 보내면 안 됩니다.")
+
+        results = await process_emsc_event(
+            object(),
+            event,
+            get_channels=get_channels,
+            send_alert=send,
+        )
+
+        self.assertEqual(results[0].status, "skipped")
+        self.assertEqual(results[0].action, "below_threshold")
+
+    async def test_sends_first_magnitude_six_point_five_event(self):
+        event = _emsc_event(magnitude=6.5)
+        saved_states = []
+        sent_events = []
+
+        async def get_channels():
+            return {1: 100}
+
+        async def load(_guild_id):
+            return EmscAlertState(channel_id=100)
+
+        async def save(_guild_id, state):
+            saved_states.append(state)
+
+        async def resolve(_bot, _channel_id):
+            return object()
+
+        async def send(_target, sent_event, notify_everyone):
+            sent_events.append(sent_event)
+            self.assertFalse(notify_everyone)
+            return 900
+
+        results = await process_emsc_event(
+            object(),
+            event,
+            get_channels=get_channels,
+            load_state=load,
+            save_state=save,
+            resolve_channel=resolve,
+            send_alert=send,
+        )
+
+        self.assertEqual(results[0].action, "sent")
+        self.assertEqual(sent_events, [event])
+        self.assertEqual(
+            find_emsc_record(saved_states[0], event.event_id).message_id,
+            900,
+        )
+
+    async def test_skips_first_event_below_magnitude_six_point_five(self):
+        event = _emsc_event(magnitude=6.4)
+
+        async def get_channels():
+            return {1: 100}
+
+        async def load(_guild_id):
+            return EmscAlertState(channel_id=100)
+
+        async def send(_target, _event, _notify_everyone):
+            raise AssertionError("EMSC M6.5 미만은 보내면 안 됩니다.")
+
+        results = await process_emsc_event(
+            object(),
+            event,
+            get_channels=get_channels,
+            load_state=load,
+            send_alert=send,
+        )
+
+        self.assertEqual(results[0].status, "skipped")
+        self.assertEqual(results[0].action, "below_threshold")
+
+    async def test_skips_japan_event_to_avoid_jma_duplicate(self):
+        event = _emsc_event(region="HOKKAIDO, JAPAN REGION")
+
+        async def get_channels():
+            return {1: 100}
+
+        results = await process_emsc_event(
+            object(),
+            event,
+            get_channels=get_channels,
+        )
+
+        self.assertEqual(results[0].status, "skipped")
+        self.assertEqual(results[0].action, "japan_duplicate")
+
+    async def test_edits_tracked_event_when_emsc_updates_it(self):
+        first_event = _emsc_event(magnitude=6.6)
+        event = _emsc_event(
+            action="update",
+            magnitude=6.3,
+            updated_offset_seconds=60,
+        )
+        initial_state = remember_emsc_message(
+            EmscAlertState(channel_id=100),
+            event_id=first_event.event_id,
+            revision=first_event.revision,
+            message_id=900,
+        )
+        edited = []
+        saved_states = []
+
+        async def get_channels():
+            return {1: 100}
+
+        async def load(_guild_id):
+            return initial_state
+
+        async def save(_guild_id, state):
+            saved_states.append(state)
+
+        async def resolve(_bot, _channel_id):
+            return object()
+
+        async def edit(
+            _target,
+            message_id,
+            edited_event,
+            notify_everyone,
+        ):
+            edited.append((message_id, edited_event, notify_everyone))
+            return message_id
+
+        results = await process_emsc_event(
+            object(),
+            event,
+            get_channels=get_channels,
+            load_state=load,
+            save_state=save,
+            resolve_channel=resolve,
+            edit_alert=edit,
+        )
+
+        self.assertEqual(results[0].action, "edited")
+        self.assertEqual(edited, [(900, event, False)])
+        self.assertEqual(
+            find_emsc_record(saved_states[0], event.event_id).revision,
+            event.revision,
+        )
+
+    async def test_delete_edits_tracked_message(self):
+        first_event = _emsc_event(magnitude=6.5)
+        event = _emsc_event(
+            action="delete",
+            magnitude=6.5,
+            updated_offset_seconds=60,
+        )
+        initial_state = remember_emsc_message(
+            EmscAlertState(channel_id=100),
+            event_id=first_event.event_id,
+            revision=first_event.revision,
+            message_id=900,
+        )
+
+        async def get_channels():
+            return {1: 100}
+
+        async def load(_guild_id):
+            return initial_state
+
+        async def save(_guild_id, _state):
+            return None
+
+        async def resolve(_bot, _channel_id):
+            return object()
+
+        async def edit(
+            _target,
+            message_id,
+            _event,
+            _notify_everyone,
+        ):
+            return message_id
+
+        results = await process_emsc_event(
+            object(),
+            event,
+            get_channels=get_channels,
+            load_state=load,
+            save_state=save,
+            resolve_channel=resolve,
+            edit_alert=edit,
+        )
+
+        self.assertEqual(results[0].action, "cancelled")
+
+    async def test_korea_magnitude_five_point_five_notifies_once(self):
+        state = EmscAlertState(channel_id=100)
+        notifications = []
+
+        async def get_channels():
+            return {1: 100}
+
+        async def load(_guild_id):
+            return state
+
+        async def save(_guild_id, updated_state):
+            nonlocal state
+            state = updated_state
+
+        async def resolve(_bot, _channel_id):
+            return object()
+
+        async def send(_target, _event, notify_everyone):
+            notifications.append(notify_everyone)
+            return 900
+
+        async def edit(
+            _target,
+            message_id,
+            _event,
+            notify_everyone,
+        ):
+            notifications.append(notify_everyone)
+            return message_id
+
+        for event in (
+            _emsc_event(magnitude=5.0, region="SOUTH KOREA"),
+            _emsc_event(
+                action="update",
+                magnitude=5.5,
+                region="SOUTH KOREA",
+                updated_offset_seconds=60,
+            ),
+            _emsc_event(
+                action="update",
+                magnitude=5.6,
+                region="SOUTH KOREA",
+                updated_offset_seconds=120,
+            ),
+        ):
+            await process_emsc_event(
+                object(),
+                event,
+                get_channels=get_channels,
+                load_state=load,
+                save_state=save,
+                resolve_channel=resolve,
+                send_alert=send,
+                edit_alert=edit,
+            )
+
+        self.assertEqual(notifications, [False, True, False])
+        record = find_emsc_record(state, "20260810_0000344")
+        self.assertTrue(record.everyone_notified)
+
+    async def test_non_korea_magnitude_seven_never_notifies_everyone(self):
+        state = EmscAlertState(channel_id=100)
+        notifications = []
+
+        async def get_channels():
+            return {1: 100}
+
+        async def load(_guild_id):
+            return state
+
+        async def save(_guild_id, updated_state):
+            nonlocal state
+            state = updated_state
+
+        async def resolve(_bot, _channel_id):
+            return object()
+
+        async def send(_target, _event, notify_everyone):
+            notifications.append(notify_everyone)
+            return 900
+
+        async def edit(
+            _target,
+            message_id,
+            _event,
+            notify_everyone,
+        ):
+            notifications.append(notify_everyone)
+            return message_id
+
+        for event in (
+            _emsc_event(magnitude=6.5),
+            _emsc_event(
+                action="update",
+                magnitude=7.0,
+                updated_offset_seconds=60,
+            ),
+            _emsc_event(
+                action="update",
+                magnitude=7.1,
+                updated_offset_seconds=120,
+            ),
+        ):
+            await process_emsc_event(
+                object(),
+                event,
+                get_channels=get_channels,
+                load_state=load,
+                save_state=save,
+                resolve_channel=resolve,
+                send_alert=send,
+                edit_alert=edit,
+            )
+
+        self.assertEqual(notifications, [False, False, False])
+        record = find_emsc_record(state, "20260810_0000344")
+        self.assertFalse(record.everyone_notified)
+
+    def test_embed_matches_jma_layout_and_color_style(self):
+        embed = build_emsc_embed(
+            _emsc_event(magnitude=6.0),
+            include_map=True,
+        )
+
+        self.assertEqual(
+            [field.name for field in embed.fields[:6]],
+            [
+                "규모",
+                "깊이",
+                "최대 예상 진도",
+                "발표 단계",
+                "발표 시각",
+                "발생 추정",
+            ],
+        )
+        self.assertTrue(all(field.inline for field in embed.fields[:6]))
+        self.assertEqual(embed.fields[2].value, "제공 안 함")
+        self.assertEqual(embed.color, discord.Color.red())
+        self.assertEqual(
+            embed.image.url,
+            f"attachment://{EARTHQUAKE_MAP_FILENAME}",
+        )
+        self.assertIn("EMSC/CSEM", embed.footer.text)
+
+    async def test_send_never_mentions_everyone_for_non_korea_emsc(self):
+        target = SimpleNamespace(
+            send=AsyncMock(return_value=SimpleNamespace(id=900))
+        )
+
+        with patch(
+            "util.earthquake.emsc_alerts.build_earthquake_map_file",
+            new=AsyncMock(return_value=None),
+        ):
+            message_id = await send_emsc_alert(
+                target,
+                _emsc_event(magnitude=7.5),
+                notify_everyone=True,
+            )
+
+        self.assertEqual(message_id, 900)
+        send_options = target.send.await_args.kwargs
+        self.assertNotIn("content", send_options)
+        self.assertFalse(send_options["allowed_mentions"].everyone)
+        self.assertFalse(send_options["allowed_mentions"].users)
+        self.assertFalse(send_options["allowed_mentions"].roles)
+
+    async def test_send_mentions_everyone_for_korea_magnitude_five_point_five(self):
+        target = SimpleNamespace(
+            send=AsyncMock(return_value=SimpleNamespace(id=900))
+        )
+
+        with patch(
+            "util.earthquake.emsc_alerts.build_earthquake_map_file",
+            new=AsyncMock(return_value=None),
+        ):
+            message_id = await send_emsc_alert(
+                target,
+                _emsc_event(
+                    magnitude=5.5,
+                    region="SOUTH KOREA",
+                ),
+            )
+
+        self.assertEqual(message_id, 900)
+        send_options = target.send.await_args.kwargs
+        self.assertEqual(send_options["content"], "@everyone")
+        self.assertTrue(send_options["allowed_mentions"].everyone)
+        self.assertFalse(send_options["allowed_mentions"].users)
+        self.assertFalse(send_options["allowed_mentions"].roles)
+
+    async def test_edit_non_korea_removes_any_existing_everyone_content(self):
+        message = SimpleNamespace(
+            id=900,
+            attachments=[],
+            edit=AsyncMock(),
+        )
+        target = SimpleNamespace(
+            fetch_message=AsyncMock(return_value=message)
+        )
+
+        with patch(
+            "util.earthquake.emsc_alerts.build_earthquake_map_file",
+            new=AsyncMock(return_value=None),
+        ):
+            message_id = await edit_emsc_alert(
+                target,
+                900,
+                _emsc_event(action="update", magnitude=7.5),
+                notify_everyone=True,
+            )
+
+        self.assertEqual(message_id, 900)
+        edit_options = message.edit.await_args.kwargs
+        self.assertIsNone(edit_options["content"])
+        self.assertFalse(edit_options["allowed_mentions"].everyone)
+
+    async def test_edit_replaces_korea_message_when_threshold_is_crossed(self):
+        message = SimpleNamespace(
+            id=900,
+            attachments=[],
+            delete=AsyncMock(),
+        )
+        target = SimpleNamespace(
+            fetch_message=AsyncMock(return_value=message),
+            send=AsyncMock(return_value=SimpleNamespace(id=901)),
+        )
+
+        with patch(
+            "util.earthquake.emsc_alerts.build_earthquake_map_file",
+            new=AsyncMock(return_value=None),
+        ):
+            message_id = await edit_emsc_alert(
+                target,
+                900,
+                _emsc_event(
+                    action="update",
+                    magnitude=5.5,
+                    region="SOUTH KOREA",
+                ),
+                notify_everyone=True,
+            )
+
+        self.assertEqual(message_id, 901)
+        message.delete.assert_awaited_once_with()
+        send_options = target.send.await_args.kwargs
+        self.assertEqual(send_options["content"], "@everyone")
+        self.assertTrue(send_options["allowed_mentions"].everyone)
+
+
 class JmaEewStreamTests(unittest.IsolatedAsyncioTestCase):
     async def test_consumes_heartbeat_and_eew_message(self):
         class FakeWebSocket:
@@ -877,6 +1520,94 @@ class JmaEewStreamTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(count, 1)
         self.assertEqual(websocket.sent, ["ping"])
         self.assertEqual(processed_events[0].magnitude, 4.3)
+
+
+class EmscStreamTests(unittest.IsolatedAsyncioTestCase):
+    async def test_consumes_emsc_standing_order_message(self):
+        class FakeWebSocket:
+            def __init__(self):
+                self.messages = [
+                    SimpleNamespace(
+                        type=aiohttp.WSMsgType.TEXT,
+                        data=json.dumps(
+                            _emsc_payload(),
+                            ensure_ascii=False,
+                        ),
+                    ),
+                ]
+
+            def __aiter__(self):
+                self._iterator = iter(self.messages)
+                return self
+
+            async def __anext__(self):
+                try:
+                    return next(self._iterator)
+                except StopIteration:
+                    raise StopAsyncIteration
+
+        processed_events = []
+
+        async def process(_bot, event):
+            processed_events.append(event)
+            return []
+
+        count = await consume_emsc_messages(
+            object(),
+            FakeWebSocket(),
+            process_event=process,
+        )
+
+        self.assertEqual(count, 1)
+        self.assertEqual(processed_events[0].event_id, "20260810_0000344")
+        self.assertEqual(processed_events[0].magnitude, 6.5)
+
+    async def test_recovers_recent_updates_after_reconnect(self):
+        class FakeResponse:
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *_args):
+                return False
+
+            def raise_for_status(self):
+                return None
+
+            async def json(self):
+                return {
+                    "type": "FeatureCollection",
+                    "features": [_emsc_payload()["data"]],
+                }
+
+        class FakeSession:
+            def __init__(self):
+                self.url = None
+                self.params = None
+
+            def get(self, url, *, params):
+                self.url = url
+                self.params = params
+                return FakeResponse()
+
+        session = FakeSession()
+        processed_events = []
+
+        async def process(_bot, event):
+            processed_events.append(event)
+            return []
+
+        count = await _recover_emsc_updates(
+            object(),
+            session,
+            process_event=process,
+            log=lambda _message: None,
+            now=NOW,
+        )
+
+        self.assertEqual(count, 1)
+        self.assertEqual(session.params["minmag"], "5.0")
+        self.assertIn("updatedafter", session.params)
+        self.assertEqual(processed_events[0].action, "update")
 
 
 if __name__ == "__main__":

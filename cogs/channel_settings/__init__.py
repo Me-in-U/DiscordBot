@@ -14,9 +14,9 @@ PURPOSE_CHOICES = {
     "youtube": "유튜브",
     "maplestory_notice": "메이플공지",
     "codex_reset": "코덱스리셋",
-    "earthquake_alert": "일본지진알림",
+    "earthquake_alert": "지진알림",
 }
-PURPOSE_DESCRIPTION = "기념일/도박/음악/유튜브/메이플공지/코덱스리셋/일본지진알림"
+PURPOSE_DESCRIPTION = "기념일/도박/음악/유튜브/메이플공지/코덱스리셋/지진알림"
 
 
 def _add_current_channel_fields(
@@ -55,7 +55,7 @@ class ChannelSettings(commands.Cog):
             app_commands.Choice(name="메이플공지", value="maplestory_notice"),
             app_commands.Choice(name="코덱스리셋", value="codex_reset"),
             app_commands.Choice(
-                name="일본지진알림",
+                name="지진알림",
                 value="earthquake_alert",
             ),
         ]

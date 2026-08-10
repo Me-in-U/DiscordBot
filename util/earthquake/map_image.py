@@ -8,13 +8,11 @@ import tempfile
 import time
 from collections.abc import Awaitable, Callable
 from pathlib import Path
+from typing import Protocol
 
 import aiohttp
 import discord
 from PIL import Image, ImageDraw, ImageFont
-
-from util.earthquake.jma_eew import JmaEewEvent
-
 
 EARTHQUAKE_MAP_FILENAME = "earthquake-map.png"
 EARTHQUAKE_MAP_WIDTH = 640
@@ -35,8 +33,22 @@ logger = logging.getLogger(__name__)
 LoadTile = Callable[[int, int, int], Awaitable[bytes]]
 
 
+class EarthquakeMapEvent(Protocol):
+    event_id: str
+    latitude: float | None
+    longitude: float | None
+
+
 async def build_jma_eew_map_file(
-    event: JmaEewEvent,
+    event: EarthquakeMapEvent,
+    *,
+    load_tile: LoadTile | None = None,
+) -> discord.File | None:
+    return await build_earthquake_map_file(event, load_tile=load_tile)
+
+
+async def build_earthquake_map_file(
+    event: EarthquakeMapEvent,
     *,
     load_tile: LoadTile | None = None,
 ) -> discord.File | None:
@@ -74,9 +86,9 @@ async def build_jma_eew_map_file(
         ValueError,
     ):
         logger.warning(
-            "지진 추정 진원 지도 생성 실패: event=%s serial=%s",
+            "지진 추정 진원 지도 생성 실패: event=%s revision=%s",
             event.event_id,
-            event.serial,
+            getattr(event, "serial", getattr(event, "revision", "unknown")),
             exc_info=True,
         )
         return None
@@ -87,7 +99,7 @@ async def build_jma_eew_map_file(
     )
 
 
-def build_openstreetmap_url(event: JmaEewEvent) -> str | None:
+def build_openstreetmap_url(event: EarthquakeMapEvent) -> str | None:
     if event.latitude is None or event.longitude is None:
         return None
     return (

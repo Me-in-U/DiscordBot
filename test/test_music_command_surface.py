@@ -119,13 +119,13 @@ class MusicCommandSurfaceTests(unittest.TestCase):
             text,
         )
         self.assertIn(
-            "기념일/도박/음악/유튜브/메이플공지/코덱스리셋/일본지진알림",
+            "기념일/도박/음악/유튜브/메이플공지/코덱스리셋/지진알림",
             text,
         )
         self.assertIn("for purpose_key, purpose_label in PURPOSE_CHOICES.items()", text)
         self.assertIn("summary.get(purpose_key)", text)
         self.assertIn(
-            "기념일/도박/음악/유튜브/메이플공지/코덱스리셋/일본지진알림",
+            "기념일/도박/음악/유튜브/메이플공지/코덱스리셋/지진알림",
             help_text,
         )
         self.assertIn("현재 채널 shortcut으로", help_text)
@@ -153,7 +153,7 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         self.assertIn(("현재 메이플공지 채널", "<#9876>", True), embed.fields)
         self.assertIn(("현재 코덱스리셋 채널", "<#1234>", True), embed.fields)
         self.assertIn(
-            ("현재 일본지진알림 채널", "<#5678>", True),
+            ("현재 지진알림 채널", "<#5678>", True),
             embed.fields,
         )
 
