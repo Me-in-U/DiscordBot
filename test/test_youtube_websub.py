@@ -5,6 +5,7 @@ import util.youtube.websub as youtube_websub
 
 from util.youtube.websub import (
     YouTubeVideoStatus,
+    build_youtube_feed_fallback_urls,
     build_youtube_websub_callback_url,
     build_youtube_websub_request_data,
     build_youtube_upload_notification_message,
@@ -63,6 +64,15 @@ class YouTubeWebSubTests(unittest.TestCase):
         self.assertEqual(
             build_youtube_feed_topic_url("UC_TEST"),
             "https://www.youtube.com/feeds/videos.xml?channel_id=UC_TEST",
+        )
+
+    def test_builds_feed_polling_fallback_urls(self):
+        self.assertEqual(
+            build_youtube_feed_fallback_urls("UC_TEST"),
+            (
+                "https://www.youtube.com/feeds/videos.xml?channel_id=UC_TEST",
+                "https://www.youtube.com/xml/feeds/videos.xml?channel_id=UC_TEST",
+            ),
         )
 
     def test_builds_websub_callback_url_with_verify_token(self):

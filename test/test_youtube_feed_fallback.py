@@ -114,6 +114,7 @@ class YouTubeFeedFallbackTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(state.seen_updates[1]), 50)
 
     async def test_fetch_feed_entries_parses_atom_and_returns_empty_on_http_error(self):
+        failure_logs = []
         success_entries = await fetch_youtube_feed_entries(
             _Session(
                 200,
@@ -137,11 +138,53 @@ class YouTubeFeedFallbackTests(unittest.IsolatedAsyncioTestCase):
         failed_entries = await fetch_youtube_feed_entries(
             _Session(500, "server error"),
             _subscription(),
-            log=lambda _message: None,
+            log=failure_logs.append,
         )
 
         self.assertEqual([entry.video_id for entry in success_entries], ["VIDEO123"])
         self.assertEqual(failed_entries, [])
+        self.assertEqual(len(failure_logs), 1)
+        self.assertNotIn("server error", failure_logs[0])
+        self.assertIn("route=1 status=500", failure_logs[0])
+        self.assertIn("route=2 status=500", failure_logs[0])
+
+    async def test_fetch_feed_entries_uses_xml_route_after_primary_failure(self):
+        atom_xml = """<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns:yt="http://www.youtube.com/xml/schemas/2015"
+      xmlns="http://www.w3.org/2005/Atom">
+  <entry>
+    <yt:videoId>VIDEO456</yt:videoId>
+    <yt:channelId>UC_TEST</yt:channelId>
+    <title>대체 경로 영상</title>
+    <link rel="alternate" href="https://www.youtube.com/watch?v=VIDEO456"/>
+    <published>2026-08-13T01:00:00+00:00</published>
+    <updated>2026-08-13T01:10:00+00:00</updated>
+  </entry>
+</feed>
+"""
+        session = _SequenceSession(
+            [
+                _Response(404, "not found"),
+                _Response(200, atom_xml),
+            ]
+        )
+        logs = []
+
+        entries = await fetch_youtube_feed_entries(
+            session,
+            _subscription(),
+            log=logs.append,
+        )
+
+        self.assertEqual([entry.video_id for entry in entries], ["VIDEO456"])
+        self.assertEqual(
+            session.urls,
+            [
+                "https://www.youtube.com/feeds/videos.xml?channel_id=UC_TEST",
+                "https://www.youtube.com/xml/feeds/videos.xml?channel_id=UC_TEST",
+            ],
+        )
+        self.assertEqual(logs, [])
 
     async def test_poll_feed_fallback_processes_matching_entries_and_refreshes(self):
         state = YouTubeFeedFallbackState(
@@ -212,6 +255,16 @@ class _Response:
 
     async def text(self) -> str:
         return self.body
+
+
+class _SequenceSession:
+    def __init__(self, responses):
+        self.responses = list(responses)
+        self.urls = []
+
+    def get(self, url: str):
+        self.urls.append(url)
+        return self.responses.pop(0)
 
 
 if __name__ == "__main__":

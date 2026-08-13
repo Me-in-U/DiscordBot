@@ -1,5 +1,7 @@
 import asyncio
 import json
+import logging
+
 from api.chatGPT import custom_prompt_model
 from common.openai_prompt import build_prompt, build_single_image_content
 from util.db import execute_query
@@ -7,6 +9,7 @@ from util.db import execute_query
 
 FIND1557_FROM_IMAGE_PROMPT_ID = "pmpt_68ad1661f57c8190b18ab6adfaa69c4d0c4d98e2fa43e7fa"
 FIND1557_FROM_IMAGE_PROMPT_VERSION = "7"
+logger = logging.getLogger(__name__)
 
 
 def count1557(ocr_text: str) -> int:
@@ -73,16 +76,24 @@ async def find1557(message):
                     FIND1557_FROM_IMAGE_PROMPT_VERSION,
                 ),
             )
-        except Exception as e:
-            print("GPT 호출 중 예외 발생:", e)
+        except Exception as exc:
+            logger.warning(
+                "1557 이미지 분석 호출 실패: error=%s",
+                type(exc).__name__,
+            )
             # await message.channel.send("오류가 발생했습니다. 나중에 다시 시도해주세요.")
             return
         response = json.loads(response)
-        print("구조화된 응답:", response)
+        ocr_text = str(response.get("imageToText") or "")
+        logger.info(
+            "1557 이미지 분석 완료: exist=%s ocr_length=%s",
+            bool(response.get("exist")),
+            len(ocr_text),
+        )
         # 이미지 OCR 결과에 1557이 존재한다고 판별된 경우
         if response["exist"]:
             # OCR로 추출된 문자열 기준으로 1557 세트 수를 다시 계산
-            count = count1557(response["imageToText"])
+            count = count1557(ocr_text)
             if count:
                 # 이미지에서 찾은 세트 수를 디스코드 채팅으로 알리고 DB 카운트도 올림
                 # await message.channel.send(f"1557 {count}세트 발견", delete_after=2)

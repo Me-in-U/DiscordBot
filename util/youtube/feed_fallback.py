@@ -14,7 +14,7 @@ from util.youtube.subscriptions import (
 )
 from util.youtube.websub import (
     YouTubeAtomEntry,
-    build_youtube_feed_topic_url,
+    build_youtube_feed_fallback_urls,
     parse_youtube_atom_entries,
     should_process_youtube_feed_update,
 )
@@ -89,18 +89,23 @@ async def fetch_youtube_feed_entries(
     *,
     log: LogMessage = print,
 ) -> list[YouTubeAtomEntry]:
-    topic_url = build_youtube_feed_topic_url(subscription.channel_id)
-    async with session.get(topic_url) as response:
-        if response.status < 200 or response.status >= 300:
-            body = await response.text()
-            log(
-                "YouTube Atom feed 조회 실패: "
-                f"channel={subscription.channel_id} "
-                f"status={response.status} body={body[:300]}"
-            )
-            return []
-        atom_xml = await response.text()
-    return parse_youtube_atom_entries(atom_xml)
+    attempts: list[str] = []
+    feed_urls = build_youtube_feed_fallback_urls(subscription.channel_id)
+    for index, feed_url in enumerate(feed_urls, start=1):
+        try:
+            async with session.get(feed_url) as response:
+                if 200 <= response.status < 300:
+                    atom_xml = await response.text()
+                    return parse_youtube_atom_entries(atom_xml)
+                attempts.append(f"route={index} status={response.status}")
+        except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
+            attempts.append(f"route={index} error={type(exc).__name__}")
+
+    log(
+        "YouTube Atom feed 조회 실패: "
+        f"channel={subscription.channel_id} attempts={'; '.join(attempts)}"
+    )
+    return []
 
 
 async def poll_youtube_feed_fallback(

@@ -29,6 +29,11 @@ services:
       timeout: 10s
       retries: 5
       start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: ${BOT_LOG_MAX_SIZE:-10m}
+        max-file: ${BOT_LOG_MAX_FILES:-3}
     labels:
       - bot.display_name=discord bot 神
 

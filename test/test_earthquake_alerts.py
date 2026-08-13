@@ -38,6 +38,7 @@ from util.earthquake.emsc_alerts import (
 )
 from util.earthquake.emsc_stream import (
     _recover_emsc_updates,
+    _should_log_reconnect_failure,
     consume_emsc_messages,
 )
 from util.earthquake.jma_eew import (
@@ -1523,6 +1524,15 @@ class JmaEewStreamTests(unittest.IsolatedAsyncioTestCase):
 
 
 class EmscStreamTests(unittest.IsolatedAsyncioTestCase):
+    def test_throttles_repeated_connection_failure_logs(self):
+        logged_failures = {
+            count
+            for count in range(1, 22)
+            if _should_log_reconnect_failure(count)
+        }
+
+        self.assertEqual(logged_failures, {1, 10, 20})
+
     async def test_consumes_emsc_standing_order_message(self):
         class FakeWebSocket:
             def __init__(self):
@@ -1608,6 +1618,44 @@ class EmscStreamTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(session.params["minmag"], "5.0")
         self.assertIn("updatedafter", session.params)
         self.assertEqual(processed_events[0].action, "update")
+
+    async def test_empty_reconnect_backfill_response_is_not_an_error(self):
+        class FakeResponse:
+            status = 204
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *_args):
+                return False
+
+            def raise_for_status(self):
+                raise AssertionError("204 must be handled before raise_for_status")
+
+            async def json(self):
+                raise AssertionError("204 must not be decoded as JSON")
+
+        class FakeSession:
+            def get(self, _url, *, params):
+                self.params = params
+                return FakeResponse()
+
+        processed_events = []
+
+        async def process(_bot, event):
+            processed_events.append(event)
+            return []
+
+        count = await _recover_emsc_updates(
+            object(),
+            FakeSession(),
+            process_event=process,
+            log=lambda _message: None,
+            now=NOW,
+        )
+
+        self.assertEqual(count, 0)
+        self.assertEqual(processed_events, [])
 
 
 if __name__ == "__main__":

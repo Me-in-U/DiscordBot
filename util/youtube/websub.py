@@ -10,6 +10,9 @@ from xml.etree import ElementTree
 
 
 YOUTUBE_FEED_BASE_URL = "https://www.youtube.com/feeds/videos.xml"
+YOUTUBE_FEED_FALLBACK_BASE_URL = (
+    "https://www.youtube.com/xml/feeds/videos.xml"
+)
 YOUTUBE_HUB_URL = "https://pubsubhubbub.appspot.com/subscribe"
 YOUTUBE_SHORTS_MAX_SECONDS = 180
 
@@ -47,6 +50,14 @@ class YouTubeVideoLiveStatus:
 
 def build_youtube_feed_topic_url(channel_id: str) -> str:
     return f"{YOUTUBE_FEED_BASE_URL}?{urlencode({'channel_id': channel_id})}"
+
+
+def build_youtube_feed_fallback_urls(channel_id: str) -> tuple[str, str]:
+    query = urlencode({"channel_id": channel_id})
+    return (
+        f"{YOUTUBE_FEED_BASE_URL}?{query}",
+        f"{YOUTUBE_FEED_FALLBACK_BASE_URL}?{query}",
+    )
 
 
 def build_youtube_websub_callback_url(callback_url: str, verify_token: str) -> str:

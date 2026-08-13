@@ -21,6 +21,7 @@ from util.earthquake.emsc_alerts import process_emsc_event
 
 logger = logging.getLogger(__name__)
 EMSC_RECONNECT_BACKFILL_WINDOW = timedelta(minutes=10)
+EMSC_RECONNECT_LOG_EVERY_FAILURES = 10
 ProcessEvent = Callable[
     [object, EmscEvent],
     Awaitable[list[EarthquakeAlertResult]],
@@ -36,6 +37,7 @@ async def run_emsc_stream(
     log: LogMessage = print,
 ) -> None:
     reconnect_delay = 2
+    consecutive_failures = 0
     has_connected = False
     while not bot.is_closed():
         try:
@@ -48,6 +50,7 @@ async def run_emsc_stream(
                     headers={"User-Agent": "DiscordBot EMSC earthquake alerts"},
                 ) as websocket:
                     reconnect_delay = 2
+                    consecutive_failures = 0
                     log("EMSC 전 세계 지진 WebSocket 연결 완료")
                     if has_connected:
                         await _recover_emsc_updates(
@@ -70,8 +73,16 @@ async def run_emsc_stream(
             asyncio.TimeoutError,
             json.JSONDecodeError,
             ValueError,
-        ):
-            logger.warning("EMSC 지진 WebSocket 연결 오류", exc_info=True)
+        ) as exc:
+            consecutive_failures += 1
+            if _should_log_reconnect_failure(consecutive_failures):
+                logger.warning(
+                    "EMSC 지진 WebSocket 연결 오류: "
+                    "consecutive_failures=%s retry_in=%ss error=%s",
+                    consecutive_failures,
+                    reconnect_delay,
+                    type(exc).__name__,
+                )
 
         if bot.is_closed():
             return
@@ -101,6 +112,8 @@ async def _recover_emsc_updates(
             EMSC_FDSN_EVENT_URL,
             params=params,
         ) as response:
+            if getattr(response, "status", None) == 204:
+                return 0
             response.raise_for_status()
             payload = await response.json()
     except (
@@ -133,6 +146,13 @@ async def _recover_emsc_updates(
     if processed_count:
         log(f"EMSC 재연결 누락분 처리 완료: {processed_count}건")
     return processed_count
+
+
+def _should_log_reconnect_failure(failure_count: int) -> bool:
+    return failure_count == 1 or (
+        failure_count > 0
+        and failure_count % EMSC_RECONNECT_LOG_EVERY_FAILURES == 0
+    )
 
 
 async def consume_emsc_messages(

@@ -381,7 +381,7 @@ docker compose --env-file .env up -d --build
 docker compose --env-file .env ps
 ```
 
-Compose는 `127.0.0.1:1557:1557`로 Status API를 노출하고, 컨테이너에서 호스트 DB 접근을 위해 `host.docker.internal` host gateway를 추가합니다. Whisper 다운로드는 `whisper-model-cache` named volume에 보존되므로 애플리케이션 컨테이너 교체 때 같은 모델을 다시 받지 않습니다.
+Compose는 `127.0.0.1:1557:1557`로 Status API를 노출하고, 컨테이너에서 호스트 DB 접근을 위해 `host.docker.internal` host gateway를 추가합니다. Whisper 다운로드는 `whisper-model-cache` named volume에 보존되므로 애플리케이션 컨테이너 교체 때 같은 모델을 다시 받지 않습니다. Docker `json-file` 로그는 기본 10MB 파일 3개로 회전하며 `BOT_LOG_MAX_SIZE`와 `BOT_LOG_MAX_FILES`로 조정할 수 있습니다.
 
 ## 검증
 

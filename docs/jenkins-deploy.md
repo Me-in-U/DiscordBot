@@ -33,6 +33,7 @@
 - YouTube 요약은 `yt-dlp`, ffmpeg, OpenAI 호출을 같은 프로세스에서 사용하므로 동시 요청이 많으면 메모리와 CPU 사용량이 커질 수 있다.
 - 음성 대화/STT 기능은 기본적으로 Whisper `tiny` 모델을 CPU `int8`로 실행한다. GPU 모델은 CUDA 런타임을 별도로 준비하고 `VOICE_CHAT_WHISPER_DEVICE=cuda`를 명시한 경우에만 사용한다.
 - Whisper 모델 파일은 `whisper-model-cache` named volume에 보존되어 애플리케이션 컨테이너 교체 시 재다운로드되지 않는다.
+- Docker `json-file` 로그는 기본 `10m` 크기와 파일 3개로 회전한다. 필요하면 `BOT_LOG_MAX_SIZE`와 `BOT_LOG_MAX_FILES`를 배포 환경에서 조정한다.
 - YouTube 요약과 STT가 겹치면 처리 지연이나 OOM 가능성이 있다.
 - YouTube 요약 또는 STT를 운영에서 자주 쓰는 서버라면 1GB 이상 메모리 제한과 최소 1 vCPU 이상의 여유를 권장한다.
 - `health check` 실패가 반복되면 먼저 `docker compose ps`, 최근 컨테이너 로그, OOM kill 여부, host CPU/memory 사용량을 확인한다.

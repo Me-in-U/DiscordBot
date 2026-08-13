@@ -38,6 +38,13 @@ class DeploymentContractTests(unittest.TestCase):
 
         self.assertIn("ENV_FILE=${ENV_FILE:-.env}", compose)
 
+    def test_compose_rotates_container_logs(self):
+        compose = Path("docker-compose.yml").read_text(encoding="utf-8")
+
+        self.assertIn("driver: json-file", compose)
+        self.assertIn("max-size: ${BOT_LOG_MAX_SIZE:-10m}", compose)
+        self.assertIn("max-file: ${BOT_LOG_MAX_FILES:-3}", compose)
+
     def test_jenkins_runs_compile_and_unittest_before_deploy(self):
         text = Path("Jenkinsfile").read_text(encoding="utf-8")
 
