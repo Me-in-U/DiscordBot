@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import random
-import re
 from dataclasses import dataclass
-from typing import Sequence
+from typing import Collection, Sequence
 
 
 POSITIONS = ("탑", "정글", "미드", "원딜", "서폿")
@@ -26,40 +25,73 @@ class LolScrimMatch:
         return [slot.player for slot in (*self.red, *self.blue)]
 
 
-def parse_extra_players(text: str | None) -> list[str]:
-    if not text:
-        return []
+@dataclass(frozen=True, slots=True)
+class LolScrimParticipant:
+    user_id: int
+    label: str
 
-    normalized = text.strip()
-    if not normalized:
-        return []
 
-    if not re.search(r"[,;\n]", normalized):
-        return [normalized]
+class LolScrimRoster:
+    def __init__(self) -> None:
+        self._participants: dict[int, LolScrimParticipant] = {}
 
-    return [
-        player.strip()
-        for player in re.split(r"[,;\n]+", normalized)
-        if player.strip()
-    ]
+    @property
+    def count(self) -> int:
+        return len(self._participants)
+
+    @property
+    def is_full(self) -> bool:
+        return self.count == MAX_SCRIM_PLAYERS
+
+    def contains(self, user_id: int) -> bool:
+        return user_id in self._participants
+
+    def add(self, user_id: int, label: str) -> bool:
+        if self.contains(user_id):
+            return False
+        if self.is_full:
+            raise ValueError("내전 참가자는 최대 10명까지 등록할 수 있습니다.")
+
+        normalized_label = str(label).strip()
+        if not normalized_label:
+            raise ValueError("내전 참가자 이름은 비어 있을 수 없습니다.")
+
+        self._participants[user_id] = LolScrimParticipant(
+            user_id=user_id,
+            label=normalized_label,
+        )
+        return True
+
+    def remove(self, user_id: int) -> bool:
+        return self._participants.pop(user_id, None) is not None
+
+    def retain(self, user_ids: Collection[int]) -> list[int]:
+        retained_user_ids = set(user_ids)
+        removed_user_ids = [
+            user_id
+            for user_id in self._participants
+            if user_id not in retained_user_ids
+        ]
+        for user_id in removed_user_ids:
+            del self._participants[user_id]
+        return removed_user_ids
+
+    def labels(self) -> list[str]:
+        return [participant.label for participant in self._participants.values()]
 
 
 def build_lol_scrim_match(
-    voice_players: Sequence[str],
-    extra_players: Sequence[str] | None = None,
+    players: Sequence[str],
     *,
     rng: random.Random | None = None,
 ) -> LolScrimMatch:
     players = [
         str(player).strip()
-        for player in [*voice_players, *(extra_players or [])]
+        for player in players
         if str(player).strip()
     ]
-    if len(players) > MAX_SCRIM_PLAYERS:
-        raise ValueError("내전 인원은 최대 10명까지 가능합니다.")
-
-    missing_count = MAX_SCRIM_PLAYERS - len(players)
-    players.extend(f"인원{index}" for index in range(1, missing_count + 1))
+    if len(players) != MAX_SCRIM_PLAYERS:
+        raise ValueError("내전 팀 배정에는 정확히 10명이 필요합니다.")
 
     randomizer = rng or random
     shuffled_players = list(players)
@@ -81,6 +113,25 @@ def build_lol_scrim_match(
 
 def format_lol_scrim_team_slots(slots: Sequence[TeamSlot]) -> str:
     return "\n".join(f"`{slot.position}` **{slot.player}**" for slot in slots)
+
+
+def format_lol_scrim_roster(
+    participant_labels: Sequence[str],
+    *,
+    max_players: int = MAX_SCRIM_PLAYERS,
+) -> str:
+    if len(participant_labels) > max_players:
+        raise ValueError("표시할 참가자가 모집 정원을 초과했습니다.")
+
+    lines = [
+        f"`{index:02d}` {label}"
+        for index, label in enumerate(participant_labels, start=1)
+    ]
+    lines.extend(
+        f"`{index:02d}` 빈자리"
+        for index in range(len(participant_labels) + 1, max_players + 1)
+    )
+    return "\n".join(lines)
 
 
 def format_lol_scrim_match(match: LolScrimMatch) -> str:
