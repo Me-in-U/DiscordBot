@@ -223,6 +223,78 @@ class SurroundingMessageContextTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(context.previous_messages, "Alice: 이전 정상")
         self.assertEqual(context.following_messages, "Alice: 이후 정상")
 
+    async def test_build_surrounding_context_includes_nearby_image_inputs(self):
+        author = DummyAuthor(1, "Alice")
+        previous = DummyMessage(
+            "레전드 복구 좀 했다",
+            [DummyAttachment("https://cdn.example/previous.png", "image/png")],
+            message_id=19,
+            author=author,
+        )
+        target = DummyMessage("0.55퍼만 낮춰주셈", message_id=20, author=author)
+        following = DummyMessage(
+            "이 사진도 봐줘",
+            [DummyAttachment("https://cdn.example/following.png", "image/png")],
+            message_id=21,
+            author=author,
+        )
+        DummyChannel([previous, target, following])
+
+        context = await build_surrounding_message_context(target)
+
+        self.assertEqual(
+            context.previous_messages,
+            "Alice: 레전드 복구 좀 했다 (이전 메시지 첨부 이미지 1)",
+        )
+        self.assertEqual(
+            context.following_messages,
+            "Alice: 이 사진도 봐줘 (이후 메시지 첨부 이미지 1)",
+        )
+        self.assertEqual(
+            [(image.label, image.url) for image in context.images],
+            [
+                ("이전 메시지 첨부 이미지 1", "https://cdn.example/previous.png"),
+                ("이후 메시지 첨부 이미지 1", "https://cdn.example/following.png"),
+            ],
+        )
+
+    async def test_build_surrounding_context_caps_images_to_closest_four(self):
+        author = DummyAuthor(1, "Alice")
+        previous_messages = [
+            DummyMessage(
+                f"이전 이미지 {index}",
+                [
+                    DummyAttachment(
+                        f"https://cdn.example/previous-{index}.png",
+                        "image/png",
+                    )
+                ],
+                message_id=index,
+                author=author,
+            )
+            for index in range(1, 6)
+        ]
+        target = DummyMessage("해석 대상", message_id=10, author=author)
+        DummyChannel([*previous_messages, target])
+
+        context = await build_surrounding_message_context(target)
+
+        self.assertEqual(len(context.images), 4)
+        self.assertEqual(
+            [image.url for image in context.images],
+            [
+                "https://cdn.example/previous-5.png",
+                "https://cdn.example/previous-4.png",
+                "https://cdn.example/previous-3.png",
+                "https://cdn.example/previous-2.png",
+            ],
+        )
+        self.assertIn("Alice: 이전 이미지 1 (이미지 첨부)", context.previous_messages)
+        self.assertIn(
+            "Alice: 이전 이미지 5 (이전 메시지 첨부 이미지 1)",
+            context.previous_messages,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

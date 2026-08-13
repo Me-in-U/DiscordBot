@@ -8,8 +8,13 @@ from discord.ext import commands
 
 from api.chatGPT import custom_prompt_model
 from common.discord_ui import SafeView
-from common.openai_prompt import build_prompt, build_single_image_content
+from common.openai_prompt import (
+    build_labeled_image_content,
+    build_prompt,
+    build_single_image_content,
+)
 from util.message.context import (
+    MessageContextImage,
     build_message_action_target,
     build_message_select_label,
     build_recent_message_option,
@@ -18,7 +23,7 @@ from util.message.context import (
 from util.logging_utils import log_user_error
 
 INTERPRET_PROMPT_ID = "pmpt_68abf98a25b481938994e409ffd1ecf20db1ff235be9e7ab"
-INTERPRET_PROMPT_VERSION = "12"
+INTERPRET_PROMPT_VERSION = "16"
 logger = logging.getLogger(__name__)
 _INTERPRET_RESPONSE_LABEL_PATTERN = re.compile(
     r"(?i)\b(Reasoning|Conclusion|Hidden meaning)\s*:"
@@ -64,15 +69,28 @@ async def interpret_target(
     previous_messages: str = "",
     following_messages: str = "",
     prompt_version: str = INTERPRET_PROMPT_VERSION,
+    context_images: tuple[MessageContextImage, ...] = (),
 ) -> str:
     normalized_question = question.strip()
     if image_url and not normalized_question:
         normalized_question = "첨부 이미지를 해석해줘."
 
     try:
+        if context_images:
+            labeled_images = []
+            if image_url:
+                labeled_images.append(("해석 대상 첨부 이미지", image_url))
+            labeled_images.extend(
+                (context_image.label, context_image.url)
+                for context_image in context_images
+            )
+            image_content = build_labeled_image_content(labeled_images)
+        else:
+            image_content = build_single_image_content(image_url)
+
         response = await asyncio.to_thread(
             custom_prompt_model,
-            image_content=build_single_image_content(image_url),
+            image_content=image_content,
             prompt=build_prompt(
                 INTERPRET_PROMPT_ID,
                 prompt_version,
@@ -111,6 +129,7 @@ async def interpret_message_context_menu(
         target.image_url,
         previous_messages=context.previous_messages,
         following_messages=context.following_messages,
+        context_images=context.images,
     )
     await interaction.followup.send(interpreted)
 
@@ -193,6 +212,7 @@ class InterpretSelectView(SafeView):
             image_url,
             previous_messages=context.previous_messages,
             following_messages=context.following_messages,
+            context_images=context.images,
         )
 
         # 원본 메시지를 번역 결과로 덮어쓰기

@@ -9,6 +9,7 @@ from cogs.interpret import (
     format_interpret_response_for_discord,
     interpret_target,
 )
+from util.message.context import MessageContextImage
 
 
 class InterpretActionTests(unittest.TestCase):
@@ -76,7 +77,7 @@ class InterpretTargetTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(variables["previous_messages"], "")
         self.assertEqual(variables["following_messages"], "")
         self.assertEqual(captured_kwargs["prompt"]["version"], INTERPRET_PROMPT_VERSION)
-        self.assertEqual(INTERPRET_PROMPT_VERSION, "12")
+        self.assertEqual(INTERPRET_PROMPT_VERSION, "16")
         self.assertEqual(
             result,
             "**의미 분석**\n표면 의미입니다.\n\n**결론**\n최종 해석입니다.",
@@ -103,6 +104,51 @@ class InterpretTargetTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(variables["previous_messages"], "Alice: 이 이미지 봄?")
         self.assertEqual(variables["following_messages"], "Bob: 뭔 뜻임?")
         self.assertNotIn("Discord Markdown", target_question)
+
+    async def test_interpret_target_sends_surrounding_images_with_context_labels(self):
+        captured_kwargs = {}
+
+        def fake_custom_prompt_model(**kwargs):
+            captured_kwargs.update(kwargs)
+            return "Reasoning: 사진과 문장을 함께 해석했습니다."
+
+        with patch("cogs.interpret.custom_prompt_model", fake_custom_prompt_model):
+            await interpret_target(
+                "0.55퍼만 낮춰주셈",
+                None,
+                previous_messages=(
+                    "Alice: 레전드 복구 좀 했다 (이전 메시지 첨부 이미지 1)"
+                ),
+                context_images=(
+                    MessageContextImage(
+                        label="이전 메시지 첨부 이미지 1",
+                        url="https://cdn.example/previous.png",
+                    ),
+                ),
+            )
+
+        self.assertEqual(
+            captured_kwargs["image_content"],
+            [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "input_text",
+                            "text": "이전 메시지 첨부 이미지 1",
+                        },
+                        {
+                            "type": "input_image",
+                            "image_url": "https://cdn.example/previous.png",
+                        },
+                    ],
+                }
+            ],
+        )
+        self.assertEqual(
+            captured_kwargs["prompt"]["variables"]["previous_messages"],
+            "Alice: 레전드 복구 좀 했다 (이전 메시지 첨부 이미지 1)",
+        )
 
     async def test_interpret_target_returns_safe_message_on_model_failure(self):
         def fake_custom_prompt_model(**kwargs):

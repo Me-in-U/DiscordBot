@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from typing import Any, TypeAlias
 
 
 PromptPayload: TypeAlias = dict[str, Any]
 OpenAIInputContent: TypeAlias = list[dict[str, Any]]
+LabeledImageInput: TypeAlias = tuple[str, str]
 
 
 def build_prompt(
@@ -35,4 +37,39 @@ def build_single_image_content(image_url: str | None) -> OpenAIInputContent | No
                 }
             ],
         },
+    ]
+
+
+def build_labeled_image_content(
+    images: Iterable[LabeledImageInput],
+) -> OpenAIInputContent | None:
+    content = []
+    for label, image_url in images:
+        normalized_url = str(image_url or "").strip()
+        if not normalized_url:
+            continue
+
+        normalized_label = str(label or "").strip()
+        if normalized_label:
+            content.append(
+                {
+                    "type": "input_text",
+                    "text": normalized_label,
+                }
+            )
+        content.append(
+            {
+                "type": "input_image",
+                "image_url": normalized_url,
+            }
+        )
+
+    if not content:
+        return None
+
+    return [
+        {
+            "role": "user",
+            "content": content,
+        }
     ]

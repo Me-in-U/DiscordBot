@@ -17,6 +17,7 @@ IMAGE_EXTENSIONS = {
     ".webp",
 }
 IMAGE_ONLY_LABEL = "(이미지)"
+MAX_SURROUNDING_CONTEXT_IMAGES = 4
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,6 +34,13 @@ class MessageActionTarget:
 class SurroundingMessageContext:
     previous_messages: str = ""
     following_messages: str = ""
+    images: tuple["MessageContextImage", ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class MessageContextImage:
+    label: str
+    url: str
 
 
 def _is_image_attachment(attachment) -> bool:
@@ -111,13 +119,15 @@ def _author_display_name(message) -> str:
     return "Unknown"
 
 
-def _format_context_message(message) -> str:
+def _format_context_message(message, image_label: str | None = None) -> str:
     target = build_message_action_target(message)
     content_parts = []
     if target.text:
         content_parts.append(target.text)
     if target.image_url:
-        content_parts.append("(이미지 첨부)")
+        content_parts.append(
+            f"({image_label})" if image_label else "(이미지 첨부)"
+        )
 
     content = " ".join(content_parts).strip() or "(내용 없음)"
     return f"{_author_display_name(message)}: {content}"
@@ -134,6 +144,41 @@ def _is_surrounding_context_candidate(message, bot_user=None) -> bool:
     if not target.has_input:
         return False
     return not target.text.startswith("/")
+
+
+def _collect_surrounding_context_images(
+    previous_messages,
+    following_messages,
+    *,
+    limit: int = MAX_SURROUNDING_CONTEXT_IMAGES,
+) -> tuple[tuple[MessageContextImage, ...], dict[int, str]]:
+    if limit <= 0:
+        return (), {}
+
+    candidates = []
+    max_distance = max(len(previous_messages), len(following_messages))
+    for distance in range(max_distance):
+        if distance < len(previous_messages):
+            candidates.append(("이전", previous_messages[-1 - distance]))
+        if distance < len(following_messages):
+            candidates.append(("이후", following_messages[distance]))
+
+    images = []
+    labels_by_message = {}
+    section_counts = {"이전": 0, "이후": 0}
+    for section, context_message in candidates:
+        image_url = build_message_action_target(context_message).image_url
+        if not image_url:
+            continue
+
+        section_counts[section] += 1
+        label = f"{section} 메시지 첨부 이미지 {section_counts[section]}"
+        images.append(MessageContextImage(label=label, url=image_url))
+        labels_by_message[id(context_message)] = label
+        if len(images) >= limit:
+            break
+
+    return tuple(images), labels_by_message
 
 
 async def build_surrounding_message_context(
@@ -176,15 +221,27 @@ async def build_surrounding_message_context(
         logger.debug("주변 메시지 컨텍스트 조회 실패", exc_info=True)
         return SurroundingMessageContext()
 
+    context_images, image_labels = _collect_surrounding_context_images(
+        previous_messages,
+        following_messages,
+    )
+
     return SurroundingMessageContext(
         previous_messages="\n".join(
-            _format_context_message(context_message)
+            _format_context_message(
+                context_message,
+                image_labels.get(id(context_message)),
+            )
             for context_message in previous_messages
         ),
         following_messages="\n".join(
-            _format_context_message(context_message)
+            _format_context_message(
+                context_message,
+                image_labels.get(id(context_message)),
+            )
             for context_message in following_messages
         ),
+        images=context_images,
     )
 
 

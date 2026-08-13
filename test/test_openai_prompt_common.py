@@ -1,6 +1,10 @@
 import unittest
 
-from common.openai_prompt import build_prompt, build_single_image_content
+from common.openai_prompt import (
+    build_labeled_image_content,
+    build_prompt,
+    build_single_image_content,
+)
 
 
 class OpenAIPromptCommonTests(unittest.TestCase):
@@ -50,6 +54,45 @@ class OpenAIPromptCommonTests(unittest.TestCase):
     def test_build_single_image_content_returns_none_without_image_url(self):
         self.assertIsNone(build_single_image_content(None))
         self.assertIsNone(build_single_image_content(""))
+
+    def test_build_labeled_image_content_keeps_image_context_order(self):
+        payload = build_labeled_image_content(
+            [
+                ("해석 대상 첨부 이미지", "https://cdn.example/target.png"),
+                ("이전 메시지 첨부 이미지 1", "https://cdn.example/previous.png"),
+            ]
+        )
+
+        self.assertEqual(
+            payload,
+            [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "input_text",
+                            "text": "해석 대상 첨부 이미지",
+                        },
+                        {
+                            "type": "input_image",
+                            "image_url": "https://cdn.example/target.png",
+                        },
+                        {
+                            "type": "input_text",
+                            "text": "이전 메시지 첨부 이미지 1",
+                        },
+                        {
+                            "type": "input_image",
+                            "image_url": "https://cdn.example/previous.png",
+                        },
+                    ],
+                }
+            ],
+        )
+
+    def test_build_labeled_image_content_returns_none_without_valid_images(self):
+        self.assertIsNone(build_labeled_image_content([]))
+        self.assertIsNone(build_labeled_image_content([("빈 이미지", "")]))
 
 
 if __name__ == "__main__":
