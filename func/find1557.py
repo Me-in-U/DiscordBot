@@ -6,7 +6,7 @@ from util.db import execute_query
 
 
 FIND1557_FROM_IMAGE_PROMPT_ID = "pmpt_68ad1661f57c8190b18ab6adfaa69c4d0c4d98e2fa43e7fa"
-FIND1557_FROM_IMAGE_PROMPT_VERSION = "6"
+FIND1557_FROM_IMAGE_PROMPT_VERSION = "7"
 
 
 def count1557(ocr_text: str) -> int:

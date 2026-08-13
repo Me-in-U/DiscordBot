@@ -7,7 +7,7 @@ from discord.ext import commands
 
 from api.chatGPT import custom_prompt_model
 from common.discord_ui import SafeView
-from common.openai_prompt import build_prompt
+from common.openai_prompt import build_labeled_image_content, build_prompt
 from func.youtube_summary import (
     YOUTUBE_POST_KIND,
     YOUTUBE_VIDEO_KIND,
@@ -17,13 +17,13 @@ from func.youtube_summary import (
     get_youtube_summary_title,
     process_youtube_link,
 )
-from util.message.recent import get_recent_messages
+from util.message.recent import get_recent_message_images, get_recent_messages
 from util.logging_utils import log_user_error
 from util.message.context import extract_first_youtube_link
 
 
 DISCORD_SUMMARY_PROMPT_ID = "pmpt_68ac08b66784819785d89655eaaaa7470bc0cc5deddb37d9"
-DISCORD_SUMMARY_PROMPT_VERSION = "5"
+DISCORD_SUMMARY_PROMPT_VERSION = "7"
 logger = logging.getLogger(__name__)
 
 
@@ -181,7 +181,10 @@ class SummarizeCommands(commands.Cog):
         """봇이 준비되었을 때 호출됩니다."""
         print("DISCORD_CLIENT -> SummarizeCommands Cog : on ready!")
 
-    @app_commands.command(name="대화요약", description="최근 채팅 내용을 요약합니다.")
+    @app_commands.command(
+        name="대화요약",
+        description="최근 채팅과 최근 이미지 최대 4장을 함께 요약합니다.",
+    )
     @app_commands.describe(
         추가_요청="추가로 원하는 요약 사항이 있으면 입력하세요. (선택)"
     )
@@ -202,18 +205,29 @@ class SummarizeCommands(commands.Cog):
 
         # 요약 요청 메시지 생성
         request_message = 추가_요청 or ""
+        guild_id = interaction.guild.id
+        recent_messages = get_recent_messages(
+            client=self.bot,
+            guild_id=guild_id,
+            limit=150,
+        )
+        recent_images = get_recent_message_images(
+            client=self.bot,
+            guild_id=guild_id,
+            limit=150,
+            max_images=4,
+        )
 
         # ChatGPT에 메시지 전달
         try:
             response = await asyncio.to_thread(
                 custom_prompt_model,
+                image_content=build_labeled_image_content(recent_images),
                 prompt=build_prompt(
                     DISCORD_SUMMARY_PROMPT_ID,
                     DISCORD_SUMMARY_PROMPT_VERSION,
                     {
-                        "recent_messages": get_recent_messages(
-                            client=self.bot, guild_id=interaction.guild.id, limit=150
-                        ),
+                        "recent_messages": recent_messages,
                         "additional_requests": request_message,
                     },
                 ),

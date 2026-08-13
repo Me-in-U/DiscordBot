@@ -4,6 +4,8 @@ from unittest.mock import patch
 
 from func.youtube_post import YouTubePostInfo
 from func.youtube_summarizer import (
+    COMMENTS_SUMMARY_PROMPT_VERSION,
+    YOUTUBE_SUMMARY_PROMPT_VERSION,
     summarize_comments_with_gpt,
     summarize_text_with_gpt,
     summarize_youtube_post_with_gpt,
@@ -11,6 +13,10 @@ from func.youtube_summarizer import (
 
 
 class YouTubeSummarizerTests(unittest.TestCase):
+    def test_uses_published_summary_prompt_versions(self):
+        self.assertEqual(COMMENTS_SUMMARY_PROMPT_VERSION, "10")
+        self.assertEqual(YOUTUBE_SUMMARY_PROMPT_VERSION, "6")
+
     def test_summarize_comments_joins_comments_for_prompt_payload(self):
         with patch("func.youtube_summarizer.build_prompt", return_value={"p": "comments"}) as build_prompt:
             with patch("func.youtube_summarizer.custom_prompt_model", return_value="댓글 요약"):

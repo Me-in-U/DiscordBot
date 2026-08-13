@@ -17,7 +17,7 @@ from util.logging_utils import log_user_error
 
 
 TRANSLATION_PROMPT_ID = "pmpt_68ac23cf2e6c81969b355cc2d2ab11600ddeea74b62910b3"
-TRANSLATION_PROMPT_VERSION = "6"
+TRANSLATION_PROMPT_VERSION = "7"
 logger = logging.getLogger(__name__)
 
 

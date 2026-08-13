@@ -13,6 +13,7 @@ from cogs.explanation import (
     format_explanation_response_for_discord,
 )
 from common.openai_prompt import build_single_image_content
+from util.message.context import MessageContextImage
 
 
 class ExplanationActionTests(unittest.TestCase):
@@ -49,7 +50,7 @@ class ExplanationActionTests(unittest.TestCase):
                 },
             },
         )
-        self.assertEqual(EXPLANATION_PROMPT_VERSION, "5")
+        self.assertEqual(EXPLANATION_PROMPT_VERSION, "6")
 
     def test_build_explanation_prompt_uses_image_fallback_text(self):
         prompt = build_explanation_prompt("   ", has_image=True)
@@ -110,6 +111,41 @@ class ExplanationFormatTests(unittest.TestCase):
 
 
 class ExplanationTargetTests(unittest.IsolatedAsyncioTestCase):
+    async def test_explain_target_labels_target_and_nearby_images(self):
+        captured_kwargs = {}
+
+        def fake_custom_prompt_model(**kwargs):
+            captured_kwargs.update(kwargs)
+            return "**설명**\n이미지 관계 설명"
+
+        with patch("cogs.explanation.custom_prompt_model", fake_custom_prompt_model):
+            await explain_target(
+                "목록을 설명해줘",
+                "https://example.com/target.png",
+                context_images=(
+                    MessageContextImage(
+                        label="이전 메시지 첨부 이미지 1",
+                        url="https://example.com/previous.png",
+                    ),
+                ),
+            )
+
+        self.assertEqual(
+            captured_kwargs["image_content"][0]["content"],
+            [
+                {"type": "input_text", "text": "설명 대상 첨부 이미지"},
+                {
+                    "type": "input_image",
+                    "image_url": "https://example.com/target.png",
+                },
+                {"type": "input_text", "text": "이전 메시지 첨부 이미지 1"},
+                {
+                    "type": "input_image",
+                    "image_url": "https://example.com/previous.png",
+                },
+            ],
+        )
+
     async def test_explain_target_sends_raw_target_message_and_formats_response(self):
         captured_kwargs = {}
 

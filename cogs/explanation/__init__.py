@@ -8,8 +8,13 @@ from discord.ext import commands
 
 from api.chatGPT import custom_prompt_model
 from common.discord_ui import SafeView
-from common.openai_prompt import build_prompt, build_single_image_content
+from common.openai_prompt import (
+    build_labeled_image_content,
+    build_prompt,
+    build_single_image_content,
+)
 from util.message.context import (
+    MessageContextImage,
     build_message_action_target,
     build_message_select_label,
     build_recent_message_option,
@@ -19,7 +24,7 @@ from util.logging_utils import log_user_error
 
 
 EXPLANATION_PROMPT_ID = "pmpt_69fabdb4fa308190867e700bb0a2de160eaa5a328b9e0f83"
-EXPLANATION_PROMPT_VERSION = "5"
+EXPLANATION_PROMPT_VERSION = "6"
 logger = logging.getLogger(__name__)
 _EXPLANATION_RESPONSE_LABEL_PATTERN = re.compile(
     r"(?i)\b(Summary|Details|Explanation|Context|Unclear|요약|설명|주요 내용|맥락|추가 맥락|불확실한 부분)\s*:"
@@ -106,9 +111,22 @@ def _generate_explanation(
     image_url: str | None,
     previous_messages: str = "",
     following_messages: str = "",
+    context_images: tuple[MessageContextImage, ...] = (),
 ) -> str:
+    if context_images:
+        labeled_images = []
+        if image_url:
+            labeled_images.append(("설명 대상 첨부 이미지", image_url))
+        labeled_images.extend(
+            (context_image.label, context_image.url)
+            for context_image in context_images
+        )
+        image_content = build_labeled_image_content(labeled_images)
+    else:
+        image_content = build_single_image_content(image_url)
+
     response = custom_prompt_model(
-        image_content=build_single_image_content(image_url),
+        image_content=image_content,
         prompt=build_explanation_prompt(
             text,
             has_image=bool(image_url),
@@ -124,6 +142,7 @@ async def explain_target(
     image_url: str | None,
     previous_messages: str = "",
     following_messages: str = "",
+    context_images: tuple[MessageContextImage, ...] = (),
 ) -> str:
     try:
         return await asyncio.to_thread(
@@ -132,6 +151,7 @@ async def explain_target(
             image_url,
             previous_messages,
             following_messages,
+            context_images,
         )
     except Exception as exc:
         return log_user_error(logger, "설명", exc)
@@ -160,6 +180,7 @@ async def explain_message_context_menu(
         target.image_url,
         previous_messages=context.previous_messages,
         following_messages=context.following_messages,
+        context_images=context.images,
     )
     await interaction.followup.send(explained)
 
@@ -235,6 +256,7 @@ class ExplanationSelectView(SafeView):
             self.selected_message.get("image_url"),
             previous_messages=context.previous_messages,
             following_messages=context.following_messages,
+            context_images=context.images,
         )
         if isinstance(self.original_message, discord.Message):
             try:

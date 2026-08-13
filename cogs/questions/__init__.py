@@ -12,9 +12,9 @@ from util.logging_utils import log_user_error
 
 
 GENERAL_PROMPT_ID = "pmpt_68ac254fa8008190861e8f3f686556d50c6160cd272b9aca"
-GENERAL_PROMPT_VERSION = "4"
+GENERAL_PROMPT_VERSION = "7"
 GOD_QUESTION_PROMPT_ID = "pmpt_68acfa93ac6481959537fcb1853c883307d25e6bf62ef36c"
-GOD_QUESTION_PROMPT_VERSION = "5"
+GOD_QUESTION_PROMPT_VERSION = "8"
 logger = logging.getLogger(__name__)
 
 

@@ -12,7 +12,7 @@ from cogs.translation import (
 
 
 class TranslationTargetTests(unittest.IsolatedAsyncioTestCase):
-    async def test_translate_target_uses_translation_prompt_version_6(self):
+    async def test_translate_target_uses_translation_prompt_version_7(self):
         captured_kwargs = {}
 
         def fake_custom_prompt_model(**kwargs):
@@ -31,7 +31,7 @@ class TranslationTargetTests(unittest.IsolatedAsyncioTestCase):
                 "variables": {"target_message": "example target_message"},
             },
         )
-        self.assertEqual(TRANSLATION_PROMPT_VERSION, "6")
+        self.assertEqual(TRANSLATION_PROMPT_VERSION, "7")
         self.assertIsNone(captured_kwargs["image_content"])
 
     async def test_translate_target_returns_safe_message_on_model_failure(self):
