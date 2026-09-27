@@ -9,7 +9,7 @@ from discord.ext import commands
 from api.chatGPT import generate_text_model
 
 
-MEAL_RECOMMENDATION_MODEL = "gpt-5.4-nano"
+MEAL_RECOMMENDATION_MODEL = "gpt-6-luna"
 MEAL_RECOMMENDATION_MAX_OUTPUT_TOKENS = 24
 MEAL_RECOMMENDATION_ERROR_MESSAGE = "⚠️ 음식 추천 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
 MEAL_RECOMMENDATION_INPUT = "지금 먹을 음식 메뉴 하나를 한국어로 추천해줘."

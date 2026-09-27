@@ -23,7 +23,7 @@ from util.message.context import extract_first_youtube_link
 
 
 DISCORD_SUMMARY_PROMPT_ID = "pmpt_68ac08b66784819785d89655eaaaa7470bc0cc5deddb37d9"
-DISCORD_SUMMARY_PROMPT_VERSION = "7"
+DISCORD_SUMMARY_PROMPT_VERSION = "10"
 logger = logging.getLogger(__name__)
 
 

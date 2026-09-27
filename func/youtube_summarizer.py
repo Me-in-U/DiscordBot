@@ -8,9 +8,9 @@ from func.youtube_post import YouTubePostInfo, build_youtube_post_summary_input
 
 
 COMMENTS_SUMMARY_PROMPT_ID = "pmpt_68abfada6cc8819392effc146b3a39730a3a8fd787c57011"
-COMMENTS_SUMMARY_PROMPT_VERSION = "10"
+COMMENTS_SUMMARY_PROMPT_VERSION = "12"
 YOUTUBE_SUMMARY_PROMPT_ID = "pmpt_68ac079c0d1081958393a758f0b6f4cc01c6576daa0b0eb7"
-YOUTUBE_SUMMARY_PROMPT_VERSION = "6"
+YOUTUBE_SUMMARY_PROMPT_VERSION = "10"
 
 
 async def summarize_comments_with_gpt(comments: list) -> str:
@@ -49,6 +49,6 @@ async def summarize_youtube_post_with_gpt(post_info: YouTubePostInfo) -> str:
         generate_text_model,
         post_input,
         instructions,
-        "gpt-5.4-mini",
+        "gpt-6-luna",
         400,
     )

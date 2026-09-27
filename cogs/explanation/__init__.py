@@ -24,7 +24,7 @@ from util.logging_utils import log_user_error
 
 
 EXPLANATION_PROMPT_ID = "pmpt_69fabdb4fa308190867e700bb0a2de160eaa5a328b9e0f83"
-EXPLANATION_PROMPT_VERSION = "6"
+EXPLANATION_PROMPT_VERSION = "10"
 logger = logging.getLogger(__name__)
 _EXPLANATION_RESPONSE_LABEL_PATTERN = re.compile(
     r"(?i)\b(Summary|Details|Explanation|Context|Unclear|요약|설명|주요 내용|맥락|추가 맥락|불확실한 부분)\s*:"

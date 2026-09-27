@@ -13,7 +13,7 @@ from util.maplestory.parser import MapleStoryEvent, MapleStoryNotice
 logger = logging.getLogger(__name__)
 
 
-MAPLESTORY_NOTICE_SUMMARY_MODEL = "gpt-5.4-mini"
+MAPLESTORY_NOTICE_SUMMARY_MODEL = "gpt-6-luna"
 MAPLESTORY_NOTICE_SUMMARY_MAX_OUTPUT_TOKENS = 320
 MAPLESTORY_NOTICE_SUMMARY_LINE_LIMIT = 90
 MAPLESTORY_NOTICE_SUMMARY_MIN_LINES = 3

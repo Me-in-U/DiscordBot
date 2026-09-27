@@ -14,8 +14,8 @@ from func.youtube_summarizer import (
 
 class YouTubeSummarizerTests(unittest.TestCase):
     def test_uses_published_summary_prompt_versions(self):
-        self.assertEqual(COMMENTS_SUMMARY_PROMPT_VERSION, "10")
-        self.assertEqual(YOUTUBE_SUMMARY_PROMPT_VERSION, "6")
+        self.assertEqual(COMMENTS_SUMMARY_PROMPT_VERSION, "12")
+        self.assertEqual(YOUTUBE_SUMMARY_PROMPT_VERSION, "10")
 
     def test_summarize_comments_joins_comments_for_prompt_payload(self):
         with patch("func.youtube_summarizer.build_prompt", return_value={"p": "comments"}) as build_prompt:
@@ -44,7 +44,7 @@ class YouTubeSummarizerTests(unittest.TestCase):
 
         self.assertEqual(result, "게시물 요약")
         self.assertIn("게시물 링크: https://youtube.com/post/post-id", generate.call_args.args[0])
-        self.assertEqual(generate.call_args.args[2], "gpt-5.4-mini")
+        self.assertEqual(generate.call_args.args[2], "gpt-6-luna")
 
 
 if __name__ == "__main__":

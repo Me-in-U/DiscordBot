@@ -23,7 +23,7 @@ from util.message.context import (
 from util.logging_utils import log_user_error
 
 INTERPRET_PROMPT_ID = "pmpt_68abf98a25b481938994e409ffd1ecf20db1ff235be9e7ab"
-INTERPRET_PROMPT_VERSION = "16"
+INTERPRET_PROMPT_VERSION = "19"
 logger = logging.getLogger(__name__)
 _INTERPRET_RESPONSE_LABEL_PATTERN = re.compile(
     r"(?i)\b(Reasoning|Conclusion|Hidden meaning)\s*:"

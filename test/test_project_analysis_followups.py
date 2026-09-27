@@ -400,7 +400,7 @@ class SensitiveLogPolicyTests(unittest.TestCase):
             return_value=FakeResponse(),
         ) as create_mock:
             self.assertEqual(
-                chatgpt.generate_text_model("입력", "지시", model="gpt-5.4-mini"),
+                chatgpt.generate_text_model("입력", "지시", model="gpt-6-luna"),
                 "요약 결과",
             )
 
@@ -424,7 +424,7 @@ class SensitiveLogPolicyTests(unittest.TestCase):
                 chatgpt.generate_text_model(
                     "입력",
                     "지시",
-                    model="gpt-5.4-nano",
+                    model="gpt-6-luna",
                     reasoning_effort="none",
                     text_verbosity="low",
                     max_output_tokens=24,

@@ -77,7 +77,7 @@ class InterpretTargetTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(variables["previous_messages"], "")
         self.assertEqual(variables["following_messages"], "")
         self.assertEqual(captured_kwargs["prompt"]["version"], INTERPRET_PROMPT_VERSION)
-        self.assertEqual(INTERPRET_PROMPT_VERSION, "16")
+        self.assertEqual(INTERPRET_PROMPT_VERSION, "19")
         self.assertEqual(
             result,
             "**의미 분석**\n표면 의미입니다.\n\n**결론**\n최종 해석입니다.",

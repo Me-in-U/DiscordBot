@@ -48,7 +48,7 @@ class SummarizeActionTests(unittest.IsolatedAsyncioTestCase):
             captured_kwargs["prompt"]["version"],
             DISCORD_SUMMARY_PROMPT_VERSION,
         )
-        self.assertEqual(DISCORD_SUMMARY_PROMPT_VERSION, "7")
+        self.assertEqual(DISCORD_SUMMARY_PROMPT_VERSION, "10")
         self.assertEqual(
             captured_kwargs["prompt"]["variables"],
             {

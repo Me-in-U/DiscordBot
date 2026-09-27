@@ -104,7 +104,7 @@ class MealRecommendationTests(unittest.TestCase):
         self.assertEqual(len(calls), 1)
         args, kwargs = calls[0]
         self.assertEqual(args, ())
-        self.assertEqual(kwargs["model"], "gpt-5.4-nano")
+        self.assertEqual(kwargs["model"], "gpt-6-luna")
         self.assertEqual(kwargs["reasoning_effort"], "none")
         self.assertEqual(kwargs["text_verbosity"], "low")
         self.assertEqual(kwargs["max_output_tokens"], 24)
