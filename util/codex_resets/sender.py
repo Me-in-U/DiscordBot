@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import discord
 
-from util.codex_resets.fetcher import CodexResetEvent
+from util.codex_resets.fetcher import CODEX_RESETS_SITE_URL, CodexResetEvent
 
 
-CODEX_RESETS_SITE_URL = "https://codex-resets.com/"
 CODEX_RESET_DESCRIPTION_LIMIT = 4000
 
 
@@ -20,7 +19,12 @@ def build_codex_reset_embed(event: CodexResetEvent) -> discord.Embed:
     embed.set_author(name="Codex Resets")
     embed.add_field(
         name="원문",
-        value=f"[X에서 보기]({event.tweet_url})",
+        value=f"[출처에서 보기]({event.tweet_url})",
+        inline=True,
+    )
+    embed.add_field(
+        name="리셋 유형",
+        value="적립형 리셋" if event.reset_type == "banked" else "일반 리셋",
         inline=True,
     )
     embed.add_field(

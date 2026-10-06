@@ -1,5 +1,6 @@
 import unittest
 from datetime import datetime, timezone
+from dataclasses import replace
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -42,6 +43,13 @@ class CodexResetsSenderTests(unittest.IsolatedAsyncioTestCase):
             channel.send.await_args.kwargs["embed"].url,
             self.event.tweet_url,
         )
+
+    def test_banked_observation_displays_type_and_tracker_link(self):
+        event = replace(self.event, reset_type="banked", tweet_url="https://codex-resets.com/")
+        embed = build_codex_reset_embed(event)
+        self.assertEqual(embed.url, "https://codex-resets.com/")
+        self.assertIn("적립형 리셋", [field.value for field in embed.fields])
+        self.assertIn("[출처에서 보기](https://codex-resets.com/)", [field.value for field in embed.fields])
 
 
 if __name__ == "__main__":

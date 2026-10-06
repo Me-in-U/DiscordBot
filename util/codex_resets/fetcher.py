@@ -4,12 +4,14 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import urlsplit
 
 import aiohttp
 
 from common.http import EXTERNAL_HTTP_TIMEOUT
 
-CODEX_RESETS_API_URL = "https://codex-resets.com/api/resets"
+CODEX_RESETS_API_URL = "https://codex-resets.com/api/v1/resets"
+CODEX_RESETS_SITE_URL = "https://codex-resets.com/"
 CODEX_RESETS_REQUEST_TIMEOUT_SECONDS = 15
 CODEX_RESETS_HEADERS = {
     "Accept": "application/json",
@@ -24,6 +26,7 @@ class CodexResetEvent:
     tweet_url: str
     text: str
     announced_at: datetime
+    reset_type: str = "regular"
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,9 +39,9 @@ def parse_codex_resets_payload(payload: object) -> CodexResetSnapshot:
     if not isinstance(payload, dict):
         raise ValueError("Codex reset response must be an object")
 
-    raw_events = payload.get("events")
+    raw_events = payload.get("data")
     if not isinstance(raw_events, list):
-        raise ValueError("Codex reset response is missing events")
+        raise ValueError("Codex reset response is missing data")
 
     events: list[CodexResetEvent] = []
     seen_tweet_ids: set[str] = set()
@@ -50,7 +53,10 @@ def parse_codex_resets_payload(payload: object) -> CodexResetSnapshot:
         events.append(event)
 
     events.sort(key=lambda item: item.announced_at, reverse=True)
-    generated_at = _parse_optional_datetime(payload.get("generated_at"))
+    meta = payload.get("meta")
+    if not isinstance(meta, dict):
+        raise ValueError("Codex reset response is missing meta")
+    generated_at = _parse_optional_datetime(meta.get("generated_at"))
     return CodexResetSnapshot(
         events=tuple(events),
         generated_at=generated_at,
@@ -69,7 +75,12 @@ async def fetch_codex_reset_snapshot(
         headers=CODEX_RESETS_HEADERS,
         timeout=EXTERNAL_HTTP_TIMEOUT,
     ) as session:
-        async with session.get(CODEX_RESETS_API_URL, timeout=timeout) as response:
+        # ponytail: latest 100 resets; existing reseeding handles older state.
+        async with session.get(
+            CODEX_RESETS_API_URL,
+            params={"limit": 100, "order": "desc"},
+            timeout=timeout,
+        ) as response:
             response.raise_for_status()
             payload = await response.json(content_type=None)
     return parse_codex_resets_payload(payload)
@@ -79,18 +90,33 @@ def _parse_codex_reset_event(raw_event: object) -> CodexResetEvent:
     if not isinstance(raw_event, dict):
         raise ValueError("Codex reset event must be an object")
 
-    tweet_id = _required_text(raw_event, "tweet_id")
-    tweet_url = _required_text(raw_event, "tweet_url")
+    # Keep the stored ID format so existing guilds retain their notification state.
+    tweet_id = _required_text(raw_event, "id")
+    source = raw_event.get("source")
+    if not isinstance(source, dict) or source.get("type") not in ("x_post", "observed"):
+        raise ValueError("Codex reset event has an invalid source")
+    tweet_url = (
+        CODEX_RESETS_SITE_URL
+        if source.get("type") == "observed" and "url" not in source
+        else _required_text(source, "url")
+    )
+    parsed_url = urlsplit(tweet_url)
+    if parsed_url.scheme != "https" or not parsed_url.hostname or parsed_url.username:
+        raise ValueError("Codex reset event has an invalid source URL")
+    if source.get("type") == "x_post" and parsed_url.hostname not in ("x.com", "twitter.com"):
+        raise ValueError("Codex reset event has an invalid tweet URL")
+    reset_type = _required_text(raw_event, "reset_type")
+    if reset_type not in ("regular", "banked"):
+        raise ValueError("Codex reset event has an invalid reset_type")
     text = _required_text(raw_event, "text")
     announced_at = _parse_required_datetime(raw_event.get("announced_at"))
-    if not tweet_url.startswith(("https://x.com/", "https://twitter.com/")):
-        raise ValueError("Codex reset event has an invalid tweet URL")
 
     return CodexResetEvent(
         tweet_id=tweet_id,
         tweet_url=tweet_url,
         text=text,
         announced_at=announced_at,
+        reset_type=reset_type,
     )
 
 
