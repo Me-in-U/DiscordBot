@@ -33,6 +33,7 @@ class _NoticeParser(HTMLParser):
         self.stack = []
         self.fields = {"title": [], "category": [], "body": []}
         self.notices = {}
+        self.image_urls = []
         self.url = None
         self.list_mode = list_mode
 
@@ -49,6 +50,10 @@ class _NoticeParser(HTMLParser):
                 field = name
         if tag in {"script", "style"} or field == "ignore":
             field = "ignore"
+        if tag == "img" and field == "body" and attrs.get("src"):
+            image_url = urljoin(LOSTARK_BASE_URL, attrs["src"].strip())
+            if urlsplit(image_url).scheme in {"http", "https"} and image_url not in self.image_urls:
+                self.image_urls.append(image_url)
         if tag == "a" and self.list_mode:
             url = urljoin(LOSTARK_BASE_URL, attrs.get("href", ""))
             parsed = urlsplit(url)
@@ -107,11 +112,15 @@ def parse_lostark_notice_detail(html: str, notice: MapleStoryNotice) -> MapleSto
     parser = _NoticeParser(list_mode=False)
     parser.feed(html)
     body = parser.text("body")
-    if not body:
+    if not body and not parser.image_urls:
         raise ValueError(f"로스트아크 공지 본문을 찾지 못했습니다: {notice.notice_id}")
+    summary = body[:700] if body else "이미지로 작성된 공지입니다. 자세한 내용은 원문 링크에서 확인해 주세요."
+    body = body or summary
+    if parser.image_urls:
+        body += "\n본문 이미지:\n" + "\n".join(parser.image_urls)
     return replace(notice, title=parser.text("title") or notice.title,
                    category=parser.text("category") or notice.category,
-                   summary=body[:700], body_text=body)
+                   summary=summary, body_text=body)
 
 
 async def fetch_latest_lostark_notices(fetch_html=None, *, limit: int = 20) -> list[MapleStoryNotice]:

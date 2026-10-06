@@ -71,6 +71,17 @@ class LostArkNoticeTests(unittest.IsolatedAsyncioTestCase):
         changed = replace(notice, body_text=notice.body_text + " 점검 연장 안내")
         self.assertEqual(find_maplestory_notice_updates([changed], state), [changed])
 
+    async def test_image_only_notice_is_valid_and_image_changes_are_detected(self):
+        html = '<section class="article__data"><div class="fr-view"><p><img src="//cdn-lostark.game.onstove.com/event.jpg"></p><p>&nbsp;<br></p></div></section>'
+        fetch = AsyncMock(side_effect=[LIST_HTML, html])
+        notices = await fetch_latest_lostark_notices(fetch, limit=1)
+        notice = notices[0]
+        self.assertIn("이미지로 작성된 공지", notice.summary)
+        self.assertIn("https://cdn-lostark.game.onstove.com/event.jpg", notice.body_text)
+        state = maplestory_notice_state_from_notices(notices)
+        changed = parse_lostark_notice_detail(html.replace("event.jpg", "updated.jpg"), notice)
+        self.assertEqual(find_maplestory_notice_updates([changed], state), [changed])
+
     async def test_failed_detail_does_not_return_a_partial_empty_body(self):
         fetch = AsyncMock(side_effect=[LIST_HTML, "<html>일시적인 오류</html>"])
         with self.assertRaises(ValueError):
