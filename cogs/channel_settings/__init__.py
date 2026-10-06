@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import discord
+import logging
 from discord import app_commands
 from discord.ext import commands
 
 from util.earthquake.state import delete_earthquake_alert_state
 from util.guild.channel_settings import get_settings_for_guild, set_channel
+from util.lostark.notices import configure_lostark_notice_channel
+
+logger = logging.getLogger(__name__)
 
 PURPOSE_CHOICES = {
     "celebration": "기념일",
@@ -13,10 +17,11 @@ PURPOSE_CHOICES = {
     "music": "음악",
     "youtube": "유튜브",
     "maplestory_notice": "메이플공지",
+    "lostark_notice": "로아공지",
     "codex_reset": "코덱스리셋",
     "earthquake_alert": "지진알림",
 }
-PURPOSE_DESCRIPTION = "기념일/도박/음악/유튜브/메이플공지/코덱스리셋/지진알림"
+PURPOSE_DESCRIPTION = "기념일/도박/음악/유튜브/메이플공지/로아공지/코덱스리셋/지진알림"
 
 
 def _add_current_channel_fields(
@@ -53,6 +58,7 @@ class ChannelSettings(commands.Cog):
             app_commands.Choice(name="음악", value="music"),
             app_commands.Choice(name="유튜브", value="youtube"),
             app_commands.Choice(name="메이플공지", value="maplestory_notice"),
+            app_commands.Choice(name="로아공지", value="lostark_notice"),
             app_commands.Choice(name="코덱스리셋", value="codex_reset"),
             app_commands.Choice(
                 name="지진알림",
@@ -88,7 +94,16 @@ class ChannelSettings(commands.Cog):
             return
 
         guild_id = int(interaction.guild_id)
-        await set_channel(guild_id, purpose.value, channel.id if channel else None)
+        if purpose.value == "lostark_notice":
+            await interaction.response.defer(ephemeral=True, thinking=True)
+            try:
+                await configure_lostark_notice_channel(guild_id, channel.id if channel else None)
+            except Exception:
+                logger.exception("로스트아크 공지 채널 설정 실패: guild=%s", guild_id)
+                await interaction.followup.send("로스트아크 공지 채널 설정에 실패했습니다. 잠시 후 다시 시도해 주세요.", ephemeral=True)
+                return
+        else:
+            await set_channel(guild_id, purpose.value, channel.id if channel else None)
         if purpose.value == "earthquake_alert":
             await delete_earthquake_alert_state(guild_id)
 
@@ -107,7 +122,10 @@ class ChannelSettings(commands.Cog):
         )
         _add_current_channel_fields(embed, summary)
 
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        if purpose.value == "lostark_notice":
+            await interaction.followup.send(embed=embed, ephemeral=True)
+        else:
+            await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @app_commands.command(
         name="채널설정확인",

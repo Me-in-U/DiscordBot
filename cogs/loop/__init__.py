@@ -18,6 +18,7 @@ from util.loop.daily_refresh_runner import run_daily_refreshes
 from util.env_utils import getenv_clean
 from util.loop.task_lifecycle import cancel_loop_tasks, start_loop_tasks
 from util.maplestory.notice_loop_runner import run_maplestory_notice_loop
+from util.lostark.notices import run_lostark_notice_loop
 from util.loop.presence_status import build_presence_activity_name
 from util.loop.weekly_1557_reporter import run_weekly_1557_report
 from util.youtube.community_polling import poll_youtube_community_posts
@@ -70,6 +71,7 @@ LOOP_TASK_NAMES = (
     "youtube_notification_check",
     "youtube_community_check",
     "maplestory_notice_check",
+    "lostark_notice_check",
     "codex_reset_notification_check",
     "jma_eew_stream",
     "emsc_earthquake_stream",
@@ -281,6 +283,17 @@ class LoopTasks(commands.Cog):
             logger.exception("메이플스토리 공지 확인 오류")
 
     @tasks.loop(minutes=3)
+    async def lostark_notice_check(self):
+        """로스트아크 새 공지와 수정 공지를 확인합니다."""
+        try:
+            results = await run_lostark_notice_loop(self.bot)
+            for result in results:
+                if result.status == "error":
+                    logger.error("로스트아크 공지 알림 실패: guild=%s notice=%s error=%s", result.guild_id, result.notice_id, result.error)
+        except Exception:
+            logger.exception("로스트아크 공지 확인 오류")
+
+    @tasks.loop(minutes=3)
     async def codex_reset_notification_check(self):
         """Codex 사용량 리셋 알림을 확인합니다."""
         try:
@@ -330,6 +343,10 @@ class LoopTasks(commands.Cog):
     @codex_reset_notification_check.before_loop
     async def before_codex_reset_notification_check(self):
         print("-------------Codex 리셋 알림 체크 대기중...---------------")
+        await self.bot.wait_until_ready()
+
+    @lostark_notice_check.before_loop
+    async def before_lostark_notice_check(self):
         await self.bot.wait_until_ready()
 
     @jma_eew_stream.before_loop

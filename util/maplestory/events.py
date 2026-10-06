@@ -113,10 +113,12 @@ async def refresh_maplestory_notice_messages(
     bot: discord.Client,
     *,
     fetch_notices: FetchNotices | None = None,
+    channel_type: str = MAPLESTORY_NOTICE_CHANNEL_TYPE,
+    state_key: str = MAPLESTORY_NOTICE_STATE_KEY,
 ) -> list[MapleStoryNoticeUpdateResult]:
     from util.guild.channel_settings import get_channels_by_purpose
 
-    channels = await get_channels_by_purpose(MAPLESTORY_NOTICE_CHANNEL_TYPE)
+    channels = await get_channels_by_purpose(channel_type)
     if not channels:
         return []
 
@@ -136,7 +138,10 @@ async def refresh_maplestory_notice_messages(
             for guild_id, channel_id in channels.items()
         ]
 
-    state = await _load_maplestory_notice_state()
+    if state_key == MAPLESTORY_NOTICE_STATE_KEY:
+        state = await _load_maplestory_notice_state()
+    else:
+        state = await _load_maplestory_notice_state(state_key)
     changed = False
     results: list[MapleStoryNoticeUpdateResult] = []
 
@@ -266,7 +271,10 @@ async def refresh_maplestory_notice_messages(
             results.append(result)
 
     if changed:
-        await _save_maplestory_notice_state(state)
+        if state_key == MAPLESTORY_NOTICE_STATE_KEY:
+            await _save_maplestory_notice_state(state)
+        else:
+            await _save_maplestory_notice_state(state, state_key)
 
     return results
 
@@ -386,16 +394,23 @@ async def seed_maplestory_notice_state_for_guild(
     guild_id: int,
     *,
     fetch_notices: FetchNotices | None = None,
+    state_key: str = MAPLESTORY_NOTICE_STATE_KEY,
 ) -> int:
     fetch = fetch_notices or fetch_latest_maplestory_notices
     notices = await fetch()
-    state = await _load_maplestory_notice_state()
+    if state_key == MAPLESTORY_NOTICE_STATE_KEY:
+        state = await _load_maplestory_notice_state()
+    else:
+        state = await _load_maplestory_notice_state(state_key)
     guild_states = state.setdefault("guilds", {})
     if not isinstance(guild_states, dict):
         guild_states = {}
         state["guilds"] = guild_states
     guild_states[str(int(guild_id))] = maplestory_notice_state_from_notices(notices)
-    await _save_maplestory_notice_state(state)
+    if state_key == MAPLESTORY_NOTICE_STATE_KEY:
+        await _save_maplestory_notice_state(state)
+    else:
+        await _save_maplestory_notice_state(state, state_key)
     return len(notices)
 
 
@@ -572,12 +587,12 @@ def _coerce_int(value: object) -> int | None:
         return None
 
 
-async def _load_maplestory_notice_state() -> dict[str, Any]:
+async def _load_maplestory_notice_state(state_key: str = MAPLESTORY_NOTICE_STATE_KEY) -> dict[str, Any]:
     from util.db import fetch_one
 
     row = await fetch_one(
         "SELECT setting_value FROM setting_data WHERE setting_key = %s",
-        (MAPLESTORY_NOTICE_STATE_KEY,),
+        (state_key,),
     )
     if not row:
         return {"guilds": {}}
@@ -595,14 +610,14 @@ async def _load_maplestory_notice_state() -> dict[str, Any]:
     return {"guilds": guilds if isinstance(guilds, dict) else {}}
 
 
-async def _save_maplestory_notice_state(state: dict[str, Any]) -> None:
+async def _save_maplestory_notice_state(state: dict[str, Any], state_key: str = MAPLESTORY_NOTICE_STATE_KEY) -> None:
     from util.db import execute_query
 
     await execute_query(
         "INSERT INTO setting_data (setting_key, setting_value) VALUES (%s, %s) "
         "ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)",
         (
-            MAPLESTORY_NOTICE_STATE_KEY,
+            state_key,
             json.dumps(state, ensure_ascii=False),
         ),
     )

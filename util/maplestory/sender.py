@@ -118,7 +118,7 @@ async def summarize_maplestory_notice_with_openai(
         output = await asyncio.to_thread(
             text_generator,
             _build_maplestory_notice_summary_input(notice),
-            MAPLESTORY_NOTICE_SUMMARY_INSTRUCTIONS,
+            MAPLESTORY_NOTICE_SUMMARY_INSTRUCTIONS.replace("메이플스토리", notice.source_name),
             MAPLESTORY_NOTICE_SUMMARY_MODEL,
             MAPLESTORY_NOTICE_SUMMARY_MAX_OUTPUT_TOKENS,
         )
@@ -144,11 +144,11 @@ def build_maplestory_notice_embed(
         description="\n".join(lines),
         color=_maplestory_notice_color(notice),
     )
-    embed.set_author(name="메이플스토리 공지")
+    embed.set_author(name=f"{notice.source_name} 공지")
     if notice.category:
         embed.add_field(name="분류", value=notice.category, inline=True)
     embed.add_field(name="원문", value=f"[바로가기]({notice.url})", inline=True)
-    embed.set_footer(text="출처: 메이플스토리 공식 공지")
+    embed.set_footer(text=f"출처: {notice.source_name} 공식 공지")
     return embed
 
 
@@ -475,7 +475,8 @@ def _fallback_maplestory_notice_summary_lines(notice: MapleStoryNotice) -> list[
     source = _strip_notice_greeting(
         _normalize_summary_source(
             getattr(notice, "body_text", "") or notice.summary or notice.title
-        )
+        ),
+        source_name=notice.source_name,
     )
     source_blocks = _extract_important_notice_blocks(source)
     candidates = source_blocks or [
@@ -503,7 +504,7 @@ def _fallback_maplestory_notice_summary_lines(notice: MapleStoryNotice) -> list[
 
 
 def _fallback_notice_status_line(notice: MapleStoryNotice) -> str:
-    label = f"{notice.category} {notice.title}"
+    label = "".join(f"{notice.category} {notice.title}".split())
     if "패치완료" in label:
         return "패치 완료 안내입니다."
     if "점검완료" in label:
@@ -532,11 +533,12 @@ def _fallback_notice_closing_line(notice: MapleStoryNotice) -> str:
     return "세부 내용은 링크에서 확인."
 
 
-def _strip_notice_greeting(text: str) -> str:
+def _strip_notice_greeting(text: str, *, source_name: str = "메이플스토리") -> str:
     stripped = (text or "").strip()
     for prefix in (
-        "안녕하세요. 메이플스토리입니다.",
-        "안녕하세요. 메이플스토리 입니다.",
+        f"안녕하세요. {source_name}입니다.",
+        f"안녕하세요. {source_name} 입니다.",
+        f"안녕하세요, {source_name}입니다.",
     ):
         if stripped.startswith(prefix):
             return stripped[len(prefix) :].strip()

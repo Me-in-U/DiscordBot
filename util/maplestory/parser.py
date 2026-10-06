@@ -46,6 +46,7 @@ class MapleStoryNotice:
     url: str
     summary: str = ""
     body_text: str = ""
+    source_name: str = "메이플스토리"
 
 
 def parse_maplestory_ongoing_event_url(
