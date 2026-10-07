@@ -45,6 +45,14 @@ DETAIL_HTML = """
 
 
 class LostArkNoticeTests(unittest.IsolatedAsyncioTestCase):
+    def test_lostark_embed_color_does_not_overlap_maplestory_categories(self):
+        notice = parse_lostark_notice_list(LIST_HTML)[0]
+        for category in ("공지", "점검", "패치"):
+            lostark = build_maplestory_notice_embed(replace(notice, category=category, title="안내"), [])
+            maple = build_maplestory_notice_embed(replace(notice, category=category, title="안내", source_name="메이플스토리"), [])
+            self.assertEqual(lostark.color.value, 0x9B59B6)
+            self.assertNotEqual(lostark.color, maple.color)
+
     def test_list_deduplicates_pins_and_ignores_banners_and_relative_dates(self):
         notices = parse_lostark_notice_list(LIST_HTML)
         self.assertEqual([n.notice_id for n in notices], ["12", "10"])

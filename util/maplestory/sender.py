@@ -546,6 +546,8 @@ def _strip_notice_greeting(text: str, *, source_name: str = "메이플스토리"
 
 
 def _maplestory_notice_color(notice: MapleStoryNotice) -> discord.Color:
+    if notice.source_name == "로스트아크":
+        return discord.Color.purple()
     label = f"{notice.category} {notice.title}"
     if "점검" in label:
         return discord.Color.orange()
