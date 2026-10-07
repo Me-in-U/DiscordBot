@@ -23,7 +23,7 @@ class SearchPromptTests(unittest.TestCase):
             SEARCH_PROMPT_ID,
             "pmpt_68b25c89c1a48193a60de5a3cb23a1eb0c25a13613efd1bf",
         )
-        self.assertEqual(SEARCH_PROMPT_VERSION, "11")
+        self.assertEqual(SEARCH_PROMPT_VERSION, "12")
 
 
 class SearchImageTests(unittest.IsolatedAsyncioTestCase):

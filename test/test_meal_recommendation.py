@@ -82,7 +82,7 @@ class MealRecommendationTests(unittest.TestCase):
 
         calls = []
 
-        def fake_generate_text_model(*args, **kwargs):
+        def fake_custom_prompt_model(*args, **kwargs):
             calls.append((args, kwargs))
             return "# 제육\n설명"
 
@@ -90,8 +90,8 @@ class MealRecommendationTests(unittest.TestCase):
         interaction = _FakeInteraction()
 
         with patch(
-            "cogs.meal_recommendation.generate_text_model",
-            side_effect=fake_generate_text_model,
+            "cogs.meal_recommendation.custom_prompt_model",
+            side_effect=fake_custom_prompt_model,
         ):
             with patch(
                 "cogs.meal_recommendation.asyncio.to_thread",
@@ -104,32 +104,18 @@ class MealRecommendationTests(unittest.TestCase):
         self.assertEqual(len(calls), 1)
         args, kwargs = calls[0]
         self.assertEqual(args, ())
-        self.assertEqual(kwargs["model"], "gpt-6-luna")
-        self.assertEqual(kwargs["reasoning_effort"], "none")
-        self.assertEqual(kwargs["text_verbosity"], "low")
-        self.assertEqual(kwargs["max_output_tokens"], 24)
+        from cogs.meal_recommendation import (
+            MEAL_RECOMMENDATION_CUISINES,
+            MEAL_RECOMMENDATION_PROMPT_ID,
+            MEAL_RECOMMENDATION_PROMPT_VERSION,
+        )
 
-    def test_instructions_cover_world_cuisines_and_output_contract(self):
-        from cogs.meal_recommendation import MEAL_RECOMMENDATION_INSTRUCTIONS
-
-        for keyword in (
-            "한식",
-            "중식",
-            "일식",
-            "양식",
-            "동남아",
-            "남아시아",
-            "중동",
-            "지중해",
-            "남미",
-            "멕시코",
-            "유럽",
-            "아프리카",
-        ):
-            self.assertIn(keyword, MEAL_RECOMMENDATION_INSTRUCTIONS)
-
-        for keyword in ("메뉴명 하나만", "설명", "분류", "국가명", "Markdown heading"):
-            self.assertIn(keyword, MEAL_RECOMMENDATION_INSTRUCTIONS)
+        self.assertEqual(kwargs["prompt"]["id"], MEAL_RECOMMENDATION_PROMPT_ID)
+        self.assertEqual(kwargs["prompt"]["version"], MEAL_RECOMMENDATION_PROMPT_VERSION)
+        variables = kwargs["prompt"]["variables"]
+        self.assertIn(variables["cuisine"], MEAL_RECOMMENDATION_CUISINES)
+        self.assertEqual(variables["recent_menus"], "없음")
+        self.assertTrue(variables["selection_seed"].isdigit())
 
     def test_command_retries_once_when_model_repeats_previous_menu_for_guild(self):
         from cogs.meal_recommendation import MealRecommendationCommands
@@ -137,7 +123,7 @@ class MealRecommendationTests(unittest.TestCase):
         calls = []
         outputs = iter(["제육", "제육", "돈까스"])
 
-        def fake_generate_text_model(*args, **kwargs):
+        def fake_custom_prompt_model(*args, **kwargs):
             calls.append((args, kwargs))
             return next(outputs)
 
@@ -146,8 +132,8 @@ class MealRecommendationTests(unittest.TestCase):
         second_interaction = _FakeInteraction(guild_id=10, user_id=2)
 
         with patch(
-            "cogs.meal_recommendation.generate_text_model",
-            side_effect=fake_generate_text_model,
+            "cogs.meal_recommendation.custom_prompt_model",
+            side_effect=fake_custom_prompt_model,
         ):
             with patch(
                 "cogs.meal_recommendation.asyncio.to_thread",
@@ -159,9 +145,34 @@ class MealRecommendationTests(unittest.TestCase):
         first_interaction.followup.send.assert_awaited_once_with("# 제육")
         second_interaction.followup.send.assert_awaited_once_with("# 돈까스")
         self.assertEqual(len(calls), 3)
-        self.assertIn("직전 추천 메뉴는 \"제육\"", calls[1][1]["user_input"])
-        self.assertIn("반드시 다른 메뉴", calls[1][1]["user_input"])
-        self.assertIn("직전 추천 메뉴는 \"제육\"", calls[2][1]["user_input"])
+        self.assertEqual(calls[1][1]["prompt"]["variables"]["recent_menus"], "제육")
+        self.assertEqual(calls[2][1]["prompt"]["variables"]["recent_menus"], "제육")
+
+    def test_cuisine_cycle_rejects_older_menu_and_keeps_twenty_recent_menus(self):
+        from cogs.meal_recommendation import (
+            MEAL_RECOMMENDATION_CUISINES,
+            MealRecommendationCommands,
+        )
+
+        calls = []
+        outputs = iter(["메뉴0", "메뉴1", "메뉴0", "메뉴2"] + [f"메뉴{i}" for i in range(3, 22)])
+
+        def fake_custom_prompt_model(**kwargs):
+            calls.append(kwargs["prompt"]["variables"])
+            return next(outputs)
+
+        cog = MealRecommendationCommands(Mock())
+        with patch("cogs.meal_recommendation.custom_prompt_model", fake_custom_prompt_model):
+            with patch("cogs.meal_recommendation.asyncio.to_thread", _immediate_to_thread):
+                for _ in range(22):
+                    asyncio.run(cog.recommend_meal.callback(cog, _FakeInteraction()))
+
+        self.assertEqual(calls[2]["recent_menus"], "메뉴0\n메뉴1")
+        self.assertEqual(calls[2]["cuisine"], calls[3]["cuisine"])
+        successful_calls = calls[:3] + calls[4:]
+        first_cycle = successful_calls[:len(MEAL_RECOMMENDATION_CUISINES)]
+        self.assertEqual({call["cuisine"] for call in first_cycle}, set(MEAL_RECOMMENDATION_CUISINES))
+        self.assertEqual(list(cog._recent_menus["guild:123"]), [f"메뉴{i}" for i in range(2, 22)])
 
     def test_previous_menu_state_is_separate_by_guild_and_dm_user(self):
         from cogs.meal_recommendation import MealRecommendationCommands
@@ -169,7 +180,7 @@ class MealRecommendationTests(unittest.TestCase):
         calls = []
         outputs = iter(["제육", "제육", "라멘", "라멘"])
 
-        def fake_generate_text_model(*args, **kwargs):
+        def fake_custom_prompt_model(*args, **kwargs):
             calls.append((args, kwargs))
             return next(outputs)
 
@@ -180,8 +191,8 @@ class MealRecommendationTests(unittest.TestCase):
         dm_user_two = _FakeInteraction(guild_id=None, user_id=2)
 
         with patch(
-            "cogs.meal_recommendation.generate_text_model",
-            side_effect=fake_generate_text_model,
+            "cogs.meal_recommendation.custom_prompt_model",
+            side_effect=fake_custom_prompt_model,
         ):
             with patch(
                 "cogs.meal_recommendation.asyncio.to_thread",
@@ -224,7 +235,7 @@ class MealRecommendationTests(unittest.TestCase):
         interaction = _FakeInteraction()
 
         with patch(
-            "cogs.meal_recommendation.generate_text_model",
+            "cogs.meal_recommendation.custom_prompt_model",
             side_effect=RuntimeError("secret-token"),
         ):
             with patch(
@@ -246,7 +257,7 @@ class MealRecommendationTests(unittest.TestCase):
 
         outputs = iter(["제육", "제육", "제육"])
 
-        def fake_generate_text_model(*args, **kwargs):
+        def fake_custom_prompt_model(*args, **kwargs):
             return next(outputs)
 
         cog = MealRecommendationCommands(Mock())
@@ -254,8 +265,8 @@ class MealRecommendationTests(unittest.TestCase):
         second_interaction = _FakeInteraction(guild_id=10, user_id=2)
 
         with patch(
-            "cogs.meal_recommendation.generate_text_model",
-            side_effect=fake_generate_text_model,
+            "cogs.meal_recommendation.custom_prompt_model",
+            side_effect=fake_custom_prompt_model,
         ):
             with patch(
                 "cogs.meal_recommendation.asyncio.to_thread",
