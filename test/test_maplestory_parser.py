@@ -37,6 +37,43 @@ LEGACY_MAPLESTORY_PARSER_PATH = Path("util/maplestory_parser.py")
 
 
 class MapleStoryParserModuleTests(unittest.TestCase):
+    def test_sunday_maple_titles_match_anchor_text_and_data_title(self):
+        from util.maplestory.parser import parse_maplestory_ongoing_event_url
+
+        for title in ("썬데이 메이플", "스페셜 썬데이 메이플"):
+            for html in (
+                f'<a href="/News/Event/Ongoing/1397"><em> {title} </em></a>',
+                f'<a href="/News/Event/Ongoing/1397" data-title="{title}"><img src="thumb.png"></a>',
+            ):
+                with self.subTest(title=title, html=html):
+                    self.assertEqual(
+                        parse_maplestory_ongoing_event_url(html),
+                        "https://maplestory.nexon.com/News/Event/Ongoing/1397",
+                    )
+
+    def test_sunday_maple_matching_rejects_other_titles_and_event_paths(self):
+        from util.maplestory.parser import parse_maplestory_ongoing_event_url
+
+        for title, href in (
+            ("썬데이 메이플 보상 안내", "/News/Event/Ongoing/1397"),
+            ("썬데이 메이플", "/News/Event/Ended/1397"),
+        ):
+            with self.subTest(title=title, href=href):
+                self.assertIsNone(parse_maplestory_ongoing_event_url(
+                    f'<a href="{href}" data-title="{title}">{title}</a>'
+                ))
+
+    def test_explicit_event_title_keeps_exact_matching(self):
+        from util.maplestory.parser import parse_maplestory_ongoing_event_url
+
+        self.assertIsNone(parse_maplestory_ongoing_event_url(
+            LIST_HTML, target_title="썬데이 메이플"
+        ))
+        self.assertEqual(
+            parse_maplestory_ongoing_event_url(LIST_HTML, target_title="스페셜 썬데이 메이플"),
+            "https://maplestory.nexon.com/News/Event/Ongoing/1350",
+        )
+
     def test_maplestory_parser_lives_under_maplestory_package(self):
         self.assertTrue(MAPLESTORY_PARSER_PATH.exists())
         self.assertFalse(LEGACY_MAPLESTORY_PARSER_PATH.exists())

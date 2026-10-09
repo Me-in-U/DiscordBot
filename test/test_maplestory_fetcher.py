@@ -74,6 +74,27 @@ LEGACY_MAPLESTORY_FETCHER_PATH = Path("util/maplestory_fetcher.py")
 
 
 class MapleStoryFetcherModuleTests(unittest.IsolatedAsyncioTestCase):
+    async def test_fetch_sunday_maple_event_accepts_ordinary_title(self):
+        from util.maplestory.fetcher import fetch_sunday_maple_event
+
+        requested_urls = []
+
+        async def fake_fetch(url: str) -> str:
+            requested_urls.append(url)
+            html = LIST_HTML if url.endswith("/News/Event/Ongoing") else DETAIL_HTML
+            return html.replace("스페셜 썬데이 메이플", "썬데이 메이플")
+
+        event = await fetch_sunday_maple_event(fetch_html=fake_fetch)
+
+        self.assertEqual(requested_urls, [
+            "https://maplestory.nexon.com/News/Event/Ongoing",
+            "https://maplestory.nexon.com/News/Event/Ongoing/1350",
+        ])
+        self.assertIsNotNone(event)
+        assert event is not None
+        self.assertEqual(event.title, "썬데이 메이플")
+        self.assertEqual(event.image_urls, ["https://example.com/body.png"])
+
     async def test_maplestory_fetcher_lives_under_maplestory_package(self):
         self.assertTrue(MAPLESTORY_FETCHER_PATH.exists())
         self.assertFalse(LEGACY_MAPLESTORY_FETCHER_PATH.exists())

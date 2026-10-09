@@ -51,7 +51,7 @@ class MapleStoryNotice:
 
 def parse_maplestory_ongoing_event_url(
     html: str,
-    target_title: str = SUNDAY_MAPLE_EVENT_TITLE,
+    target_title: str | None = None,
 ) -> str | None:
     parser = _MapleStoryOngoingEventParser(target_title)
     parser.feed(html)
@@ -282,9 +282,13 @@ class _MapleStoryNoticeDetailParser(HTMLParser):
 
 
 class _MapleStoryOngoingEventParser(HTMLParser):
-    def __init__(self, target_title: str):
+    def __init__(self, target_title: str | None):
         super().__init__(convert_charrefs=True)
-        self.target_title = _normalize_text(target_title)
+        self.target_titles = (
+            {_normalize_text(target_title)}
+            if target_title is not None
+            else {_normalize_text(SUNDAY_MAPLE_EVENT_TITLE), _normalize_text("썬데이 메이플")}
+        )
         self.event_url: str | None = None
         self._anchor_stack: list[dict[str, object]] = []
 
@@ -295,7 +299,7 @@ class _MapleStoryOngoingEventParser(HTMLParser):
         attrs_dict = _attrs_to_dict(attrs)
         href = attrs_dict.get("href", "").strip()
         data_title = _normalize_text(attrs_dict.get("data-title", ""))
-        if data_title == self.target_title and self._is_ongoing_event_href(href):
+        if data_title in self.target_titles and self._is_ongoing_event_href(href):
             self.event_url = urljoin(MAPLESTORY_BASE_URL, href)
             return
 
@@ -314,7 +318,7 @@ class _MapleStoryOngoingEventParser(HTMLParser):
         anchor = self._anchor_stack.pop()
         href = str(anchor["href"])
         text = _normalize_text("".join(anchor["text"]))
-        if text == self.target_title and self._is_ongoing_event_href(href):
+        if text in self.target_titles and self._is_ongoing_event_href(href):
             self.event_url = urljoin(MAPLESTORY_BASE_URL, href)
 
     @staticmethod

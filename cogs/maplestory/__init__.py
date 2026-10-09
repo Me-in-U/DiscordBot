@@ -48,7 +48,7 @@ class MapleStoryCommands(commands.Cog):
 
     @app_commands.command(
         name="썬데이메이플",
-        description="진행 중인 스페셜 썬데이 메이플 이벤트 본문 이미지를 보여줍니다.",
+        description="진행 중인 썬데이 메이플과 스페셜 썬데이 메이플 이벤트 본문 이미지를 보여줍니다.",
     )
     async def sunday_maple(self, interaction: discord.Interaction):
         await interaction.response.defer(thinking=True)
@@ -65,13 +65,13 @@ class MapleStoryCommands(commands.Cog):
 
         if event is None:
             await interaction.followup.send(
-                "현재 진행중인 이벤트에 스페셜 썬데이 메이플이 없습니다."
+                "현재 진행 중인 이벤트 목록에 썬데이 메이플 이벤트가 없습니다."
             )
             return
 
         if not event.image_urls:
             await interaction.followup.send(
-                f"스페셜 썬데이 메이플 이벤트는 찾았지만 본문 이미지를 찾지 못했습니다.\n{event.url}"
+                f"{event.title} 이벤트는 찾았지만 본문 이미지를 찾지 못했습니다.\n{event.url}"
             )
             return
 
