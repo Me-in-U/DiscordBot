@@ -4,7 +4,9 @@ import unittest
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import aiohttp
 
 os.environ.setdefault("OPENAI_KEY", "test-key")
 
@@ -237,12 +239,20 @@ class TiboNotificationTests(unittest.IsolatedAsyncioTestCase):
 class TiboFetcherTests(unittest.IsolatedAsyncioTestCase):
     async def test_fetch_uses_page_and_checks_http_status(self):
         response = SimpleNamespace(raise_for_status=unittest.mock.Mock(), text=AsyncMock(return_value=FIXTURE.read_text(encoding="utf-8")))
+        session = MagicMock()
+        session.get.return_value.__aenter__.return_value = response
         with patch("util.codex_resets.tibo.aiohttp.ClientSession") as client:
-            session = client.return_value.__aenter__.return_value
-            session.get.return_value.__aenter__.return_value = response
+            client.return_value.__aenter__.return_value = session
             entries = await fetch_tibo_daily_log()
+            response.raise_for_status.side_effect = aiohttp.ClientResponseError(
+                request_info=MagicMock(), history=(), status=429,
+            )
+            with self.assertRaises(aiohttp.ClientResponseError) as error:
+                await fetch_tibo_daily_log()
+            self.assertEqual(error.exception.status, 429)
         self.assertEqual(len(entries), 2)
-        response.raise_for_status.assert_called_once()
+        self.assertEqual(response.raise_for_status.call_count, 2)
+        response.text.assert_awaited_once()
         self.assertEqual(session.get.call_args.args[0], TIBO_URL)
 
 
