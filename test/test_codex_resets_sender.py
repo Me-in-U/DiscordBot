@@ -1,8 +1,11 @@
+import os
 import unittest
 from datetime import datetime, timezone
 from dataclasses import replace
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
+
+os.environ.setdefault("OPENAI_KEY", "test-key")
 
 from util.codex_resets.fetcher import CodexResetEvent
 from util.codex_resets.sender import (
@@ -35,14 +38,41 @@ class CodexResetsSenderTests(unittest.IsolatedAsyncioTestCase):
             send=AsyncMock(return_value=SimpleNamespace(id=9876))
         )
 
-        message_id = await send_codex_reset_notification(channel, self.event)
+        with patch("cogs.translation.translate_text", AsyncMock(return_value="사용량 한도가 초기화되었습니다.")) as translate:
+            message_id = await send_codex_reset_notification(channel, self.event)
 
         self.assertEqual(message_id, 9876)
         channel.send.assert_awaited_once()
+        self.assertEqual(translate.await_args.args, (self.event.text,))
+        self.assertEqual(channel.send.await_args.kwargs["embed"].description, "사용량 한도가 초기화되었습니다.")
+        self.assertEqual(self.event.text, "Usage limits have been reset.")
         self.assertEqual(
             channel.send.await_args.kwargs["embed"].url,
             self.event.tweet_url,
         )
+
+    async def test_observed_reset_does_not_call_translation(self):
+        event = replace(self.event, tweet_url="https://codex-resets.com/")
+        channel = SimpleNamespace(send=AsyncMock(return_value=SimpleNamespace(id=1)))
+        with patch("cogs.translation.translate_text", AsyncMock()) as translate:
+            await send_codex_reset_notification(channel, event)
+        translate.assert_not_awaited()
+        self.assertEqual(channel.send.await_args.kwargs["embed"].description, event.text)
+
+    async def test_translation_failure_does_not_send_an_error_as_notification(self):
+        channel = SimpleNamespace(send=AsyncMock())
+        with patch("cogs.translation.translate_text", AsyncMock(side_effect=RuntimeError("translation unavailable"))):
+            with self.assertRaises(RuntimeError):
+                await send_codex_reset_notification(channel, self.event)
+        channel.send.assert_not_awaited()
+
+    async def test_empty_or_non_korean_translation_is_not_sent(self):
+        channel = SimpleNamespace(send=AsyncMock())
+        for translated in ("", "  ", "Usage limits reset."):
+            with self.subTest(translated=translated), patch("cogs.translation.translate_text", AsyncMock(return_value=translated)):
+                with self.assertRaises(ValueError):
+                    await send_codex_reset_notification(channel, self.event)
+        channel.send.assert_not_awaited()
 
     def test_banked_observation_displays_type_and_tracker_link(self):
         event = replace(self.event, reset_type="banked", tweet_url="https://codex-resets.com/")
