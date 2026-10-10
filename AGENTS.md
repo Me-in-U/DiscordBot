@@ -66,6 +66,10 @@ This repository hosts a modular Discord bot built with `discord.py`. Follow thes
   - Run syntax/import verification with `python -m compileall -q bot.py api cogs common func util test`.
   - Run the unittest suite with `python -m unittest discover -s test`.
   - `test/`는 importable package가 아니므로 focused checks should still use discovery mode, for example `python -m unittest discover -s test -p "test_scheduler.py"`.
+  - Choose mocks by the actual call expression: `session.get()` in `async with` is a synchronous call returning an async context manager, so use `MagicMock` for the session/request and `AsyncMock` for context entry/exit and awaited response methods. Explicitly assign the session returned by `ClientSession.__aenter__`; do not rely on its default mock return value.
+  - Reuse `test/test_codex_resets_fetcher.py` and `test/test_tibo_daily_log.py` for aiohttp tests. See [async HTTP testing and incident analysis](docs/async-http-testing.md).
+  - Follow the user's current validation scope. When execution is not requested, distinguish tests written from tests run and report results as unverified. Commit/push completion is not proof of Jenkins verification or deployment success.
+  - Capture intentionally triggered failure logs with `assertLogs` and assert the error handling outcome. Keep production tracebacks enabled. See [Jenkins log analysis](docs/jenkins-log-analysis-2026-10-11.md) for test noise, migration warnings, health retries, and dependency image cache consistency.
 
 ## Deployment Ownership
 

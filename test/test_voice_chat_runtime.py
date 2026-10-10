@@ -188,12 +188,14 @@ class StreamingSinkTests(unittest.TestCase):
                 "OpusError",
                 FakeOpusError,
             ),
+            self.assertLogs("cogs.voice_chat", level="WARNING") as logs,
         ):
             pcm = sink._decode_voice_packet(user, data)
 
         self.assertIsNone(pcm)
         self.assertNotIn(55, sink.opus_decoders)
         self.assertEqual(1, sink.decode_error_counts["opus"])
+        self.assertIn("Voice packet dropped", "\n".join(logs.output))
 
 
 class VoiceChatRuntimeTests(unittest.IsolatedAsyncioTestCase):
@@ -279,9 +281,10 @@ class VoiceChatRuntimeTests(unittest.IsolatedAsyncioTestCase):
         )
         fake_voice_recv = SimpleNamespace(VoiceRecvClient=FakeVoiceRecvClient)
 
-        with patch.object(voice_chat_module, "voice_recv", fake_voice_recv):
+        with patch.object(voice_chat_module, "voice_recv", fake_voice_recv), self.assertLogs("cogs.voice_chat", level="ERROR") as logs:
             await VoiceChat.start_chat.callback(self.cog, interaction)
 
+        self.assertIn("voice connection failed", "\n".join(logs.output))
         interaction.response.defer.assert_awaited_once()
         interaction.followup.send.assert_awaited_once()
         self.assertNotIn(guild.id, self.cog.active_chats)
@@ -328,12 +331,14 @@ class VoiceChatRuntimeTests(unittest.IsolatedAsyncioTestCase):
             "task": None,
         }
 
-        await self.cog.chat_loop(
-            command_user,
-            vc,
-            guild_id=300,
-            session_id=session_id,
-        )
+        with self.assertLogs("cogs.voice_chat", level="ERROR") as logs:
+            await self.cog.chat_loop(
+                command_user,
+                vc,
+                guild_id=300,
+                session_id=session_id,
+            )
+        self.assertIn("receiver failed", "\n".join(logs.output))
 
         vc.listen.assert_called_once()
         vc.disconnect.assert_awaited_once()

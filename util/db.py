@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import warnings
 from collections.abc import Sequence
 from typing import Any, TypeAlias
 
@@ -219,19 +220,21 @@ async def run_schema_migrations() -> None:
     pool = await get_db_pool()
     async with pool.acquire() as conn:
         async with conn.cursor() as cur:
-            await cur.execute(
-                """
-                CREATE TABLE IF NOT EXISTS schema_migrations (
-                    migration_key VARCHAR(64) PRIMARY KEY,
-                    version INT NOT NULL,
-                    applied_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)
-                        ON UPDATE CURRENT_TIMESTAMP(6)
-                ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-                """
-            )
-            # Create tables if missing
-            for query in queries:
-                await cur.execute(query)
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", message=r"Table '.*' already exists", category=aiomysql.Warning, module=r"aiomysql\.cursors")
+                await cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS schema_migrations (
+                        migration_key VARCHAR(64) PRIMARY KEY,
+                        version INT NOT NULL,
+                        applied_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)
+                            ON UPDATE CURRENT_TIMESTAMP(6)
+                    ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+                    """
+                )
+                # Create tables if missing
+                for query in queries:
+                    await cur.execute(query)
 
             # Ensure column types are BIGINT UNSIGNED for FK compatibility with backend
             await _ensure_bigint_unsigned(conn, "guild", "guild_id")
@@ -315,10 +318,10 @@ async def run_schema_migrations() -> None:
                 INSERT INTO schema_migrations (migration_key, version)
                 VALUES (%s, %s)
                 ON DUPLICATE KEY UPDATE
-                    version = VALUES(version),
+                    version = %s,
                     applied_at = CURRENT_TIMESTAMP(6)
                 """,
-                (SCHEMA_MIGRATION_KEY, DB_SCHEMA_VERSION),
+                (SCHEMA_MIGRATION_KEY, DB_SCHEMA_VERSION, DB_SCHEMA_VERSION),
             )
 
 

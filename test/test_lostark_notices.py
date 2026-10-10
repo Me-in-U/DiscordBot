@@ -110,9 +110,12 @@ class LostArkNoticeTests(unittest.IsolatedAsyncioTestCase):
         def unavailable(*args):
             raise RuntimeError("offline")
 
-        lines = await summarize_maplestory_notice_with_openai(
-            replace(notice, title="임시 점검 완료 안내"), generate_text=unavailable,
-        )
+        with self.assertLogs("util.maplestory.sender", level="WARNING") as logs:
+            lines = await summarize_maplestory_notice_with_openai(
+                replace(notice, title="임시 점검 완료 안내"), generate_text=unavailable,
+            )
+        self.assertIn("offline", "\n".join(logs.output))
+        self.assertIn("로스트아크 공지 OpenAI 요약 실패", "\n".join(logs.output))
         self.assertEqual(lines[0], "점검 완료 안내입니다.")
 
     async def test_enable_seeds_before_changing_channel(self):

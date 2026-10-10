@@ -51,8 +51,12 @@ This repository hosts a modular Discord bot built with `discord.py`. Follow thes
   - Use `_launchBot.ps1` to activate the virtual environment and run the bot.
   - If PowerShell is inconvenient, `_launchBot.bat` provides the same local entry point.
 - **Testing**:
-  - Ad-hoc tests in `test/` directory (e.g., `spring_ai_test.py`).
-  - No formal unit test suite; rely on manual verification or script execution.
+  - Use Python 3.11 for Docker/runtime parity. When verification is requested, run `python -m compileall -q bot.py api cogs common func util test` and `python -m unittest discover -s test`.
+  - Focused tests also use discovery, for example `python -m unittest discover -s test -p "test_tibo_daily_log.py"`; `test/` is not an importable package.
+  - Choose mocks by the call expression. For `async with session.get(url)`, use an explicit `MagicMock` session and request context manager; use `AsyncMock` for context entry/exit and awaited response methods. Do not take the default `ClientSession.__aenter__.return_value` as the session without configuring it.
+  - Reuse `test/test_codex_resets_fetcher.py` and `test/test_tibo_daily_log.py`. Read [the incident analysis and test pattern](../docs/async-http-testing.md) before adding aiohttp tests.
+  - Honor the user's validation scope and distinguish tests written, tests run, Git push, Jenkins verification, and deployment success.
+  - Capture intentional failure logs with `assertLogs` while asserting the fallback or cleanup outcome; preserve production error logging. See [Jenkins log analysis](../docs/jenkins-log-analysis-2026-10-11.md).
 
 ## Deployment Ownership
 

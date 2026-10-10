@@ -124,7 +124,8 @@ async def summarize_maplestory_notice_with_openai(
         )
     except Exception:
         logger.warning(
-            "메이플스토리 공지 OpenAI 요약 실패: notice=%s",
+            "%s 공지 OpenAI 요약 실패: notice=%s",
+            notice.source_name,
             notice.notice_id,
             exc_info=True,
         )

@@ -3,9 +3,10 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import warnings
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 os.environ.setdefault("DISCORD_TOKEN", "test-token")
 os.environ.setdefault("OPENAI_KEY", "test-openai-key")
@@ -70,6 +71,8 @@ class DeploymentContractTests(unittest.TestCase):
         text = Path("Jenkinsfile").read_text(encoding="utf-8")
 
         self.assertGreaterEqual(text.count("sha256sum requirements.txt Dockerfile.deps"), 2)
+        deploy = Path("scripts/jenkins_deploy.sh").read_text(encoding="utf-8")
+        self.assertIn("sha256sum requirements.txt Dockerfile.deps | sha256sum", deploy)
 
     def test_jenkins_uses_dependency_venv_python_inside_docker(self):
         text = Path("Jenkinsfile").read_text(encoding="utf-8")
@@ -245,6 +248,37 @@ class RuntimeReliabilityGuardTests(unittest.IsolatedAsyncioTestCase):
 
 
 class DbMigrationContractTests(unittest.IsolatedAsyncioTestCase):
+    async def test_migration_filters_only_existing_table_notes_and_avoids_deprecated_values(self):
+        import aiomysql
+        import util.db as db
+
+        cursor = MagicMock()
+
+        async def execute(query, args=None):
+            if "CREATE TABLE IF NOT EXISTS" in query:
+                warnings.warn_explicit("Table 'guild' already exists", aiomysql.Warning, "cursors.py", 239, module="aiomysql.cursors")
+            elif "INSERT INTO schema_migrations" in query:
+                warnings.warn_explicit("Unexpected schema warning", aiomysql.Warning, "cursors.py", 239, module="aiomysql.cursors")
+
+        cursor.execute = AsyncMock(side_effect=execute)
+        connection = MagicMock()
+        connection.cursor.return_value.__aenter__.return_value = cursor
+        pool = MagicMock()
+        pool.acquire.return_value.__aenter__.return_value = connection
+        with (
+            patch.object(db, "get_db_pool", AsyncMock(return_value=pool)),
+            patch.object(db, "_ensure_bigint_unsigned", AsyncMock()),
+            patch.object(db, "_ensure_column", AsyncMock()),
+            warnings.catch_warnings(record=True) as recorded,
+        ):
+            warnings.simplefilter("always")
+            await db.run_schema_migrations()
+            warnings.warn_explicit("Table 'guild' already exists", aiomysql.Warning, "cursors.py", 239, module="aiomysql.cursors")
+        self.assertEqual([str(item.message) for item in recorded], ["Unexpected schema warning", "Table 'guild' already exists"])
+        query, args = cursor.execute.await_args.args
+        self.assertNotIn("VALUES(version)", query)
+        self.assertEqual(args, (db.SCHEMA_MIGRATION_KEY, db.DB_SCHEMA_VERSION, db.DB_SCHEMA_VERSION))
+
     async def test_startup_validates_schema_without_running_migrations(self):
         import bot
 

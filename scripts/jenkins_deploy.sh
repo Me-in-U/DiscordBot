@@ -46,10 +46,10 @@ run_compose() {
 }
 
 ensure_dependency_image() {
-  local requirements_hash
+  local deps_hash
 
-  requirements_hash="$(sha256sum "${ROOT_DIR}/requirements.txt" | awk '{print $1}')"
-  DEPS_IMAGE="${DEPS_IMAGE:-${DEPS_IMAGE_REPOSITORY}:${requirements_hash}}"
+  deps_hash="$(sha256sum requirements.txt Dockerfile.deps | sha256sum | awk '{print $1}')"
+  DEPS_IMAGE="${DEPS_IMAGE:-${DEPS_IMAGE_REPOSITORY}:${deps_hash}}"
   export DEPS_IMAGE
 
   echo "[INFO] Using dependency image: ${DEPS_IMAGE}"
@@ -65,8 +65,9 @@ ensure_dependency_image() {
 
 wait_for_health() {
   local attempt
+  local health_error
   for attempt in $(seq 1 "${HEALTHCHECK_MAX_ATTEMPTS}"); do
-    if curl --fail --silent --show-error -H "Host: ${HEALTHCHECK_HOST_HEADER}" "${HEALTHCHECK_URL}" >/dev/null; then
+    if health_error="$(curl --fail --silent --show-error --connect-timeout 5 --max-time 10 --output /dev/null -H "Host: ${HEALTHCHECK_HOST_HEADER}" "${HEALTHCHECK_URL}" 2>&1)"; then
       echo "[INFO] Bot health check succeeded."
       return 0
     fi
@@ -76,6 +77,7 @@ wait_for_health() {
   done
 
   echo "[ERROR] Bot health check failed: ${HEALTHCHECK_URL}"
+  echo "[ERROR] Last health check response: ${health_error}"
   return 1
 }
 

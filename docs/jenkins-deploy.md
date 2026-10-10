@@ -75,6 +75,10 @@
 
 ## 배포 동작
 
+검증과 마이그레이션, 배포의 기본 의존성 이미지 키는 `requirements.txt`와 `Dockerfile.deps`를 함께 해시한다. 컨테이너 부팅 대기 중 health 실패는 INFO로 표시하고, 최대 시도 횟수 이후에도 실패하면 마지막 curl 오류와 함께 배포를 중단한다. 테스트가 의도적으로 만든 예외, DB 재실행 경고와 실제 이미지 캐시 문제의 구분은 [2026-10-11 Jenkins 로그 분석](jenkins-log-analysis-2026-10-11.md)을 참고한다.
+
+`Verify`에서 unittest가 실패하면 DB 마이그레이션과 배포는 실행되지 않는다. 실패 후 기존 컨테이너가 healthy여도 새 커밋 배포 성공으로 판단하지 않는다. 테스트 대역 때문에 검증이 실패한 사례와 재발 방지 기준은 [비동기 HTTP 테스트 문서](async-http-testing.md)를 참고한다.
+
 - `main` 브랜치 push 시 Jenkins 가 자동 실행된다.
 - Jenkins 는 저장소를 checkout 한 뒤 `discordbot-env` Credential 로 `.env.deploy` 를 복원한다.
 - Docker Compose 는 로컬 기본값으로 `.env` 를 사용하고, Jenkins 배포에서는 `ENV_FILE=.env.deploy` 를 통해 배포 전용 env 파일을 사용한다.
