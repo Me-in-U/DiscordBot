@@ -12,6 +12,7 @@ from bot import (
     load_recent_messages,
 )
 from util.codex_resets.loop_runner import run_codex_reset_notification_loop
+from util.codex_resets.tibo import refresh_tibo_daily_log_notifications
 from util.earthquake.emsc_stream import run_emsc_stream
 from util.earthquake.stream import run_jma_eew_stream
 from util.loop.daily_refresh_runner import run_daily_refreshes
@@ -295,11 +296,17 @@ class LoopTasks(commands.Cog):
 
     @tasks.loop(minutes=3)
     async def codex_reset_notification_check(self):
-        """Codex 사용량 리셋 알림을 확인합니다."""
+        """Codex 사용량 리셋과 Tibo Daily log 알림을 확인합니다."""
         try:
             await run_codex_reset_notification_loop(self.bot)
         except Exception:
             logger.exception("Codex 리셋 알림 확인 오류")
+        try:
+            sent_count = await refresh_tibo_daily_log_notifications(self.bot)
+            if sent_count:
+                logger.info("Tibo Daily log 알림 %s건 전송 완료", sent_count)
+        except Exception:
+            logger.exception("Tibo Daily log 알림 확인 오류")
 
     @tasks.loop(seconds=5)
     async def jma_eew_stream(self):

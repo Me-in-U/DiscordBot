@@ -6,6 +6,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from util.earthquake.state import delete_earthquake_alert_state
+from util.codex_resets.tibo import reset_tibo_daily_log_state
 from util.guild.channel_settings import get_settings_for_guild, set_channel
 from util.lostark.notices import configure_lostark_notice_channel
 
@@ -106,6 +107,8 @@ class ChannelSettings(commands.Cog):
             await set_channel(guild_id, purpose.value, channel.id if channel else None)
         if purpose.value == "earthquake_alert":
             await delete_earthquake_alert_state(guild_id)
+        if purpose.value == "codex_reset":
+            await reset_tibo_daily_log_state(guild_id)
 
         action = "해제" if channel is None else "설정"
         channel_text = "설정 해제" if channel is None else channel.mention
@@ -117,6 +120,7 @@ class ChannelSettings(commands.Cog):
             description=(
                 f"`{PURPOSE_CHOICES[purpose.value]}` 기능 채널을 {action}했습니다."
                 f"\n→ {PURPOSE_CHOICES[purpose.value]} 채널: {channel_text}"
+                + ("\nTibo Daily log 알림도 함께 설정됩니다." if purpose.value == "codex_reset" and channel else "")
             ),
             color=discord.Color.blurple(),
         )

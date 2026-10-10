@@ -35,17 +35,14 @@ def _extract_response_text(response) -> str:
     return message.strip()
 
 
-def custom_prompt_model(prompt, image_content=None):
+def custom_prompt_model(prompt, image_content=None, *, instructions=None):
     try:
+        request_kwargs = {"prompt": prompt}
         if image_content:
-            response = clientGPT.responses.create(
-                input=image_content,
-                prompt=prompt,
-            )
-        else:
-            response = clientGPT.responses.create(
-                prompt=prompt,
-            )
+            request_kwargs["input"] = image_content
+        if instructions is not None:
+            request_kwargs["instructions"] = instructions
+        response = clientGPT.responses.create(**request_kwargs)
         logger.debug("OpenAI prompt response received: type=%s", type(response).__name__)
         return _extract_response_text(response)
     except Exception as exc:

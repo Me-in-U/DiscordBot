@@ -166,7 +166,7 @@ class HelpCommand(commands.Cog):
                 ),
                 (
                     "`/코덱스리셋알림 [상태]`",
-                    "현재 채널에서 Codex 사용량 리셋 알림을 받거나 해제합니다.",
+                    "현재 채널에서 Codex 리셋과 Tibo Daily log의 Day별 한국어 요약 임베드를 받거나 해제합니다.",
                 ),
                 (
                     "`/지진알림 [상태]`",

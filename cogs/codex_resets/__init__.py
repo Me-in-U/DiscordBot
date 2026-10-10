@@ -9,6 +9,7 @@ from util.codex_resets.events import (
     seed_codex_reset_state_for_guild,
 )
 from util.guild.channel_settings import set_channel
+from util.codex_resets.tibo import reset_tibo_daily_log_state
 
 
 logger = logging.getLogger(__name__)
@@ -45,7 +46,7 @@ class CodexResetCommands(commands.Cog):
 
     @app_commands.command(
         name="코덱스리셋알림",
-        description="현재 채널에서 Codex 사용량 리셋 알림을 받거나 해제합니다.",
+        description="현재 채널에서 Codex 리셋과 Tibo Daily log 알림을 받거나 해제합니다.",
     )
     @app_commands.describe(
         status="true면 현재 채널로 알림을 받고 false면 알림을 해제합니다."
@@ -62,8 +63,9 @@ class CodexResetCommands(commands.Cog):
         guild_id = int(interaction.guild_id)
         if not status:
             await set_channel(guild_id, CODEX_RESET_CHANNEL_TYPE, None)
+            await reset_tibo_daily_log_state(guild_id)
             await interaction.response.send_message(
-                "Codex 리셋 알림을 해제했습니다.",
+                "Codex 리셋과 Tibo Daily log 알림을 해제했습니다.",
                 ephemeral=True,
             )
             return
@@ -78,6 +80,7 @@ class CodexResetCommands(commands.Cog):
         channel_id = int(interaction.channel_id)
         await interaction.response.defer(ephemeral=True, thinking=True)
         await set_channel(guild_id, CODEX_RESET_CHANNEL_TYPE, channel_id)
+        await reset_tibo_daily_log_state(guild_id)
 
         try:
             seeded_count = await seed_codex_reset_state_for_guild(guild_id)
@@ -87,7 +90,8 @@ class CodexResetCommands(commands.Cog):
                 guild_id,
             )
             await interaction.followup.send(
-                "Codex 리셋 알림을 설정했습니다.\n"
+                "Codex 리셋과 Tibo Daily log 알림을 설정했습니다.\n"
+                "Daily log는 첫 확인 이후 새 발표와 내용 수정을 알립니다.\n"
                 "다만 최신 리셋 초기 상태 저장에 실패해 다음 확인 때 초기화됩니다.",
                 ephemeral=True,
             )
@@ -99,9 +103,10 @@ class CodexResetCommands(commands.Cog):
             else "현재 리셋 이력이 없어 다음 새 리셋부터 알립니다."
         )
         await interaction.followup.send(
-            "Codex 리셋 알림을 설정했습니다.\n"
+            "Codex 리셋과 Tibo Daily log 알림을 설정했습니다.\n"
             f"알림 채널: <#{channel_id}>\n"
-            f"{seed_message}",
+            f"{seed_message}\n"
+            "Daily log는 첫 확인 이후 새 발표와 내용 수정을 알립니다.",
             ephemeral=True,
         )
 

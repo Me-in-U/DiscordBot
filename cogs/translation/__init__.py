@@ -21,25 +21,37 @@ TRANSLATION_PROMPT_VERSION = "10"
 logger = logging.getLogger(__name__)
 
 
-async def translate_target(
+async def translate_text(
     target_message: str,
-    image_url: str | None,
+    image_url: str | None = None,
     prompt_version: str = TRANSLATION_PROMPT_VERSION,
+    *,
+    instructions: str | None = None,
 ) -> str:
     normalized_message = target_message.strip()
     if image_url and not normalized_message:
         normalized_message = "첨부 이미지의 텍스트나 내용을 한국어로 번역해줘."
 
+    options = {"instructions": instructions} if instructions is not None else {}
+    return await asyncio.to_thread(
+        custom_prompt_model,
+        image_content=build_single_image_content(image_url),
+        prompt=build_prompt(
+            TRANSLATION_PROMPT_ID,
+            prompt_version,
+            {"target_message": normalized_message},
+        ),
+        **options,
+    )
+
+
+async def translate_target(
+    target_message: str,
+    image_url: str | None,
+    prompt_version: str = TRANSLATION_PROMPT_VERSION,
+) -> str:
     try:
-        return await asyncio.to_thread(
-            custom_prompt_model,
-            image_content=build_single_image_content(image_url),
-            prompt=build_prompt(
-                TRANSLATION_PROMPT_ID,
-                prompt_version,
-                {"target_message": normalized_message},
-            ),
-        )
+        return await translate_text(target_message, image_url, prompt_version)
     except Exception as exc:
         return log_user_error(logger, "번역", exc)
 

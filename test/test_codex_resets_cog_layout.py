@@ -29,6 +29,7 @@ class CodexResetsCogLayoutTests(unittest.TestCase):
         self.assertIn("async def codex_reset_notification_check", loop_source)
         self.assertIn("@tasks.loop(minutes=3)", loop_source)
         self.assertIn("run_codex_reset_notification_loop", loop_source)
+        self.assertIn("refresh_tibo_daily_log_notifications", loop_source)
 
     def test_help_and_readme_document_codex_reset_notifications(self):
         help_source = HELP_PATH.read_text(encoding="utf-8")
@@ -38,6 +39,8 @@ class CodexResetsCogLayoutTests(unittest.TestCase):
         self.assertIn("코덱스리셋", help_source)
         self.assertIn("/코덱스리셋알림", readme_source)
         self.assertIn("3분", readme_source)
+        self.assertIn("Tibo", help_source)
+        self.assertIn("Tibo", readme_source)
 
 
 if __name__ == "__main__":

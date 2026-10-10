@@ -8,6 +8,7 @@ from cogs.translation import (
     TRANSLATION_PROMPT_ID,
     TRANSLATION_PROMPT_VERSION,
     translate_target,
+    translate_text,
 )
 
 
@@ -47,6 +48,26 @@ class TranslationTargetTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("secret-token", result)
         self.assertNotIn("Error:", result)
         self.assertIn("secret-token", "\n".join(captured.output))
+
+    async def test_shared_translation_accepts_summary_instructions_and_raises_errors(self):
+        with patch("cogs.translation.custom_prompt_model", return_value="요약") as model:
+            self.assertEqual(await translate_text("source", instructions="한국어로 요약"), "요약")
+        self.assertEqual(model.call_args.kwargs["instructions"], "한국어로 요약")
+        self.assertEqual(model.call_args.kwargs["prompt"]["id"], TRANSLATION_PROMPT_ID)
+        with patch("cogs.translation.custom_prompt_model", side_effect=RuntimeError("failure")):
+            with self.assertRaises(RuntimeError):
+                await translate_text("source")
+
+    def test_custom_prompt_forwards_optional_instructions(self):
+        from api.chatGPT import custom_prompt_model
+
+        with patch("api.chatGPT.clientGPT.responses.create") as create:
+            create.return_value.output_text = "요약"
+            self.assertEqual(custom_prompt_model({"id": "example"}, instructions="한국어 요약"), "요약")
+            create.assert_called_once_with(prompt={"id": "example"}, instructions="한국어 요약")
+            create.reset_mock()
+            custom_prompt_model({"id": "example"})
+            create.assert_called_once_with(prompt={"id": "example"})
 
 
 if __name__ == "__main__":
