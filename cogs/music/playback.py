@@ -13,6 +13,7 @@ from util.music.state import (
 )
 from util.music.playback import (
     MusicPlayerPreparationError,
+    build_prepared_playback_start,
     prepare_music_player,
     prepare_replay_source,
 )
@@ -41,52 +42,71 @@ class MusicPlaybackMixin:
         playback_start: Any,
         started_at: float | None = None,
     ) -> None:
-        self._cancel_idle_disconnect(state)
-        start_music_playback_state(
-            state,
-            player,
-            started_at=time.time() if started_at is None else started_at,
-        )
-        state.control_view = await self._build_control_view(guild_id, state)
-        self._vc_play(guild_id=guild_id, source=playback_start.source)
-        await self._restart_updater(guild_id)
-        embed = self._make_playing_embed(player, guild_id)
-        await self._edit_msg(state=state, embed=embed, view=state.control_view)
+        try:
+            self._cancel_idle_disconnect(state)
+            start_music_playback_state(
+                state,
+                player,
+                started_at=time.time() if started_at is None else started_at,
+            )
+            state.control_view = await self._build_control_view(guild_id, state)
+            self._vc_play(guild_id=guild_id, source=playback_start.source)
+            await self._restart_updater(guild_id)
+            embed = self._make_playing_embed(player, guild_id)
+            await self._edit_msg(state=state, embed=embed, view=state.control_view)
+        except (Exception, asyncio.CancelledError):
+            self._abort_prepared_playback(guild_id, state, playback_start.source)
+            raise
+
+    def _cleanup_prepared_source(self, source: Any) -> None:
+        try:
+            source.cleanup()
+        except Exception:
+            logger.exception("음악 소스 정리 실패")
+
+    def _abort_prepared_playback(self, guild_id: int, state: GuildMusicState, source: Any) -> None:
+        state.playback_generation += 1
+        guild = self.bot.get_guild(guild_id)
+        voice_client = guild.voice_client if guild else None
+        try:
+            if voice_client:
+                voice_client.stop()
+        except Exception:
+            logger.exception("음악 시작 실패 후 재생 중단 실패: guild_id=%s", guild_id)
+        finally:
+            self._cleanup_prepared_source(source)
+            if state.updater_task and state.updater_task is not asyncio.current_task():
+                state.updater_task.cancel()
+            state.updater_task = None
+            reset_music_idle_state(state)
+            state.is_seeking = False
+            if state.queue:
+                self._spawn_bg(self._on_song_end(guild_id, generation=state.playback_generation))
+            else:
+                self._schedule_idle_disconnect(guild_id)
 
     async def _updater_loop(self, guild_id: int):
         state = self._get_state(guild_id)
         try:
-            dbg("_updater_loop: start")
-            while state.player:
-                guild = self.bot.get_guild(guild_id)
-                voice_client = guild.voice_client if guild else None
-                # ! voice_client 연결 끊김
-                if not voice_client:
-                    dbg("_updater_loop: voice_client disconnected")
-                    await self._force_stop(guild_id)
-                    return
-                # ! 봇만 남아있음 → 종료 호출
-                if voice_client and len(voice_client.channel.members) == 1:
-                    dbg("_updater_loop: bot alone in channel, stopping")
-                    await self._force_stop(guild_id)
-                    return
-                # ! 일시정지 대기
-                if voice_client.is_paused():
-                    dbg("_updater_loop: paused")
-                    await asyncio.sleep(1)
-                    continue
-                # ! 재생시간 계산
-                elapsed = int(time.time() - state.start_ts)
-                total = state.player.data.get("duration", 0)
-                dbg(f"_updater_loop: elapsed={elapsed} total={total}")
-                # ! 메시지 수정(임베드, 뷰)
-                embed = self._make_playing_embed(
-                    state.player, guild_id, min(elapsed, total) if total else elapsed
-                )
-                await self._edit_msg(state, embed, state.control_view)
-                await asyncio.sleep(5)
+            while True:
+                async with self._music_operation(guild_id):
+                    if state.player is None:
+                        return
+                    guild = self.bot.get_guild(guild_id)
+                    voice_client = guild.voice_client if guild else None
+                    if not voice_client or len(voice_client.channel.members) == 1:
+                        await self._force_stop(guild_id)
+                        return
+                    paused = voice_client.is_paused()
+                    if not paused:
+                        elapsed = int(time.time() - state.start_ts)
+                        total = state.player.data.get("duration", 0)
+                        embed = self._make_playing_embed(
+                            state.player, guild_id, min(elapsed, total) if total else elapsed
+                        )
+                        await self._edit_msg(state, embed, state.control_view)
+                await asyncio.sleep(1 if paused else 5)
         finally:
-            dbg("_updater_loop: end")
             if state.updater_task is asyncio.current_task():
                 state.updater_task = None
 
@@ -148,11 +168,19 @@ class MusicPlaybackMixin:
             # 정지 상태 진입
             state.playback_generation += 1
             state.is_stopping = True
-            if vc:
-                await self._disconnect_voice_client_safely(
-                    vc,
-                    action="_force_stop",
-                )
+            try:
+                if vc:
+                    vc.stop()
+                    await self._disconnect_voice_client_safely(
+                        vc,
+                        action="_force_stop",
+                    )
+            finally:
+                if state.updater_task is asyncio.current_task():
+                    state.updater_task = None
+                reset_music_playback_state(state)
+                reset_music_idle_state(state)
+                state.is_seeking = False
             state.control_view = await self._build_helper_view(guild_id)
             embed = self._make_default_embed()
             await self._edit_music_panel_safely(
@@ -161,8 +189,6 @@ class MusicPlaybackMixin:
                 state.control_view,
                 action="_force_stop",
             )
-            # 상태 초기화
-            reset_music_playback_state(state)
 
     async def _restart_updater(self, guild_id: int):
         dbg("_restart_updater: called")
@@ -190,7 +216,7 @@ class MusicPlaybackMixin:
                 dbg("_after_play: finished")
 
             def _schedule_song_end() -> None:
-                self._spawn_bg(self._on_song_end(guild_id, generation=generation))
+                self._spawn_bg(self._on_song_end(guild_id, generation=generation, error=error))
 
             self.bot.loop.call_soon_threadsafe(_schedule_song_end)
 
@@ -210,7 +236,9 @@ class MusicPlaybackMixin:
             voice_client.stop()
             voice_client.play(source, after=_after_play)
 
-    async def _on_song_end(self, guild_id: int, *, generation: int | None = None):
+    async def _on_song_end(
+        self, guild_id: int, *, generation: int | None = None, error: Exception | None = None
+    ):
         dbg("_on_song_end: called")
         # ! 기본정보 로드
         async with self._music_operation(guild_id):
@@ -235,6 +263,15 @@ class MusicPlaybackMixin:
 
             # !루프이거나 루프상태인데 스킵하면 처음부터
             if state.is_skipping or state.is_loop:
+                if error is not None:
+                    logger.warning("음악 반복 재생 오류: guild_id=%s", guild_id,
+                                   exc_info=(type(error), error, error.__traceback__))
+                    if state.playback_error_retries >= 1:
+                        await self._force_stop(guild_id)
+                        return
+                    state.playback_error_retries += 1
+                else:
+                    state.playback_error_retries = 0
                 dbg(f"_on_song_end: loop/skip replay queue_size={len(state.queue)}")
                 try:
                     replay = await prepare_replay_source(
@@ -244,6 +281,7 @@ class MusicPlaybackMixin:
                         ffmpeg_options=ffmpeg_options,
                         ffmpeg_executable=_detect_ffmpeg_executable(),
                         loop=self.bot.loop,
+                        refresh=error is not None,
                     )
                 except MusicPlayerPreparationError:
                     logger.warning(
@@ -258,17 +296,23 @@ class MusicPlaybackMixin:
                     state.player.audio_url = replay.refreshed_player.audio_url
                 state.player.source = replay.source
                 # ! play & updater 재시작
-                self._vc_play(guild_id, source=replay.source)
-                await self._restart_updater(guild_id)
+                try:
+                    self._vc_play(guild_id, source=replay.source)
+                    await self._restart_updater(guild_id)
+                except (Exception, asyncio.CancelledError):
+                    self._abort_prepared_playback(guild_id, state, replay.source)
+                    raise
                 return
 
             # !대기열에 곡이 없으면 패널을 빈(embed 초기) 상태로 리셋
             if not state.queue:
                 dbg("_on_song_end: no next track -> reset panel and wait for idle timeout")
                 reset_music_idle_state(state)
-                state.control_view = await self._build_helper_view(guild_id)
-                await self._edit_msg(state, self._make_default_embed(), state.control_view)
-                self._schedule_idle_disconnect(guild_id)
+                try:
+                    state.control_view = await self._build_helper_view(guild_id)
+                    await self._edit_msg(state, self._make_default_embed(), state.control_view)
+                finally:
+                    self._schedule_idle_disconnect(guild_id)
                 return
 
             # ! 다음 곡 준비: URL -> YTDLSource 변환 후 재생
@@ -286,9 +330,7 @@ class MusicPlaybackMixin:
                 # 실패 시 다음 곡으로 넘어가기 시도 (재귀적 호출 방지 위해 task로)
                 self._spawn_bg(self._on_song_end(guild_id, generation=state.playback_generation))
                 return
-            self._cancel_idle_disconnect(state)
-            start_music_playback_state(state, player, started_at=time.time())
-            embed = self._make_playing_embed(state.player, guild_id)
-            await self._edit_msg(state, embed, state.control_view)
-            self._vc_play(guild_id, source=state.player.source)
-            await self._restart_updater(guild_id)
+            await self._start_prepared_playback(
+                guild_id=guild_id, state=state, player=player,
+                playback_start=build_prepared_playback_start(player),
+            )

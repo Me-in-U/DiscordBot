@@ -4,6 +4,8 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any
 
+from util.music.audio import prepare_opus_source
+
 
 STREAM_PREPARE_ERROR_MESSAGE = (
     "❌ 스트림 URL을 가져오지 못했습니다. 잠시 후 다시 시도하거나 다른 영상으로 시도해 주세요."
@@ -109,15 +111,21 @@ async def prepare_replay_source(
     ffmpeg_options: dict[str, Any],
     ffmpeg_executable: str,
     loop: Any,
+    refresh: bool = False,
 ) -> MusicReplaySourceResult:
+    if refresh:
+        refreshed = await prepare_music_player(
+            source_factory, player.webpage_url, loop=loop, requester=player.requester,
+        )
+        return MusicReplaySourceResult(source=refreshed.source, refreshed_player=refreshed)
     audio_url = getattr(player, "audio_url", None) or player.data.get("url")
     try:
         return MusicReplaySourceResult(
-            source=ffmpeg_source_factory(
+            source=await prepare_opus_source(ffmpeg_source_factory(
                 audio_url,
                 **ffmpeg_options,
                 executable=ffmpeg_executable,
-            )
+            ))
         )
     except Exception:
         refreshed = await prepare_music_player(

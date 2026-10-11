@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 import time
 import discord
-from util.music.state import reset_music_playback_state
+from util.music.state import reset_music_idle_state, reset_music_playback_state
 from util.music.playback import MusicPlayerPreparationError, prepare_music_player
 from util.music.playback_actions import (
     begin_seek_playback_action,
@@ -120,15 +121,18 @@ class MusicControlsMixin:
             state.playback_generation += 1
             self._cancel_idle_disconnect(state)
             result = begin_stop_playback_action(state)
-            await voice_client.disconnect()
+            try:
+                voice_client.stop()
+                await voice_client.disconnect()
+            finally:
+                reset_music_playback_state(state)
+                reset_music_idle_state(state)
+                state.is_seeking = False
 
             # ! reset panel
             state.control_view = await self._build_helper_view(interaction.guild.id)
             embed = self._make_default_embed()
             await self._edit_msg(state, embed, state.control_view)
-
-            # ! 재생 상태 완전 초기화
-            reset_music_playback_state(state)
 
             # ! 메시지
             await self._send_auto_delete(interaction, result.user_message)
@@ -148,6 +152,8 @@ class MusicControlsMixin:
             if error := same_voice_channel_error(interaction, voice_client):
                 await self._send_auto_delete(interaction, error)
                 return
+            player = None
+            restart_started = False
             try:
                 validation_result = validate_seek_playback_action(state, seconds=seconds)
                 if validation_result:
@@ -166,6 +172,7 @@ class MusicControlsMixin:
                     requester=state.player.requester,
                 )
                 # ! 멈추고 재생 위치부터 새 소스 생성
+                restart_started = True
                 begin_seek_playback_action(state)
                 state.playback_generation += 1
                 voice_client.stop()
@@ -188,6 +195,10 @@ class MusicControlsMixin:
                 await self._edit_msg(state, embed, state.control_view)
                 # ! 메시지
                 await self._send_auto_delete(interaction, result.user_message)
+            except asyncio.CancelledError:
+                if player is not None:
+                    self._abort_prepared_playback(guild_id, state, player.source)
+                raise
             except MusicPlayerPreparationError as exc:
                 result = fail_seek_playback_action(state)
                 if isinstance(exc.original_error, FileNotFoundError):
@@ -216,6 +227,8 @@ class MusicControlsMixin:
                     seconds,
                     exc_info=True,
                 )
+                if player is not None and restart_started:
+                    self._abort_prepared_playback(guild_id, state, player.source)
                 # 실패 시 is_seeking 안전 복구
                 result = fail_seek_playback_action(state)
                 await self._send_auto_delete(

@@ -181,6 +181,8 @@ class MusicRequestsMixin:
 
             player = await self._prepare_play_url_now_player(interaction, url)
             if player is None:
+                if state.player is None:
+                    self._schedule_idle_disconnect(guild_id)
                 return
 
             replacing = self._begin_play_url_now_replacement(state, voice_client)
@@ -202,6 +204,7 @@ class MusicRequestsMixin:
     ) -> None:
         player = await self._prepare_music_url_immediate_player(interaction, url)
         if player is None:
+            self._schedule_idle_disconnect(guild_id)
             return
 
         await self._start_music_url_prepared_playback(

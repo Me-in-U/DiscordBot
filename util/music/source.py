@@ -14,6 +14,7 @@ import discord
 import yt_dlp as youtube_dl
 
 from common.http import EXTERNAL_HTTP_TIMEOUT
+from util.music.audio import prepare_opus_source
 from util.music.extractor import (
     resolve_search_result_url,
     select_best_audio_format,
@@ -35,7 +36,7 @@ HEADERS = {
 
 ffmpeg_options = {
     "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
-    "options": "-threads 2 -vn -ac 2 -ar 48000 -acodec libopus -compression_level 5 -application audio -hide_banner -nostats -loglevel error",
+    "options": "-threads 2 -vn -ac 2 -ar 48000 -acodec libopus -compression_level 5 -application audio -frame_duration 20 -page_duration 20000 -hide_banner -nostats -loglevel error",
 }
 
 YTDL_EXECUTOR = ThreadPoolExecutor(max_workers=2, thread_name_prefix="ytdl")
@@ -254,7 +255,7 @@ async def fetch_stream_info(page_url: str) -> tuple[str, dict[str, Any]]:
 class YTDLSource:
     def __init__(
         self,
-        source: discord.FFmpegOpusAudio,
+        source: discord.AudioSource,
         *,
         data: dict[str, Any],
         requester: discord.User | None = None,
@@ -309,7 +310,9 @@ class YTDLSource:
             dbg(
                 f"YTDLSource.from_url: [fallback] creating FFmpegOpusAudio exec={ffmpeg_exec}"
             )
-            source = discord.FFmpegOpusAudio(audio_url, **opts, executable=ffmpeg_exec)
+            source = await prepare_opus_source(
+                discord.FFmpegOpusAudio(audio_url, **opts, executable=ffmpeg_exec)
+            )
             return cls(
                 source=source,
                 data=data,
@@ -359,5 +362,7 @@ class YTDLSource:
         )
         ffmpeg_exec = _detect_ffmpeg_executable()
         dbg(f"YTDLSource.from_url: creating FFmpegOpusAudio exec={ffmpeg_exec}")
-        source = discord.FFmpegOpusAudio(audio_url, **opts, executable=ffmpeg_exec)
+        source = await prepare_opus_source(
+            discord.FFmpegOpusAudio(audio_url, **opts, executable=ffmpeg_exec)
+        )
         return cls(source=source, data=data, requester=requester, audio_url=audio_url)

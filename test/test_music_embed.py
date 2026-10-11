@@ -9,7 +9,8 @@ class _Avatar:
 
 
 class _BotUser:
-    avatar = _Avatar()
+    avatar = None
+    display_avatar = _Avatar()
 
 
 class _Bot:
@@ -28,6 +29,12 @@ class _Player:
 
 
 class MusicEmbedTests(unittest.TestCase):
+    def test_default_embed_supports_bot_without_custom_avatar(self):
+        cog = MusicCog(_Bot())
+        embed = cog._make_default_embed()
+        self.assertEqual(embed.footer.icon_url, _Avatar.url)
+
+
     def test_playing_embed_adds_queue_preview_after_progress(self):
         cog = MusicCog(_Bot())
         state = cog._get_state(1)

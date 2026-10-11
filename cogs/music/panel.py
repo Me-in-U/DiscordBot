@@ -116,7 +116,7 @@ class MusicPanelMixin:
     def _make_default_embed(self) -> Embed:
         try:
             return make_default_music_embed(
-                bot_avatar_url=self.bot.user.avatar.url,
+                bot_avatar_url=self.bot.user.display_avatar.url,
             )
         except (AttributeError, TypeError, ValueError):
             logger.exception("기본 음악 패널 임베드 생성 실패")
@@ -133,7 +133,7 @@ class MusicPanelMixin:
                 is_loop=state.is_loop,
                 is_paused=state.paused_at is not None,
                 elapsed=elapsed,
-                fallback_requester_icon_url=self.bot.user.avatar.url,
+                fallback_requester_icon_url=self.bot.user.display_avatar.url,
             )
         except (AttributeError, TypeError, ValueError):
             logger.exception("음악 재생 임베드 생성 실패")

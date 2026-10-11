@@ -13,6 +13,7 @@ class GuildMusicState:
     operation_lock: asyncio.Lock = field(default_factory=asyncio.Lock, repr=False)
     operation_owner: asyncio.Task | None = field(default=None, repr=False)
     playback_generation: int = 0
+    playback_error_retries: int = 0
     player: Any = None
     start_ts: float = 0.0
     paused_at: float | None = None
@@ -33,6 +34,7 @@ def reset_music_playback_state(state: GuildMusicState) -> None:
     state.queue.clear()
     state.is_loop = False
     state.is_skipping = False
+    state.playback_error_retries = 0
     if state.updater_task:
         state.updater_task.cancel()
         state.updater_task = None
@@ -44,6 +46,7 @@ def reset_music_idle_state(state: GuildMusicState) -> None:
     state.start_ts = 0.0
     state.is_loop = False
     state.is_skipping = False
+    state.playback_error_retries = 0
     state.is_stopping = False
 
 
@@ -55,6 +58,7 @@ def start_music_playback_state(
 ) -> None:
     state.is_stopping = False
     state.is_skipping = False
+    state.playback_error_retries = 0
     state.player = player
     state.start_ts = started_at
     state.paused_at = None

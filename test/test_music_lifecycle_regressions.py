@@ -265,6 +265,142 @@ class MusicLifecycleRegressionTests(unittest.IsolatedAsyncioTestCase):
             self.assertIs(self.state.operation_owner, asyncio.current_task())
         self.assertFalse(self.state.operation_lock.locked())
 
+    async def test_failed_playback_start_cleans_source_and_resets_state(self):
+        prepared = player('failed')
+        prepared.source = MagicMock()
+        self.cog._vc_play = MagicMock(side_effect=RuntimeError('disconnected'))
+        with self.assertRaisesRegex(RuntimeError, 'disconnected'):
+            await self.cog._start_prepared_playback(
+                guild_id=1, state=self.state, player=prepared,
+                playback_start=SimpleNamespace(source=prepared.source),
+            )
+        prepared.source.cleanup.assert_called_once()
+        self.assertIsNone(self.state.player)
+        self.assertIsNone(self.state.updater_task)
+        self.cog._schedule_idle_disconnect.assert_called_once_with(1)
+
+    async def test_cancelled_playback_start_cleans_source_and_resets_state(self):
+        prepared = player('cancelled')
+        prepared.source = MagicMock()
+        self.cog._build_control_view.side_effect = asyncio.CancelledError
+        with self.assertRaises(asyncio.CancelledError):
+            await self.cog._start_prepared_playback(
+                guild_id=1, state=self.state, player=prepared,
+                playback_start=SimpleNamespace(source=prepared.source),
+            )
+        prepared.source.cleanup.assert_called_once()
+        self.assertIsNone(self.state.player)
+        self.cog._schedule_idle_disconnect.assert_called_once_with(1)
+
+    async def test_stop_resets_state_even_when_panel_update_fails(self):
+        self.state.player = player('playing')
+        self.state.queue.append(QueuedTrack(url='queued'))
+        self.state.paused_at = 100
+        self.cog._edit_msg.side_effect = RuntimeError('panel failed')
+        with self.assertRaisesRegex(RuntimeError, 'panel failed'):
+            await self.cog._stop(self.interaction())
+        self.assertIsNone(self.state.player)
+        self.assertIsNone(self.state.paused_at)
+        self.assertFalse(self.state.queue)
+        self.assertFalse(self.state.is_stopping)
+
+    async def test_stop_resets_state_even_when_disconnect_fails(self):
+        self.state.player = player('playing')
+        self.voice.disconnect = AsyncMock(side_effect=OSError('disconnect failed'))
+        with self.assertRaises(OSError):
+            await self.cog._stop(self.interaction())
+        self.assertIsNone(self.state.player)
+        self.assertFalse(self.state.is_stopping)
+
+    async def test_force_stop_resets_state_even_when_panel_update_fails(self):
+        self.state.player = player('playing')
+        self.cog._edit_msg.side_effect = RuntimeError('panel failed')
+        with self.assertRaisesRegex(RuntimeError, 'panel failed'):
+            await self.cog._force_stop(1)
+        self.assertIsNone(self.state.player)
+        self.assertFalse(self.state.is_stopping)
+
+    async def test_loop_playback_error_refreshes_once_then_stops(self):
+        self.state.player = player('looping')
+        self.state.is_loop = True
+        self.cog._vc_play(guild_id=1, source='old')
+        self.voice.stop()
+        refreshed = SimpleNamespace(audio_url='fresh-url')
+        replay = SimpleNamespace(source='fresh-source', refreshed_player=refreshed)
+        with patch('cogs.music.playback.prepare_replay_source', AsyncMock(return_value=replay)) as prepare:
+            with self.assertLogs('cogs.music', level='WARNING'):
+                self.voice.callbacks[0](RuntimeError('stream failed'))
+                await self.flush_callbacks()
+                self.assertTrue(prepare.await_args.kwargs['refresh'])
+                self.assertEqual(self.state.playback_error_retries, 1)
+                self.voice.stop()
+                self.voice.callbacks[1](RuntimeError('stream still failed'))
+                await self.flush_callbacks()
+            self.assertEqual(prepare.await_count, 1)
+        self.assertIsNone(self.state.player)
+        self.assertFalse(self.state.is_loop)
+        self.assertEqual(self.voice.played, ['old', 'fresh-source'])
+
+    async def test_failed_preparation_schedules_idle_disconnect(self):
+        self.cog._prepare_music_url_immediate_player = AsyncMock(return_value=None)
+        await self.cog._play_music_url_branch(self.interaction(), 'https://example.com/broken')
+        self.cog._schedule_idle_disconnect.assert_called_once_with(1)
+        self.assertIsNone(self.state.player)
+
+    async def test_failed_favorite_replacement_keeps_current_playback(self):
+        original = player('current')
+        self.state.player = original
+        self.cog._prepare_play_url_now_player = AsyncMock(return_value=None)
+        await self.cog._play_url_now(self.interaction(), 'https://example.com/broken')
+        self.assertIs(self.state.player, original)
+        self.cog._schedule_idle_disconnect.assert_not_called()
+
+    async def test_favorite_play_defers_before_database_lookup(self):
+        interaction = self.interaction()
+        self.cog._send_ephemeral_response = AsyncMock()
+        async def lookup(*args):
+            self.assertTrue(interaction.response.is_done())
+            return None
+        with patch('cogs.music.favorites.get_music_favorite', AsyncMock(side_effect=lookup)):
+            await self.cog._play_music_favorite(interaction, 1)
+        self.cog._send_ephemeral_response.assert_awaited_once()
+
+    async def test_favorite_database_failure_reports_error_without_starting_playback(self):
+        import aiomysql
+        interaction = self.interaction()
+        self.cog._send_ephemeral_response = AsyncMock()
+        self.cog._play_url_now = AsyncMock()
+        with patch('cogs.music.favorites.get_music_favorite', AsyncMock(side_effect=aiomysql.Error('DB down'))):
+            with self.assertLogs('cogs.music', level='WARNING'):
+                await self.cog._play_music_favorite(interaction, 1)
+        self.assertTrue(interaction.response.is_done())
+        self.cog._send_ephemeral_response.assert_awaited_once()
+        self.cog._play_url_now.assert_not_awaited()
+
+    async def test_favorite_refresh_waits_for_stop_and_reads_latest_state(self):
+        self.state.control_msg = object()
+        self.state.control_channel = object()
+        self.state.player = player('old')
+        async with self.cog._music_operation(1):
+            refresh = asyncio.create_task(self.cog._refresh_music_panel_for_favorites(1))
+            await asyncio.sleep(0)
+            self.cog._edit_msg.assert_not_awaited()
+            self.state.player = None
+        await refresh
+        self.cog._edit_msg.assert_awaited_with(self.state, 'idle', 'helper')
+        self.cog._make_playing_embed.assert_not_called()
+
+    async def test_updater_waits_for_state_lock_and_does_not_send_stale_panel(self):
+        from cogs.music.playback import MusicPlaybackMixin
+        self.state.player = player('old')
+        async with self.cog._music_operation(1):
+            updater = asyncio.create_task(MusicPlaybackMixin._updater_loop(self.cog, 1))
+            await asyncio.sleep(0)
+            self.cog._edit_msg.assert_not_awaited()
+            self.state.player = None
+        await updater
+        self.cog._edit_msg.assert_not_awaited()
+
     def test_split_cog_registers_all_music_commands(self):
         self.assertEqual(
             {command.name for command in MusicCog.__cog_app_commands__},

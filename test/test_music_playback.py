@@ -1,6 +1,7 @@
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 from cogs.music import MusicCog
 from util.music.playback import (
@@ -157,6 +158,8 @@ class MusicPlaybackTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_prepare_replay_source_reuses_cached_audio_url(self):
         calls = []
+        raw_source = MagicMock()
+        raw_source.read.return_value = b"opus-packet"
         player = SimpleNamespace(
             audio_url="cached-audio",
             data={"url": "data-audio"},
@@ -165,7 +168,7 @@ class MusicPlaybackTests(unittest.IsolatedAsyncioTestCase):
 
         def ffmpeg_source_factory(audio_url, **kwargs):
             calls.append((audio_url, kwargs))
-            return "new-source"
+            return raw_source
 
         async def source_factory(url, *, loop, requester):
             raise AssertionError("refresh should not run")
@@ -179,7 +182,10 @@ class MusicPlaybackTests(unittest.IsolatedAsyncioTestCase):
             loop="loop",
         )
 
-        self.assertEqual(result.source, "new-source")
+        self.assertIs(result.source.source, raw_source)
+        raw_source.read.assert_called()
+        self.assertEqual(raw_source.read.call_count, 10)
+        self.assertEqual(result.source.read(), b"opus-packet")
         self.assertIsNone(result.refreshed_player)
         self.assertEqual(
             calls,
@@ -214,6 +220,21 @@ class MusicPlaybackTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.source, "fresh-source")
         self.assertIs(result.refreshed_player, refreshed)
         self.assertEqual(calls, [("https://example.com/watch?v=1", "loop", None)])
+
+
+    async def test_replay_refresh_bypasses_cached_ffmpeg_source(self):
+        from unittest.mock import AsyncMock, MagicMock
+        original = SimpleNamespace(webpage_url="page-url", requester="requester")
+        refreshed = SimpleNamespace(source="fresh-source")
+        factory = AsyncMock(return_value=refreshed)
+        cached_factory = MagicMock()
+        result = await prepare_replay_source(
+            original, source_factory=factory, ffmpeg_source_factory=cached_factory,
+            ffmpeg_options={}, ffmpeg_executable="ffmpeg", loop="loop", refresh=True,
+        )
+        self.assertIs(result.refreshed_player, refreshed)
+        factory.assert_awaited_once_with("page-url", loop="loop", requester="requester")
+        cached_factory.assert_not_called()
 
 
 if __name__ == "__main__":

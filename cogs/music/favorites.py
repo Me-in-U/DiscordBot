@@ -196,34 +196,43 @@ class MusicFavoritesMixin:
         )
 
     async def _refresh_music_panel_for_favorites(self, guild_id: int) -> None:
-        state = self._get_state(guild_id)
-        panel_action = build_music_favorite_panel_refresh_action(
-            guild_id=guild_id,
-            has_control_message=state.control_msg is not None,
-            has_control_channel=state.control_channel is not None,
-            has_player=state.player is not None,
-        )
-        if not panel_action.should_refresh:
-            return
-        if panel_action.should_use_playing_panel:
-            state.control_view = await self._build_control_view(
-                panel_action.guild_id,
-                state,
+        async with self._music_operation(guild_id):
+            state = self._get_state(guild_id)
+            panel_action = build_music_favorite_panel_refresh_action(
+                guild_id=guild_id,
+                has_control_message=state.control_msg is not None,
+                has_control_channel=state.control_channel is not None,
+                has_player=state.player is not None,
             )
-            elapsed = int(time.time() - state.start_ts) if state.start_ts else 0
-            embed = self._make_playing_embed(state.player, panel_action.guild_id, elapsed)
-        else:
-            state.control_view = await self._build_helper_view(panel_action.guild_id)
-            embed = self._make_default_embed()
-        await self._edit_msg(state, embed, state.control_view)
+            if not panel_action.should_refresh:
+                return
+            if panel_action.should_use_playing_panel:
+                state.control_view = await self._build_control_view(
+                    panel_action.guild_id,
+                    state,
+                )
+                now = state.paused_at if state.paused_at is not None else time.time()
+                elapsed = max(0, int(now - state.start_ts)) if state.start_ts else 0
+                embed = self._make_playing_embed(state.player, panel_action.guild_id, elapsed)
+            else:
+                state.control_view = await self._build_helper_view(panel_action.guild_id)
+                embed = self._make_default_embed()
+            await self._edit_msg(state, embed, state.control_view)
 
     async def _play_music_favorite(
         self,
         interaction: discord.Interaction,
         slot: int,
     ) -> None:
+        if not interaction.response.is_done():
+            await interaction.response.defer(thinking=True, ephemeral=True)
         play_request = build_music_favorite_play_request_action(slot)
-        favorite = await get_music_favorite(interaction.guild.id, play_request.slot)
+        try:
+            favorite = await get_music_favorite(interaction.guild.id, play_request.slot)
+        except (aiomysql.Error, TypeError, ValueError, KeyError):
+            logger.warning("음악 즐겨찾기 조회 실패", exc_info=True)
+            await self._send_ephemeral_response(interaction, "❌ 즐겨찾기를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.")
+            return
         play_result = build_music_favorite_play_action(
             slot=play_request.slot,
             favorite=favorite,
