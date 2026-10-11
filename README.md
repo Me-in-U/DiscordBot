@@ -60,7 +60,7 @@ Discord 서버 운영, AI 보조, 음악 재생, 게임/도박, 일정, 외부 �
 대표 예시는 다음과 같습니다.
 
 - `cogs/gambling/`: 도박 명령 surface, 잔액/게임 로직은 하위 파일로 분리
-- `cogs/music/`: 음악 명령 surface, queue/playback/source/view helper는 `util/music/`
+- `cogs/music/`: `__init__.py`는 Cog 등록, 명령어, 이벤트를 담당합니다. 즐겨찾기는 `favorites.py`, 패널은 `panel.py`, 검색과 대기열은 `queue.py`, URL 재생 요청은 `requests.py`, 일시정지와 구간 이동은 `controls.py`, 재생 수명주기와 곡 종료는 `playback.py`에 있습니다. 공통 상수와 로거는 `runtime.py`, 순수 로직과 source/view helper는 `util/music/`에 있습니다.
 - `cogs/youtube_subscriptions/`: YouTube 구독 명령 surface, 상태/알림/WebSub helper는 `util/youtube/`
 - `cogs/maplestory/`: MapleStory 명령 surface, fetch/parser/sender/state는 `util/maplestory/`
 - `cogs/loop/`: background task orchestration, 세부 runner는 `util/loop/`, `util/youtube/`, `util/maplestory/`, `util/codex_resets/`, `util/earthquake/`
@@ -237,6 +237,7 @@ Wolfx는 일본 기상청과 관계없는 비공식 중계 서비스이며 EMSC/
 ### 음악
 
 음악 명령은 `/채널설정 기능:음악`으로 채널을 제한할 수 있습니다.
+재생 상태 처리와 재발 방지 테스트는 [음악 재생 상태와 비동기 처리](docs/music-playback-lifecycle.md)를 참고하세요.
 
 | 명령어 | 설명 |
 | --- | --- |

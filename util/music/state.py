@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import collections
 from dataclasses import dataclass, field
 from typing import Any, Deque
@@ -9,6 +10,9 @@ from util.music.queue import QueuedTrack
 
 @dataclass
 class GuildMusicState:
+    operation_lock: asyncio.Lock = field(default_factory=asyncio.Lock, repr=False)
+    operation_owner: asyncio.Task | None = field(default=None, repr=False)
+    playback_generation: int = 0
     player: Any = None
     start_ts: float = 0.0
     paused_at: float | None = None

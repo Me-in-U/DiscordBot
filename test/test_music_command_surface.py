@@ -14,6 +14,15 @@ LEGACY_CHANNEL_SETTINGS_COG_PATH = Path("cogs/channel_settings.py")
 DB_PATH = Path("util/db.py")
 
 
+def _music_source() -> str:
+    """명령과 분리된 구현을 함께 읽어 기존 동작 검사를 유지한다."""
+    paths = [MUSIC_PATH] + [
+        MUSIC_PATH.with_name(name)
+        for name in ("runtime.py", "favorites.py", "panel.py", "playback.py", "controls.py", "queue.py", "requests.py")
+    ]
+    return "\n\n".join(path.read_text(encoding="utf-8") for path in paths)
+
+
 def _decorator_name(decorator: ast.expr) -> str:
     if isinstance(decorator, ast.Call):
         decorator = decorator.func
@@ -162,7 +171,7 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         self.assertFalse(LEGACY_CHANNEL_SETTINGS_COG_PATH.exists())
 
     def test_seek_restarts_playback_with_guild_id(self):
-        tree = ast.parse(MUSIC_PATH.read_text(encoding="utf-8"))
+        tree = ast.parse(_music_source())
         seek_node = _function_node(tree, "_seek")
         vc_play_calls = [
             node
@@ -181,7 +190,7 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         )
 
     def test_updater_does_not_advance_queue_directly(self):
-        tree = ast.parse(MUSIC_PATH.read_text(encoding="utf-8"))
+        tree = ast.parse(_music_source())
         updater_node = _function_node(tree, "_updater_loop")
 
         self.assertFalse(
@@ -218,10 +227,10 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         raise AssertionError("SearchResultView class not found")
 
     def test_empty_queue_schedules_idle_disconnect_instead_of_immediate_stop(self):
-        tree = ast.parse(MUSIC_PATH.read_text(encoding="utf-8"))
+        tree = ast.parse(_music_source())
         on_song_end = _function_node(tree, "_on_song_end")
         source = ast.get_source_segment(
-            MUSIC_PATH.read_text(encoding="utf-8"), on_song_end
+            _music_source(), on_song_end
         )
 
         self.assertIn("_schedule_idle_disconnect(guild_id)", source)
@@ -229,14 +238,14 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         self.assertNotIn("no next track -> stop and reset panel", source)
 
     def test_idle_disconnect_state_is_explicit(self):
-        text = MUSIC_PATH.read_text(encoding="utf-8")
+        text = _music_source()
         state_text = MUSIC_STATE_PATH.read_text(encoding="utf-8")
 
         self.assertIn("IDLE_DISCONNECT_SECONDS = 300", text)
         self.assertIn("idle_disconnect_task: object | None = None", state_text)
 
     def test_background_task_spawn_logs_task_exceptions(self):
-        tree = ast.parse(MUSIC_PATH.read_text(encoding="utf-8"))
+        tree = ast.parse(_music_source())
         spawn_node = next(
             (
                 node
@@ -247,13 +256,13 @@ class MusicCommandSurfaceTests(unittest.TestCase):
             None,
         )
         self.assertIsNotNone(spawn_node, "_spawn_bg function not found")
-        source = ast.get_source_segment(MUSIC_PATH.read_text(encoding="utf-8"), spawn_node)
+        source = ast.get_source_segment(_music_source(), spawn_node)
 
         self.assertIn("task.exception()", source)
         self.assertIn("logger.exception", source)
 
     def test_queue_added_paths_use_shared_auto_delete_response(self):
-        source_text = MUSIC_PATH.read_text(encoding="utf-8")
+        source_text = _music_source()
         queue_actions_text = MUSIC_QUEUE_ACTIONS_PATH.read_text(encoding="utf-8")
         tree = ast.parse(source_text)
 
@@ -284,7 +293,7 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         self.assertNotIn('"▶ **대기열에 추가되었습니다.**"', search_pick_source)
 
     def test_play_url_command_delegates_queue_decision_to_helper(self):
-        source_text = MUSIC_PATH.read_text(encoding="utf-8")
+        source_text = _music_source()
         tree = ast.parse(source_text)
         play_source = ast.get_source_segment(
             source_text,
@@ -372,7 +381,7 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         self.assertIn("return", play_branch_source)
 
     def test_play_command_delegates_debug_message_to_music_logging_helper(self):
-        source_text = MUSIC_PATH.read_text(encoding="utf-8")
+        source_text = _music_source()
         tree = ast.parse(source_text)
 
         self.assertIn("from util.music.logging import", source_text)
@@ -396,7 +405,7 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         self.assertIn("def log_music_debug", logging_source)
 
     def test_play_url_queue_decision_helper_handles_queued_response(self):
-        source_text = MUSIC_PATH.read_text(encoding="utf-8")
+        source_text = _music_source()
         tree = ast.parse(source_text)
         decision_source = ast.get_source_segment(
             source_text,
@@ -413,7 +422,7 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         self.assertNotIn("build_prepared_playback_start", decision_source)
 
     def test_search_pick_command_delegates_queue_decision_to_action_helper(self):
-        source_text = MUSIC_PATH.read_text(encoding="utf-8")
+        source_text = _music_source()
         tree = ast.parse(source_text)
         function_node = _function_node(tree, "_play_from_search_pick")
         function_source = ast.get_source_segment(source_text, function_node)
@@ -431,7 +440,7 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         self.assertNotIn("normalize_search_entry_url", call_names)
 
     def test_search_pick_voice_error_uses_shared_auto_delete_response(self):
-        source_text = MUSIC_PATH.read_text(encoding="utf-8")
+        source_text = _music_source()
         tree = ast.parse(source_text)
         function_source = ast.get_source_segment(
             source_text,
@@ -445,7 +454,7 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         )
 
     def test_play_url_voice_error_uses_shared_auto_delete_response(self):
-        source_text = MUSIC_PATH.read_text(encoding="utf-8")
+        source_text = _music_source()
         tree = ast.parse(source_text)
         function_source = ast.get_source_segment(
             source_text,
@@ -464,7 +473,7 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         )
 
     def test_play_url_now_voice_guard_delegates_to_helper(self):
-        source_text = MUSIC_PATH.read_text(encoding="utf-8")
+        source_text = _music_source()
         tree = ast.parse(source_text)
         play_url_now_source = ast.get_source_segment(
             source_text,
@@ -489,7 +498,7 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         self.assertIn("음악을 제어할 수 있습니다", helper_source)
 
     def test_play_url_now_playback_state_delegates_to_action_helpers(self):
-        source_text = MUSIC_PATH.read_text(encoding="utf-8")
+        source_text = _music_source()
         tree = ast.parse(source_text)
         play_url_now_source = ast.get_source_segment(
             source_text,
@@ -515,7 +524,7 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         self.assertNotIn("state.is_seeking = False", play_url_now_source)
 
     def test_play_url_now_preparation_delegates_to_helper(self):
-        source_text = MUSIC_PATH.read_text(encoding="utf-8")
+        source_text = _music_source()
         tree = ast.parse(source_text)
         play_url_now_source = ast.get_source_segment(
             source_text,
@@ -538,7 +547,7 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         self.assertIn("return None", helper_source)
 
     def test_play_url_now_playback_start_delegates_to_helper(self):
-        source_text = MUSIC_PATH.read_text(encoding="utf-8")
+        source_text = _music_source()
         tree = ast.parse(source_text)
         play_url_now_source = ast.get_source_segment(
             source_text,
@@ -561,7 +570,7 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         self.assertIn("self._send_auto_delete(", helper_source)
 
     def test_play_url_preparation_error_uses_shared_auto_delete_response(self):
-        source_text = MUSIC_PATH.read_text(encoding="utf-8")
+        source_text = _music_source()
         tree = ast.parse(source_text)
         function_source = ast.get_source_segment(
             source_text,
@@ -590,7 +599,7 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         )
 
     def test_music_url_immediate_playback_start_delegates_to_helper(self):
-        source_text = MUSIC_PATH.read_text(encoding="utf-8")
+        source_text = _music_source()
         tree = ast.parse(source_text)
         function_source = ast.get_source_segment(
             source_text,
@@ -612,7 +621,7 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         self.assertIn("self._send_auto_delete(", helper_source)
 
     def test_control_voice_guard_errors_use_shared_auto_delete_response(self):
-        source_text = MUSIC_PATH.read_text(encoding="utf-8")
+        source_text = _music_source()
         tree = ast.parse(source_text)
 
         for function_name in (
@@ -636,7 +645,7 @@ class MusicCommandSurfaceTests(unittest.TestCase):
                 )
 
     def test_control_simple_responses_use_shared_auto_delete_response(self):
-        source_text = MUSIC_PATH.read_text(encoding="utf-8")
+        source_text = _music_source()
         tree = ast.parse(source_text)
 
         for function_name in (
@@ -656,7 +665,7 @@ class MusicCommandSurfaceTests(unittest.TestCase):
                 self.assertNotIn("self._auto_delete(", function_source)
 
     def test_favorite_and_queue_display_use_shared_auto_delete_response(self):
-        source_text = MUSIC_PATH.read_text(encoding="utf-8")
+        source_text = _music_source()
         tree = ast.parse(source_text)
 
         send_auto_delete_source = ast.get_source_segment(
@@ -683,7 +692,7 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         self.assertIn("delay=20.0", show_queue_source)
 
     def test_playback_start_confirmation_uses_shared_auto_delete_response(self):
-        source_text = MUSIC_PATH.read_text(encoding="utf-8")
+        source_text = _music_source()
         tree = ast.parse(source_text)
 
         for function_name in (
@@ -718,7 +727,7 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         self.assertNotIn("playback_start.confirmation_message", play_url_source)
 
     def test_search_result_responses_use_shared_response_helper(self):
-        source_text = MUSIC_PATH.read_text(encoding="utf-8")
+        source_text = _music_source()
         tree = ast.parse(source_text)
 
         ephemeral_helper_source = ast.get_source_segment(
@@ -773,7 +782,7 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         self.assertIn("_play_music_search_branch", play_branch_source)
 
     def test_play_and_favorite_search_delegate_result_mapping_to_search_action_helper(self):
-        source_text = MUSIC_PATH.read_text(encoding="utf-8")
+        source_text = _music_source()
         tree = ast.parse(source_text)
 
         for function_name in ("_play_music_search_branch", "_search_music_for_favorite_slot"):
@@ -809,7 +818,7 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         self.assertIn("_play_music_search_branch", play_branch_source)
 
     def test_favorite_search_request_delegates_input_mapping_to_helper(self):
-        source_text = MUSIC_PATH.read_text(encoding="utf-8")
+        source_text = _music_source()
         tree = ast.parse(source_text)
         function_source = ast.get_source_segment(
             source_text,
@@ -825,7 +834,7 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         self.assertNotIn("검색어를 입력", function_source)
 
     def test_favorite_management_responses_use_shared_ephemeral_helper(self):
-        source_text = MUSIC_PATH.read_text(encoding="utf-8")
+        source_text = _music_source()
         tree = ast.parse(source_text)
 
         manager_source = ast.get_source_segment(
@@ -853,7 +862,7 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         self.assertNotIn("interaction.followup.send", play_favorite_source)
 
     def test_favorite_play_command_delegates_result_mapping_to_helper(self):
-        source_text = MUSIC_PATH.read_text(encoding="utf-8")
+        source_text = _music_source()
         tree = ast.parse(source_text)
         play_favorite_source = ast.get_source_segment(
             source_text,
@@ -872,7 +881,7 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         self.assertNotIn("⭐ 즐겨찾기 재생", play_favorite_source)
 
     def test_favorite_save_commands_delegate_payload_mapping_to_helper(self):
-        source_text = MUSIC_PATH.read_text(encoding="utf-8")
+        source_text = _music_source()
         tree = ast.parse(source_text)
 
         save_source = ast.get_source_segment(
@@ -917,7 +926,7 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         self.assertNotIn("thumbnail=favorite.thumbnail", current_source)
 
     def test_favorite_panel_refresh_delegates_panel_mode_to_helper(self):
-        source_text = MUSIC_PATH.read_text(encoding="utf-8")
+        source_text = _music_source()
         tree = ast.parse(source_text)
 
         refresh_source = ast.get_source_segment(
@@ -935,7 +944,7 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         self.assertNotIn("if state.player:", refresh_source)
 
     def test_panel_and_seek_validation_responses_use_shared_ephemeral_helper(self):
-        source_text = MUSIC_PATH.read_text(encoding="utf-8")
+        source_text = _music_source()
         tree = ast.parse(source_text)
 
         panel_source = ast.get_source_segment(
@@ -958,7 +967,7 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         self.assertNotIn("interaction.followup.send", seek_command_source)
 
     def test_music_channel_warning_uses_shared_auto_delete_helper(self):
-        source_text = MUSIC_PATH.read_text(encoding="utf-8")
+        source_text = _music_source()
         tree = ast.parse(source_text)
 
         helper_source = ast.get_source_segment(
@@ -984,7 +993,7 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         self.assertNotIn("self._auto_delete(", on_message_source)
 
     def test_cleanup_paths_use_specific_exception_helpers(self):
-        source_text = MUSIC_PATH.read_text(encoding="utf-8")
+        source_text = _music_source()
         tree = ast.parse(source_text)
 
         disconnect_helper = ast.get_source_segment(
@@ -1019,7 +1028,7 @@ class MusicCommandSurfaceTests(unittest.TestCase):
                 self.assertNotIn("패널 리셋 실패", function_source)
 
     def test_storage_loaders_use_specific_db_and_row_exceptions(self):
-        source_text = MUSIC_PATH.read_text(encoding="utf-8")
+        source_text = _music_source()
         tree = ast.parse(source_text)
 
         for function_name in ("_load_panel_ids", "_load_music_favorites"):
@@ -1055,7 +1064,7 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         self.assertNotIn("favorites = []", favorite_loader)
 
     def test_queue_metadata_loader_uses_runner_helper(self):
-        source_text = MUSIC_PATH.read_text(encoding="utf-8")
+        source_text = _music_source()
         tree = ast.parse(source_text)
 
         function_source = ast.get_source_segment(
@@ -1078,7 +1087,7 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         self.assertNotIn("thumbnails", function_source)
 
     def test_playback_control_paths_use_specific_exceptions(self):
-        source_text = MUSIC_PATH.read_text(encoding="utf-8")
+        source_text = _music_source()
         tree = ast.parse(source_text)
 
         for function_name in ("_resume", "_seek"):
@@ -1106,7 +1115,7 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         self.assertNotIn("replay source prepare failed: {type", song_end_source)
 
     def test_music_remaining_broad_catches_are_lifecycle_logged(self):
-        source_text = MUSIC_PATH.read_text(encoding="utf-8")
+        source_text = _music_source()
         tree = ast.parse(source_text)
 
         idle_source = ast.get_source_segment(
@@ -1130,7 +1139,7 @@ class MusicCommandSurfaceTests(unittest.TestCase):
                 self.assertNotIn("except Exception", function_source)
 
     def test_music_status_output_uses_logger_not_print(self):
-        source_text = MUSIC_PATH.read_text(encoding="utf-8")
+        source_text = _music_source()
         tree = ast.parse(source_text)
 
         print_calls = [
@@ -1156,7 +1165,7 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         self.assertNotIn("print(", dbg_source)
 
     def test_queue_action_commands_delegate_to_action_helpers(self):
-        source_text = MUSIC_PATH.read_text(encoding="utf-8")
+        source_text = _music_source()
         tree = ast.parse(source_text)
 
         expected_helpers = {
@@ -1182,7 +1191,7 @@ class MusicCommandSurfaceTests(unittest.TestCase):
                 self.assertNotIn("state.queue.clear()", function_source)
 
     def test_playback_commands_delegate_state_changes_to_action_helpers(self):
-        source_text = MUSIC_PATH.read_text(encoding="utf-8")
+        source_text = _music_source()
         tree = ast.parse(source_text)
 
         expected_helpers = {
@@ -1209,7 +1218,7 @@ class MusicCommandSurfaceTests(unittest.TestCase):
                     self.assertNotIn(snippet, function_source)
 
     def test_skip_and_seek_delegate_state_changes_to_action_helpers(self):
-        source_text = MUSIC_PATH.read_text(encoding="utf-8")
+        source_text = _music_source()
         tree = ast.parse(source_text)
 
         skip_source = ast.get_source_segment(source_text, _function_node(tree, "_skip"))
@@ -1245,7 +1254,7 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         self.assertIn("PRIMARY KEY (guild_id, slot)", db_source)
 
     def test_music_panel_views_include_favorite_controls(self):
-        source = MUSIC_PATH.read_text(encoding="utf-8") + MUSIC_VIEWS_PATH.read_text(encoding="utf-8")
+        source = _music_source() + MUSIC_VIEWS_PATH.read_text(encoding="utf-8")
 
         self.assertIn("MusicFavoriteManageView", source)
         self.assertIn("FavoriteSearchModal", source)
