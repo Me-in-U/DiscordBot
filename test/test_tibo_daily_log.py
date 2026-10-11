@@ -60,6 +60,17 @@ class TiboParserTests(unittest.TestCase):
         html = '<ol class="challenge-ledger"><li class="challenge-row" id="day-1"><time datetime="2026-10-05"></time>Waiting for Tibo</li></ol>'
         self.assertEqual(parse_tibo_daily_log(html), ())
 
+    def test_reset_articles_without_type_class_use_preceding_badge(self):
+        html = self.html.replace(
+            '<article id="announcement-post%3A300" class="challenge-entry challenge-entry--reset">',
+            '<span class="challenge-badge challenge-state--reset">Reset</span>'
+            '<article id="announcement-post%3A300" class="challenge-entry">',
+        )
+        self.assertEqual(parse_tibo_daily_log(html), self.entries)
+        banked = parse_tibo_daily_log(html.replace(">Reset</span>", ">Banked reset</span>"))
+        self.assertEqual(banked[0].kind, "banked-reset")
+        self.assertEqual(banked[1].kind, "improvement")
+
     def test_untrusted_source_uses_tracker_link(self):
         entries = parse_tibo_daily_log(self.html.replace("https://x.com/thsottiaux/status/500", "javascript:alert(1)"))
         self.assertEqual(entries[-1].source_url, f"{TIBO_URL}#announcement-post%3A500")
@@ -257,18 +268,26 @@ class TiboFetcherTests(unittest.IsolatedAsyncioTestCase):
 
 
 class TiboSummaryTests(unittest.IsolatedAsyncioTestCase):
-    async def test_reuses_translation_path_and_preserves_all_items(self):
+    async def test_uses_dedicated_structured_prompt_and_preserves_all_items(self):
         entries = parse_tibo_daily_log(FIXTURE.read_text(encoding="utf-8"))
-        translated = json.dumps([{"title": "한국어 제목", "summary": "한국어 요약입니다."} for entry in entries])
-        with patch("cogs.translation.translate_text", AsyncMock(return_value=translated)) as translate:
+        translated = json.dumps({"announcements": [{"title": "한국어 제목", "summary": "한국어 요약입니다."} for entry in entries]})
+        with patch("api.chatGPT.custom_prompt_model", return_value=translated) as translate:
             summaries = await summarize_tibo_daily_log(entries)
         self.assertEqual(len(summaries), len(entries))
-        self.assertEqual(len(json.loads(translate.call_args.args[0])), len(entries))
-        self.assertIn("한국어", translate.call_args.kwargs["instructions"])
+        self.assertEqual(len(json.loads(translate.call_args.kwargs["image_content"][0]["content"][0]["text"])), len(entries))
+        self.assertEqual(
+            translate.call_args.kwargs["prompt"],
+            {"id": "pmpt_6acb1292a3d081949de6159ba2e7b8980f0a4220cb94db05", "version": "1"},
+        )
+        self.assertNotIn("instructions", translate.call_args.kwargs)
 
     async def test_missing_items_or_invalid_response_fail_instead_of_sending(self):
         entries = parse_tibo_daily_log(FIXTURE.read_text(encoding="utf-8"))
-        for response in ("not json", "[]", '[{"title":"title","summary":"English"},{"title":"title","summary":"English"}]'):
-            with self.subTest(response=response), patch("cogs.translation.translate_text", AsyncMock(return_value=response)):
+        for response in (
+            "not json", "[]", '{"announcements":[]}',
+            '{"announcements":[{"title":"title","summary":"English"},{"title":"title","summary":"English"}]}',
+            '{"announcements":[{"title":"한국어 제목","summary":null},{"title":"한국어 제목","summary":"한국어 요약"}]}',
+        ):
+            with self.subTest(response=response), patch("api.chatGPT.custom_prompt_model", return_value=response):
                 with self.assertRaises(ValueError):
                     await summarize_tibo_daily_log(entries)

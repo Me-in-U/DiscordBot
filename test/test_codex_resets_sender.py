@@ -64,13 +64,17 @@ class CodexResetsSenderTests(unittest.IsolatedAsyncioTestCase):
         channel = SimpleNamespace(send=AsyncMock(return_value=SimpleNamespace(id=1)))
         translated = "사용량 한도가 초기화되었습니다."
         with patch("api.chatGPT.clientGPT.responses.create") as create:
-            create.return_value.output_text = translated
+            create.return_value.output_text = json.dumps({"translation": translated})
             await send_codex_reset_notification(channel, self.event)
 
         create.assert_called_once()
-        self.assertNotIn("prompt", create.call_args.kwargs)
         self.assertEqual(
-            json.loads(create.call_args.kwargs["input"]),
+            create.call_args.kwargs["prompt"],
+            {"id": "pmpt_6acb11b275008195b640735bc30880b60285ae979fb0bf4d", "version": "2"},
+        )
+        self.assertNotIn("instructions", create.call_args.kwargs)
+        self.assertEqual(
+            json.loads(create.call_args.kwargs["input"][0]["content"][0]["text"]),
             {"text": self.event.text, "reset_type": self.event.reset_type},
         )
         self.assertEqual(channel.send.await_args.kwargs["embed"].description, translated)
@@ -85,7 +89,15 @@ class CodexResetsSenderTests(unittest.IsolatedAsyncioTestCase):
     async def test_empty_or_non_korean_translation_is_not_sent(self):
         channel = SimpleNamespace(send=AsyncMock())
         for translated in (None, "", "  ", "Usage limits reset."):
-            with self.subTest(translated=translated), patch("api.chatGPT.generate_text_model", return_value=translated):
+            with self.subTest(translated=translated), patch("api.chatGPT.custom_prompt_model", return_value=json.dumps({"translation": translated})):
+                with self.assertRaises(ValueError):
+                    await send_codex_reset_notification(channel, self.event)
+        channel.send.assert_not_awaited()
+
+    async def test_malformed_structured_translation_is_not_sent(self):
+        channel = SimpleNamespace(send=AsyncMock())
+        for result in ("", "not json", "[]", "{}", '{"translation":"한국어","extra":true}'):
+            with self.subTest(result=result), patch("api.chatGPT.custom_prompt_model", return_value=result):
                 with self.assertRaises(ValueError):
                     await send_codex_reset_notification(channel, self.event)
         channel.send.assert_not_awaited()
