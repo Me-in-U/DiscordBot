@@ -75,7 +75,7 @@ class MusicEmbedHelperTests(unittest.TestCase):
         self.assertEqual(data["fields"][0]["value"], "테스트 곡")
         self.assertEqual(
             data["fields"][1]["value"],
-            "━━━━●━━━━━━━━━━━━━━\n00:30 / 02:00    25%",
+            "━━━━●━━━━━━━━━━━━━━\n00:30 / 02:00",
         )
         self.assertEqual(data["fields"][2]["value"], "`1` 노래1\n`2` 노래2\n`3` 노래3")
         self.assertEqual(data["thumbnail"]["url"], "https://example.com/thumb.png")
@@ -100,7 +100,7 @@ class MusicEmbedHelperTests(unittest.TestCase):
         )
         data = embed.to_dict()
         self.assertEqual(data["fields"][1]["name"], "재생 중")
-        self.assertEqual(data["fields"][1]["value"], "●━━━━━━━━━━━━━━━━━━\n00:00 / 00:00    0%")
+        self.assertEqual(data["fields"][1]["value"], "●━━━━━━━━━━━━━━━━━━\n00:00 / 00:00")
         footer = data["footer"]
 
         self.assertIn("신청자: 알 수 없음", footer["text"])

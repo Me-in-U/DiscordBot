@@ -55,7 +55,7 @@ class MusicEmbedTests(unittest.TestCase):
             fields[0]["value"],
             "[출근용 봄노래] 장범준(버스커버스커) - 🎧봄노래 모음",
         )
-        self.assertEqual(fields[1]["value"], "━●━━━━━━━━━━━━━━━━━\n01:35 / 27:53    5%")
+        self.assertEqual(fields[1]["value"], "━●━━━━━━━━━━━━━━━━━\n01:35 / 27:53")
         self.assertEqual(fields[2]["value"], "`1` 노래1\n`2` 노래2\n`3` 노래3\n+ 1곡 더")
 
     def test_paused_embed_labels_progress_without_duplicate_bar(self):

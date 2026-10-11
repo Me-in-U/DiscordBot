@@ -31,9 +31,8 @@ def make_timeline_line(elapsed: int, total: int, length: int = 18) -> str:
     normalized_elapsed = _clamp_elapsed(elapsed, normalized_total)
     elapsed_fmt = format_music_time(normalized_elapsed)
     total_fmt = format_music_time(normalized_total)
-    pct = int(normalized_elapsed / normalized_total * 100) if normalized_total else 0
     _, filled = make_progress_bar(normalized_elapsed, normalized_total, length)
     normalized_length = max(0, int(length or 0))
     left = H_BAR * filled
     right = H_BAR * (normalized_length - filled)
-    return f"{left}●{right}\n{elapsed_fmt} / {total_fmt}    {pct}%"
+    return f"{left}●{right}\n{elapsed_fmt} / {total_fmt}"

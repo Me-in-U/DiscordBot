@@ -31,15 +31,15 @@ class MusicProgressHelperTests(unittest.TestCase):
 
         self.assertEqual(
             make_timeline_line(30, 120, length=4),
-            f"{H_BAR}●{H_BAR * 3}\n00:30 / 02:00    25%",
+            f"{H_BAR}●{H_BAR * 3}\n00:30 / 02:00",
         )
 
     def test_timeline_marker_clamps_start_end_and_unknown_duration(self):
         from util.music.progress import make_timeline_line
 
-        self.assertEqual(make_timeline_line(-5, 100, 4), "●━━━━\n00:00 / 01:40    0%")
-        self.assertEqual(make_timeline_line(150, 100, 4), "━━━━●\n01:40 / 01:40    100%")
-        self.assertEqual(make_timeline_line(10, 0, 4), "●━━━━\n00:00 / 00:00    0%")
+        self.assertEqual(make_timeline_line(-5, 100, 4), "●━━━━\n00:00 / 01:40")
+        self.assertEqual(make_timeline_line(150, 100, 4), "━━━━●\n01:40 / 01:40")
+        self.assertEqual(make_timeline_line(10, 0, 4), "●━━━━\n00:00 / 00:00")
 
     def test_legacy_music_cog_delegates_to_progress_helpers(self):
         with warnings.catch_warnings():
