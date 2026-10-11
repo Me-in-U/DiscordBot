@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from util.notification_delivery import send_once
+
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
@@ -218,7 +220,7 @@ async def refresh_dday_messages(
                 )
                 continue
 
-            sent_message = await channel.send(embed=embed)
+            sent_message = await send_once(channel, f"dday:{current_date}", embed=embed)
             results.append(
                 DdayUpdateResult(
                     guild_id=current_guild_id,

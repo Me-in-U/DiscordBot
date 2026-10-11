@@ -31,6 +31,8 @@ def parse_rank_settings_value(value: Any) -> dict[str, Any]:
 class RankCommands(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
+        from util.loop.task_lifecycle import supervise_loop_tasks
+        supervise_loop_tasks(self, ("update_rank_data",))
         self.game_name: str | None = None  # 게임 닉네임
         self.tag_line: str | None = None  # 게임 태그
         self.daily_rank_loop_enabled = False  # 일일 랭크 루프 상태
@@ -210,6 +212,9 @@ class RankCommands(commands.Cog):
     @app_commands.rename(text="닉네임태그")
     async def update_daily_rank(self, interaction: discord.Interaction, text: str) -> None:
         """자정 솔랭 닉네임#태그를 업데이트합니다."""
+        if interaction.guild is None or not interaction.user.guild_permissions.administrator or interaction.guild.get_channel(SONPANNO_GUILD_ID) is None:
+            await interaction.response.send_message("대상 서버 관리자만 설정할 수 있습니다.", ephemeral=True)
+            return
         try:
             game_name, tag_line = text.strip().split("#")
             self.game_name = game_name
@@ -237,6 +242,9 @@ class RankCommands(commands.Cog):
     @app_commands.rename(status="상태")
     async def toggle_daily_loop(self, interaction: discord.Interaction, status: str) -> None:
         """자정 루프 상태를 변경합니다."""
+        if interaction.guild is None or not interaction.user.guild_permissions.administrator or interaction.guild.get_channel(SONPANNO_GUILD_ID) is None:
+            await interaction.response.send_message("대상 서버 관리자만 설정할 수 있습니다.", ephemeral=True)
+            return
         try:
             if status.lower() not in ["true", "false"]:
                 raise ValueError

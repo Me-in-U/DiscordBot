@@ -26,7 +26,7 @@ MessagePart = dict[str, str | None]
 StoredMessage = dict[str, Any]
 UserMessages = dict[int, dict[str, list[StoredMessage]]]
 PartyList = dict[int, list[discord.CategoryChannel]]
-REQUIRED_COGS = frozenset({"cogs.status_api"})
+REQUIRED_COGS = frozenset({"cogs.status_api", "cogs.loop", "cogs.music", "cogs.gambling"})
 MAX_CACHED_MESSAGES_PER_AUTHOR = 100
 
 # Client 설정, 변수
@@ -38,6 +38,7 @@ DISCORD_CLIENT = commands.Bot(command_prefix="/", intents=intents)
 DISCORD_CLIENT.remove_command("help")
 DISCORD_CLIENT.USER_MESSAGES: UserMessages = {}  # 길드별 -> 유저별 -> 메시지 리스트
 DISCORD_CLIENT.PARTY_LIST: PartyList = {}
+DISCORD_CLIENT.startup_completed = False
 _startup_completed = False
 
 # 환경 변수를 .env 파일에서 로딩
@@ -307,7 +308,9 @@ async def on_ready() -> None:
             print(f"[GLOBAL SYNC] {len(synced_global)}개 명령어 동기화")
         except Exception:
             logger.exception("슬래시 커맨드 동기화 실패")
+            return
         _startup_completed = True
+        DISCORD_CLIENT.startup_completed = True
     else:
         await load_party_list()
         logger.info("Discord reconnect detected; skipped startup-only initialization.")
@@ -341,6 +344,24 @@ async def on_member_update(before: discord.Member, after: discord.Member) -> Non
             await upsert_user(after.id, after.display_name)
     except Exception:
         logger.exception("[on_member_update 오류]")
+
+
+@DISCORD_CLIENT.event
+async def on_raw_message_delete(payload):
+    for messages in DISCORD_CLIENT.USER_MESSAGES.get(payload.guild_id, {}).values():
+        messages[:] = [entry for entry in messages if entry.get("message_id") != payload.message_id]
+
+
+@DISCORD_CLIENT.event
+async def on_raw_message_edit(payload):
+    for messages in DISCORD_CLIENT.USER_MESSAGES.get(payload.guild_id, {}).values():
+        messages[:] = [entry for entry in messages if entry.get("message_id") != payload.message_id]
+
+
+@DISCORD_CLIENT.event
+async def on_raw_bulk_message_delete(payload):
+    for messages in DISCORD_CLIENT.USER_MESSAGES.get(payload.guild_id, {}).values():
+        messages[:] = [entry for entry in messages if entry.get("message_id") not in payload.message_ids]
 
 
 @DISCORD_CLIENT.event
@@ -386,7 +407,7 @@ async def on_message(message: discord.Message) -> None:
     if message.author == DISCORD_CLIENT.user:
         append_cached_message(
             guild_map,
-            author_key,
+            str(message.author.id),
             {
                 "author": author_key,
                 "role": "assistant",
@@ -398,6 +419,8 @@ async def on_message(message: discord.Message) -> None:
                     },
                 ],
                 "time": timestamp,
+                "channel_id": message.channel.id,
+                "message_id": message.id,
             },
         )
         return  # client 스스로가 보낸 메세지는 무시
@@ -405,7 +428,7 @@ async def on_message(message: discord.Message) -> None:
         if image_url:
             append_cached_message(
                 guild_map,
-                author_key,
+                str(message.author.id),
                 {
                     "author": author_key,
                     "role": "user",
@@ -417,12 +440,14 @@ async def on_message(message: discord.Message) -> None:
                         },
                     ],
                     "time": timestamp,
+                    "channel_id": message.channel.id,
+                    "message_id": message.id,
                 },
             )
         else:
             append_cached_message(
                 guild_map,
-                author_key,
+                str(message.author.id),
                 {
                     "author": author_key,
                     "role": "user",
@@ -430,6 +455,8 @@ async def on_message(message: discord.Message) -> None:
                         {"type": "input_text", "text": message.content},
                     ],
                     "time": timestamp,
+                    "channel_id": message.channel.id,
+                    "message_id": message.id,
                 },
             )
 
@@ -545,7 +572,7 @@ async def load_recent_messages(guild_id: int | None = None) -> None:
                     )
                     append_cached_message(
                         guild_map,
-                        author_key,
+                        str(message.author.id),
                         {
                             "author": author_key,
                             "role": role,
@@ -553,6 +580,8 @@ async def load_recent_messages(guild_id: int | None = None) -> None:
                                 parts if parts else [{"type": "input_text", "text": ""}]
                             ),
                             "time": message_timestamp,
+                            "channel_id": channel.id,
+                            "message_id": message.id,
                         },
                     )
             except Exception:
@@ -587,6 +616,7 @@ async def load_recent_messages(guild_id: int | None = None) -> None:
 async def main() -> None:
     try:
         async with DISCORD_CLIENT:
+            await ensure_schema_ready()
             await load_cogs()
             await DISCORD_CLIENT.start(DISCORD_TOKEN)
     finally:

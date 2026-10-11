@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import uuid
 import logging
 from typing import List
 
@@ -11,6 +12,7 @@ from datetime import datetime
 from common.discord_ui import SafeView
 from .constants import SEOUL_TZ
 from .services import BalanceService
+from .operations import financial_operation
 
 
 logger = logging.getLogger(__name__)
@@ -34,10 +36,12 @@ class SprinkleView(SafeView):
         self.claimed_users: set[str] = set()
         self.sender = sender_user
         self.guild_id = guild_id
+        self.round_id = str(uuid.uuid4())
         self.lock = asyncio.Lock()
         self.original_message: discord.Message | None = None
 
     @discord.ui.button(label="받기", style=discord.ButtonStyle.success)
+    @financial_operation
     async def claim_button(
         self, interaction: discord.Interaction, button: discord.ui.Button
     ):
@@ -60,7 +64,7 @@ class SprinkleView(SafeView):
                 button.disabled = True
                 button.label = "종료"
                 await interaction.response.edit_message(view=self)
-                await interaction.response.send_message(
+                await interaction.followup.send(
                     "❌ 이미 모두 수령되었습니다.", ephemeral=True
                 )
                 return
@@ -68,8 +72,7 @@ class SprinkleView(SafeView):
             amount = self.parts.pop()
             self.claimed_users.add(user_id)
 
-            current = self._balance.get_balance(self.guild_id, user_id)
-            self._balance.set_balance(self.guild_id, user_id, current + amount)
+            await self._balance.settle(self.round_id, amount, recipient_id=user_id, amount=amount)
 
             await interaction.response.send_message(
                 f"✅ {interaction.user.mention} 님이 {amount:,}원을 수령했습니다!",
@@ -86,13 +89,12 @@ class SprinkleView(SafeView):
                     logger.debug("뿌리기 종료 메시지 수정 실패", exc_info=True)
                 self.stop()
 
+    @financial_operation
     async def on_timeout(self) -> None:
         remaining = sum(self.parts)
         if remaining > 0:
-            sender_bal = self._balance.get_balance(self.guild_id, str(self.sender.id))
-            self._balance.set_balance(
-                self.guild_id, str(self.sender.id), sender_bal + remaining
-            )
+            await self._balance.settle(self.round_id, remaining)
+            self.parts.clear()
         for child in self.children:
             if isinstance(child, discord.ui.Button):
                 child.disabled = True

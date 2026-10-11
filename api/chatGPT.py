@@ -15,7 +15,7 @@ if not OPENAI_KEY:
     raise EnvironmentError("OPENAI_KEY 환경 변수가 설정되지 않았습니다.")
 
 logger = logging.getLogger(__name__)
-clientGPT = OpenAI(api_key=OPENAI_KEY)
+clientGPT = OpenAI(api_key=OPENAI_KEY, timeout=45, max_retries=1)
 
 
 class OpenAIModelError(Exception):

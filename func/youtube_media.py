@@ -6,6 +6,8 @@ import logging
 import os
 import re
 import subprocess
+import time
+import threading
 from pathlib import Path
 
 import aiohttp
@@ -20,6 +22,17 @@ from func.youtube_workspace import subtitle_output_template
 
 
 logger = logging.getLogger(__name__)
+_stt_lock = threading.Lock()
+_stt_model = None
+
+class MediaLimitError(ValueError):
+    pass
+
+def _duration_limit(info, **kwargs):
+    if (info.get("duration") or 0) > 1800:
+        raise MediaLimitError("30분 이하 영상만 요약할 수 있습니다.")
+    return None
+
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
@@ -135,7 +148,10 @@ def download_youtube_subtitles(
             "quiet": True,
             "logger": YTDL_LOGGER,
             "http_headers": HEADERS,
-            "extractor_retries": 2,
+            "socket_timeout": 10,
+            "retries": 1,
+            "extractor_retries": 1,
+            "match_filter": _duration_limit,
             "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
             "source_address": "0.0.0.0",
         }
@@ -199,8 +215,17 @@ async def youtube_to_mp3(
         def _download_with_ytdlp():
             ffmpeg_exec = detect_ffmpeg_executable()
             cookies_path = os.path.join(os.getcwd(), "cookies.txt")
+            started = time.monotonic()
+            def limit_download(progress):
+                if time.monotonic() - started > 90 or progress.get("downloaded_bytes", 0) > 30 * 1024 * 1024:
+                    raise MediaLimitError("영상 다운로드 제한을 초과했습니다.")
             ydl_opts = {
                 "format": "bestaudio/best",
+                "socket_timeout": 10,
+                "retries": 1,
+                "max_filesize": 30 * 1024 * 1024,
+                "match_filter": _duration_limit,
+                "progress_hooks": [limit_download],
                 "outtmpl": output_template,
                 "postprocessors": [
                     {
@@ -217,7 +242,10 @@ async def youtube_to_mp3(
                 "no_warnings": True,
                 "quiet": True,
                 "logger": YTDL_LOGGER,
-                "extractor_retries": 2,
+                "socket_timeout": 10,
+            "retries": 1,
+            "extractor_retries": 1,
+            "match_filter": _duration_limit,
                 "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
                 "source_address": "0.0.0.0",
             }
@@ -233,6 +261,8 @@ async def youtube_to_mp3(
         else:
             raise FileNotFoundError(f"{output_path_obj} 파일이 생성되지 않았습니다.")
 
+    except MediaLimitError:
+        raise
     except VideoUnavailable:
         logger.warning("해당 유튜브 영상을 다운로드할 수 없습니다: url=%s", url, exc_info=True)
     except (DownloadError, OSError, ValueError):
@@ -255,6 +285,8 @@ async def youtube_to_mp3(
                     build_headers_str(HEADERS),
                     "-i",
                     audio_url,
+                    "-t", "1800",
+                    "-fs", str(30 * 1024 * 1024),
                     "-vn",
                     "-acodec",
                     "libmp3lame",
@@ -262,7 +294,7 @@ async def youtube_to_mp3(
                     "320k",
                     str(output_path_obj),
                 ]
-                subprocess.run(cmd, check=True)
+                subprocess.run(cmd, check=True, timeout=90)
 
             await asyncio.to_thread(_run_ffmpeg)
             if output_path_obj.exists():
@@ -290,7 +322,10 @@ async def speech_to_text(audio_path: str) -> str:
             )
 
         logger.debug("STT input path: %s", full_path)
-        model = WhisperModel("tiny", device="cpu", compute_type="int8")
+        global _stt_model
+        if _stt_model is None:
+            _stt_model = WhisperModel("tiny", device="cpu", compute_type="int8")
+        model = _stt_model
         segments, _info = model.transcribe(
             full_path,
             language="ko",
@@ -301,4 +336,7 @@ async def speech_to_text(audio_path: str) -> str:
         logger.debug("STT completed: chars=%s", len(text))
         return text
 
-    return await asyncio.to_thread(_run_stt)
+    def locked_stt():
+        with _stt_lock:
+            return _run_stt()
+    return await asyncio.to_thread(locked_stt)

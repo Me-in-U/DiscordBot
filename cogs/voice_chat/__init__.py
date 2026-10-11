@@ -6,6 +6,8 @@ import os
 import tempfile
 import uuid
 import wave
+import threading
+from util.voice_session import voice_operation
 import discord
 import davey
 import time
@@ -43,6 +45,7 @@ class StreamingSink(voice_recv.AudioSink if voice_recv else object):
         self.opus_decoders = {}  # SSRC -> decoder
         self.decode_error_counts = {}
         self.decode_error_last_logged = {}
+        self.MAX_SPEECH_BYTES = 48000 * 2 * 2 * 5
 
         # VAD Constants
         self.SILENCE_THRESHOLD = 700  # 600~800 추천 (환경 잡음 따라)
@@ -123,6 +126,8 @@ class StreamingSink(voice_recv.AudioSink if voice_recv else object):
             return None
 
     def write(self, user, data) -> None:
+        if user not in self.user_buffers and len(self.user_buffers) >= 16:
+            return
         pcm = self._decode_voice_packet(user, data)
         if not pcm:
             return
@@ -178,34 +183,47 @@ class StreamingSink(voice_recv.AudioSink if voice_recv else object):
                 # Was silent, still silent.
                 # Add to pre-speech ring buffer (frame)
                 self.user_pre_speech_buffer[user].append(pcm)
+        if len(self.user_buffers[user]) >= self.MAX_SPEECH_BYTES:
+            self.flush_user(user)
 
     def flush_user(self, user) -> None:
         buffer = self.user_buffers[user]
         duration = len(buffer) / (48000 * 2 * 2)  # 48k, stereo, 16bit
 
-        if duration >= self.MIN_SPEECH_DURATION:
-            # Save to file
-            f = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
-            f.close()
+        if duration >= self.MIN_SPEECH_DURATION and self.cog.audio_slots.acquire(blocking=False):
+            try:
+                # Save to file
+                f = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+                f.close()
 
-            with wave.open(f.name, "wb") as wf:
-                wf.setnchannels(2)
-                wf.setsampwidth(2)
-                wf.setframerate(48000)
-                wf.writeframes(buffer)
+                with wave.open(f.name, "wb") as wf:
+                    wf.setnchannels(2)
+                    wf.setsampwidth(2)
+                    wf.setframerate(48000)
+                    wf.writeframes(buffer)
 
-            print(f"[DEBUG] VAD triggered for {user.name}. Duration: {duration:.2f}s")
+                print(f"[DEBUG] VAD triggered for {user.name}. Duration: {duration:.2f}s")
 
-            # Trigger processing
-            asyncio.run_coroutine_threadsafe(
-                self.cog.process_audio(
-                    f.name,
-                    user,
-                    self.vc,
-                    self.session_id,
-                ),
-                self.cog.bot.loop,
-            )
+                # Trigger processing
+                future = asyncio.run_coroutine_threadsafe(
+                    self.cog.process_audio(
+                        f.name,
+                        user,
+                        self.vc,
+                        self.session_id,
+                    ),
+                    self.cog.bot.loop,
+                )
+                future.add_done_callback(lambda _: self.cog.audio_slots.release())
+
+            except Exception:
+                self.cog.audio_slots.release()
+                if "f" in locals() and os.path.exists(f.name):
+                    try:
+                        os.remove(f.name)
+                    except OSError:
+                        logger.exception("Voice temporary file cleanup failed")
+                logger.exception("Voice submission failed")
 
         # Reset state
         self.user_buffers[user] = bytearray()
@@ -229,6 +247,7 @@ class VoiceChat(commands.Cog):
         self.active_chats = {}  # guild_id -> task
         self.model_load_lock = asyncio.Lock()
         self.transcribe_lock = asyncio.Lock()
+        self.audio_slots = threading.BoundedSemaphore(8)
 
     async def load_model(self) -> None:
         settings = resolve_whisper_settings()
@@ -332,6 +351,7 @@ class VoiceChat(commands.Cog):
         description="음성 채널에 봇을 초대하여 실시간 대화를 시작합니다.",
     )
     @app_commands.guild_only()
+    @voice_operation
     async def start_chat(self, interaction: discord.Interaction) -> None:
         if voice_recv is None:
             await interaction.response.send_message(
@@ -352,8 +372,18 @@ class VoiceChat(commands.Cog):
             )
             return
 
+        if interaction.guild.id not in self.chat_data and len(self.chat_data) >= 4:
+            await interaction.response.send_message("현재 음성 대화가 많습니다. 잠시 후 다시 시도해주세요.", ephemeral=True)
+            return
+
         channel = voice_state.channel
         guild = interaction.guild
+        if guild.voice_client and not isinstance(guild.voice_client, voice_recv.VoiceRecvClient):
+            await interaction.response.send_message("음악을 정지하고 봇이 퇴장한 뒤 대화를 시작해주세요.", ephemeral=True)
+            return
+        if guild.voice_client and guild.voice_client.channel != channel:
+            await interaction.response.send_message("봇과 같은 음성 채널에서만 대화를 시작할 수 있습니다.", ephemeral=True)
+            return
         await interaction.response.defer(ephemeral=True, thinking=True)
         vc = None
 
@@ -370,7 +400,9 @@ class VoiceChat(commands.Cog):
             else:
                 vc = await channel.connect(cls=voice_recv.VoiceRecvClient)
 
-            self._cancel_guild_tasks(guild.id)
+            old_tasks = self._cancel_guild_tasks(guild.id)
+            if old_tasks:
+                await asyncio.gather(*old_tasks, return_exceptions=True)
             if vc.is_listening():
                 vc.stop_listening()
 
@@ -437,6 +469,7 @@ class VoiceChat(commands.Cog):
         name="대화종료", description="실시간 대화를 종료하고 봇을 퇴장시킵니다."
     )
     @app_commands.guild_only()
+    @voice_operation
     async def stop_chat(self, interaction: discord.Interaction) -> None:
         if interaction.guild is None:
             await interaction.response.send_message(
@@ -446,6 +479,10 @@ class VoiceChat(commands.Cog):
 
         guild = interaction.guild
         voice_client = guild.voice_client
+        user_channel = getattr(getattr(interaction.user, "voice", None), "channel", None)
+        if guild.id not in self.active_chats or voice_client is None or user_channel != voice_client.channel:
+            await interaction.response.send_message("진행 중인 대화의 음성 채널에서만 종료할 수 있습니다.", ephemeral=True)
+            return
         if voice_client is None and guild.id not in self.active_chats:
             await interaction.response.send_message(
                 "봇이 음성 채널에 없습니다.", ephemeral=True
@@ -474,15 +511,19 @@ class VoiceChat(commands.Cog):
         await interaction.followup.send("대화를 종료했습니다.", ephemeral=True)
 
     def _cancel_guild_tasks(self, guild_id: int) -> None:
+        tasks = []
         chat_task = self.active_chats.pop(guild_id, None)
         if chat_task is not None:
             chat_task.cancel()
+            tasks.append(chat_task)
 
         data = self.chat_data.pop(guild_id, None)
         if data is not None:
             display_task = data.get("task")
             if display_task is not None:
                 display_task.cancel()
+                tasks.append(display_task)
+        return tasks
 
     def _get_chat_session(self, guild_id: int, session_id: str):
         data = self.chat_data.get(guild_id)
@@ -613,7 +654,7 @@ class VoiceChat(commands.Cog):
                 return
 
             print("[DEBUG] Starting transcription...")
-            text = await self.transcribe(filepath)
+            text = await self.transcribe(filepath, session=(guild_id, session_id))
             print(f"[DEBUG] Transcription result: '{text}'")
 
             if text.strip():
@@ -662,7 +703,7 @@ class VoiceChat(commands.Cog):
                 except OSError:
                     logger.warning("failed to remove temporary voice file: %s", filepath, exc_info=True)
 
-    async def transcribe(self, filepath: str) -> str:
+    async def transcribe(self, filepath: str, *, session=None) -> str:
         loop = asyncio.get_event_loop()
 
         def _transcribe():
@@ -698,6 +739,8 @@ class VoiceChat(commands.Cog):
             return " ".join([segment.text for segment in segments_list])
 
         async with self.transcribe_lock:
+            if session is not None and self._get_chat_session(*session) is None:
+                return ""
             # language=None allows auto-detection (supports both Korean and English)
             # initial_prompt helps guide the model context
             text = await loop.run_in_executor(None, _transcribe)

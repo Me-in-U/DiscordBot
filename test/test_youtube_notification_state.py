@@ -199,6 +199,7 @@ class YouTubeNotificationStatePersistenceTests(unittest.IsolatedAsyncioTestCase)
                 "channelId": "UC_TEST",
                 "scheduledStartTime": "2026-06-23T01:20:00Z",
                 "lastCheckedAt": "2026-06-23T01:10:00+00:00",
+                "firstSeenAt": "2026-06-23T01:10:00+00:00",
             },
         )
         self.assertEqual(recorder.calls[0][0], 1)

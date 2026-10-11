@@ -6,10 +6,12 @@ import discord
 
 from .constants import FINAL_BALANCE_LABEL, SEOUL_TZ
 from .services import BalanceService
+from .operations import financial_operation
 
 DAILY_AMOUNT = 10_000
 
 
+@financial_operation
 async def grant_daily_money(
     interaction: discord.Interaction,
     balance: BalanceService,

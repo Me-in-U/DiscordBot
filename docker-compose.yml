@@ -2,6 +2,7 @@ name: bot
 
 services:
   discord-bot:
+    image: ${BOT_IMAGE:-bot-discord-bot}
     build:
       context: .
       dockerfile: Dockerfile

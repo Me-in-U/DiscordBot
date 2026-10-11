@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from util.notification_delivery import send_once
+
 import json
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta, timezone
@@ -248,7 +250,7 @@ async def refresh_celebration_messages(
                 target_date,
             )
             if existing_message is None:
-                sent_message = await channel.send(message)
+                sent_message = await send_once(channel, f"celebration:{target_date}", message)
                 action = "sent"
             else:
                 sent_message = await existing_message.edit(content=message)

@@ -45,6 +45,24 @@ run_compose() {
   "${COMPOSE_CMD[@]}" -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" "$@"
 }
 
+previous_image="$(docker inspect --format '{{.Image}}' "${CONTAINER_NAME}" 2>/dev/null || true)"
+replaced_container=false
+rollback_on_failure() {
+  local result=$?
+  trap - EXIT
+  if [[ "${result}" != 0 && "${replaced_container}" == true && -n "${previous_image}" ]]; then
+    echo "[ERROR] Deployment failed. Restoring previous application image."
+    export BOT_IMAGE="${previous_image}"
+    if run_compose up -d --no-build --force-recreate "${SERVICE_NAME}" && wait_for_health; then
+      echo "[INFO] Previous application restored. Deployment remains failed."
+    else
+      echo "[ERROR] Rollback did not become healthy. Operator intervention required."
+    fi
+  fi
+  exit "${result}"
+}
+trap rollback_on_failure EXIT
+
 ensure_dependency_image() {
   local deps_hash
 
@@ -92,12 +110,16 @@ EOF
 
 case "${MODE}" in
   auto|force)
+    export BOT_IMAGE="bot-discord-bot:$(git rev-parse --short HEAD 2>/dev/null || date +%s)"
     ensure_dependency_image
 
     echo "[INFO] Building ${SERVICE_NAME} image..."
     run_compose build "${SERVICE_NAME}"
+    echo "[INFO] Checking application image excludes local secrets..."
+    docker run --rm --entrypoint sh "${BOT_IMAGE}" -c 'test ! -f /app/.env && test ! -f /app/.env.deploy && test ! -f /app/cookies.txt'
 
     echo "[INFO] Starting ${SERVICE_NAME} service..."
+    replaced_container=true
     if [[ "${MODE}" == "force" ]]; then
       run_compose up -d --no-build --force-recreate "${SERVICE_NAME}"
     else
@@ -106,6 +128,8 @@ case "${MODE}" in
     wait_for_health
     ;;
   restart)
+    export BOT_IMAGE="${previous_image:-bot-discord-bot}"
+    replaced_container=true
     echo "[INFO] Restarting ${SERVICE_NAME} service without rebuild..."
     run_compose up -d --no-build --force-recreate "${SERVICE_NAME}"
     wait_for_health

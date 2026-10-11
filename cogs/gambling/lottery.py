@@ -11,6 +11,7 @@ import discord
 from common.discord_ui import SafeView
 from .constants import SEOUL_TZ
 from .services import BalanceService
+from .operations import financial_operation
 
 
 logger = logging.getLogger(__name__)
@@ -54,6 +55,7 @@ class WeeklyLotteryView(SafeView):
         button.callback = callback
         return button
 
+    @financial_operation
     async def _handle_button_interaction(
         self,
         interaction: discord.Interaction,
@@ -81,8 +83,8 @@ class WeeklyLotteryView(SafeView):
         if prize > 0:
             button.label = f"🎉 {prize:,}원!"
             button.style = discord.ButtonStyle.success
-            current = self._balance.get_balance(self.guild_id, str(user_id))
-            self._balance.set_balance(self.guild_id, str(user_id), current + prize)
+            current = await self._balance.get_balance(self.guild_id, str(user_id))
+            await self._balance.set_balance(self.guild_id, str(user_id), current + prize)
             await interaction.response.send_message(
                 f"🎉 축하합니다! {prize:,}원을 획득했습니다!", ephemeral=True
             )
@@ -184,6 +186,7 @@ def generate_prize_map() -> List[int]:
     return prize_map
 
 
+@financial_operation
 async def start_daily_lottery(
     channel: discord.abc.Messageable,
     guild_id: str,

@@ -1,4 +1,5 @@
 import asyncio
+from common.discord_output import send_text
 import logging
 
 import discord
@@ -58,7 +59,7 @@ class SearchCommands(commands.Cog):
             response = log_user_error(logger, "검색", exc)
 
         try:
-            await interaction.followup.send(response)
+            await send_text(interaction.followup, response)
         except (discord.NotFound, discord.Forbidden, discord.HTTPException):
             logger.debug("검색 결과 전송 실패", exc_info=True)
 

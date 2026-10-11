@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import random
+import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from typing import List, Tuple
@@ -10,6 +11,7 @@ import discord
 from common.discord_ui import SafeView
 from .constants import BET_AMOUNT_REQUIRED, SEOUL_TZ
 from .services import BalanceService
+from .operations import financial_operation
 
 
 SUITS = ["♠", "♥", "♦", "♣"]
@@ -168,6 +170,7 @@ class BlackjackView(SafeView):
         self.user_id = user_id
         self.base_bet = bet_amount
         self.current_bet = bet_amount
+        self.round_id = str(uuid.uuid4())
         self.num_decks = num_decks
 
         self.deck: List[Card] = build_deck(num_decks)
@@ -192,7 +195,11 @@ class BlackjackView(SafeView):
             return False
         return True
 
+    @financial_operation
     async def on_timeout(self) -> None:
+        if not self.finished:
+            await self.balance.settle(self.round_id, self.current_bet)
+            self.finished = True
         for child in self.children:
             child.disabled = True
         if self.message is not None:
@@ -203,6 +210,7 @@ class BlackjackView(SafeView):
 
     # ---------- 버튼들 ----------
     @discord.ui.button(label="Hit", style=discord.ButtonStyle.primary)
+    @financial_operation
     async def hit_button(self, interaction: discord.Interaction, _: discord.ui.Button):
         if self.finished:
             await interaction.response.send_message(
@@ -221,6 +229,7 @@ class BlackjackView(SafeView):
         )
 
     @discord.ui.button(label="Stand", style=discord.ButtonStyle.secondary)
+    @financial_operation
     async def stand_button(
         self, interaction: discord.Interaction, _: discord.ui.Button
     ):
@@ -234,6 +243,7 @@ class BlackjackView(SafeView):
         await self._finish(interaction)
 
     @discord.ui.button(label="Double", style=discord.ButtonStyle.danger)
+    @financial_operation
     async def double_button(
         self, interaction: discord.Interaction, button: discord.ui.Button
     ):
@@ -265,6 +275,7 @@ class BlackjackView(SafeView):
     @discord.ui.button(
         label="이어하기", style=discord.ButtonStyle.success, disabled=True
     )
+    @financial_operation
     async def continue_button(
         self, interaction: discord.Interaction, button: discord.ui.Button
     ):
@@ -292,6 +303,7 @@ class BlackjackView(SafeView):
         self.player.clear()
         self.dealer.clear()
         self.finished = False
+        self.round_id = str(uuid.uuid4())
         self.current_bet = self.base_bet
         self.can_double = True
 
@@ -328,8 +340,7 @@ class BlackjackView(SafeView):
         return self.deck.pop()
 
     async def _reserve_bet(self, amount: int) -> None:
-        current = await self.balance.get_balance(self.guild_id, self.user_id)
-        await self.balance.set_balance(self.guild_id, self.user_id, current - amount)
+        await self.balance.reserve(self.round_id, self.guild_id, self.user_id, amount)
 
     async def _dealer_play(self) -> None:
         # 딜러는 17 이상이 되기 전까지 카드를 받는다 (Soft 17에서는 정지)
@@ -363,8 +374,7 @@ class BlackjackView(SafeView):
         await self.balance.add_blackjack_result(self.guild_id, self.user_id, record)
 
         # 정산 반영
-        current = await self.balance.get_balance(self.guild_id, self.user_id)
-        await self.balance.set_balance(self.guild_id, self.user_id, current + prize)
+        await self.balance.settle(self.round_id, prize)
 
         await interaction.response.edit_message(
             embed=await self._build_embed(
@@ -502,6 +512,7 @@ class BlackjackView(SafeView):
         return d_title, d_hand_txt
 
 
+@financial_operation
 async def run_blackjack(
     interaction: discord.Interaction,
     balance: BalanceService,

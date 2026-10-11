@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import asynccontextmanager
-import time
 from typing import Coroutine, Any
 import discord
 from discord import Embed, app_commands
@@ -18,6 +17,7 @@ from util.music.queue import (
     shuffle_queue,
 )
 from util.music.state import GuildMusicState
+from util.voice_session import voice_lock
 from util.music.views import MusicControlView, MusicHelperView
 from dotenv import load_dotenv
 from .runtime import logger
@@ -48,11 +48,6 @@ class MusicCog(
         self._bg_tasks: set[asyncio.Task] = set()
         # 패널 메시지 ID 저장 로드
         self._panel_ids: dict[str, int] = {}
-        # 음악 채널 일반 채팅 자동삭제 경고 쿨다운 관리
-        self._last_warn: dict[int, float] = {}
-        self._warn_cooldown = 10.0  # 초
-        # 부팅시 1회 정리 수행 여부
-        self._purged_guilds: set[int] = set()
         self._favorite_cache: dict[int, list[MusicFavorite]] = {}
 
     async def cog_load(self):
@@ -79,7 +74,7 @@ class MusicCog(
         return task
 
     def _get_state(self, guild_id: int) -> GuildMusicState:
-        return self.states.setdefault(guild_id, GuildMusicState())
+        return self.states.setdefault(guild_id, GuildMusicState(operation_lock=voice_lock(guild_id)))
 
     @asynccontextmanager
     async def _music_operation(self, guild_id: int):
@@ -255,42 +250,8 @@ class MusicCog(
                     guild,
                 )
                 await self._get_or_create_panel(guild)
-                # 패널 확보 후 불필요 메세지 정리
-                await self._purge_music_channel_extras(guild)
             except Exception:
                 logger.exception("[on_ready] 길드 %s 패널 생성 실패", guild.id)
-
-    @commands.Cog.listener()
-    async def on_message(self, message: discord.Message):
-        """음악 전용 채널에서 일반 유저 메시지를 자동 삭제.
-
-        - 채널명: DEFAULT_MUSIC_CHANNEL_NAME 또는 /채널설정 기능:음악 대상
-        - 봇 메시지는 허용
-        - 패널/컨트롤 유지
-        - Slash 명령은 별도의 application interaction이라 일반 메시지 객체가 아니므로 별도 처리 불필요
-        """
-        # DM / 시스템 / 웹훅 제외
-        if not message.guild or message.type != discord.MessageType.default:
-            return
-        if message.author.bot:
-            return
-        if not await self._is_music_control_channel(message):
-            return
-        # 유저가 붙여넣은 일반 텍스트/URL 등 모두 삭제
-        try:
-            await message.delete()
-        except discord.HTTPException:
-            return
-        # 경고 메시지 (쿨다운 내 중복 표시 방지)
-        now = time.time()
-        last = self._last_warn.get(message.author.id, 0)
-        if now - last < self._warn_cooldown:
-            return
-        self._last_warn[message.author.id] = now
-        await self._send_channel_auto_delete(
-            message.channel,
-            f"{message.author.mention} 이 채널은 음악 명령 전용입니다. 다른 대화는 다른 채널을 이용해주세요!",
-        )
 
     @commands.Cog.listener()
     async def on_command_error(self, ctx, error):

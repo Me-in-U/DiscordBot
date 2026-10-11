@@ -33,6 +33,10 @@ class BufferedOpusSource(discord.AudioSource):
             return self.packets.popleft()
         return b"" if self.ended else self.source.read()
 
+    @property
+    def _current_error(self):
+        return getattr(self.source, "_current_error", None)
+
     def is_opus(self) -> bool:
         return self.source.is_opus()
 

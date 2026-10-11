@@ -266,6 +266,9 @@ class Party(commands.Cog):
         description="해당 파티 텍스트 채널에서 사용하면, 해당 파티를 삭제합니다.",
     )
     async def release_party(self, interaction: discord.Interaction):
+        if interaction.guild is None or not getattr(interaction.user.guild_permissions, "manage_channels", False):
+            await interaction.response.send_message("채널 관리 권한이 있는 사용자만 파티를 삭제할 수 있습니다.", ephemeral=True)
+            return
         if not interaction.channel.name.endswith("-채팅o"):
             await interaction.response.send_message(
                 "파티채널에서만 가능한 명령어 입니다"
@@ -273,7 +276,7 @@ class Party(commands.Cog):
             return
 
         category = interaction.channel.category
-        if category is None:
+        if category is None or category not in self.bot.PARTY_LIST.get(interaction.guild.id, []):
             await interaction.response.send_message(
                 "이 채널은 카테고리에 속하지 않습니다."
             )

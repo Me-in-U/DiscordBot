@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from typing import Protocol
+from datetime import datetime, timedelta, timezone
 
 import aiohttp
+import logging
 
 from common.http import EXTERNAL_HTTP_TIMEOUT
-from util.youtube.notification_state import touch_pending_youtube_video_check
+from util.youtube.notification_state import touch_pending_youtube_video_check, parse_youtube_datetime
 from util.youtube.subscriptions import (
     YouTubeSubscription,
     get_youtube_subscription,
@@ -52,42 +54,49 @@ async def run_youtube_notification_candidates(owner: YouTubeNotificationOwner) -
         trust_env=False,
     ) as session:
         for subscription in subscriptions:
-            subscription = await owner._poll_youtube_feed_fallback(
-                subscription,
-                session,
-            )
-            if subscription is None:
-                continue
+            try:
+                subscription = await owner._poll_youtube_feed_fallback(
+                    subscription,
+                    session,
+                )
+                if subscription is None:
+                    continue
 
-            pending = dict(subscription.pending_videos)
-            if not pending:
-                continue
+                pending = dict(subscription.pending_videos)
+                if not pending:
+                    continue
 
-            for video_id, pending_entry in list(pending.items()):
-                if not isinstance(pending_entry, dict):
-                    subscription = await owner._remove_pending_youtube_video(
+                for video_id, pending_entry in list(pending.items()):
+                    if not isinstance(pending_entry, dict):
+                        subscription = await owner._remove_pending_youtube_video(
+                            subscription,
+                            str(video_id),
+                        )
+                        pending = dict(subscription.pending_videos)
+                        continue
+                    expiry = parse_youtube_datetime(pending_entry.get("scheduledStartTime") or pending_entry.get("firstSeenAt") or pending_entry.get("lastCheckedAt"))
+                    if expiry and datetime.now(timezone.utc) > expiry + timedelta(hours=24):
+                        subscription = await owner._remove_pending_youtube_video(subscription, str(video_id))
+                        continue
+                    if not owner._should_check_pending_youtube_video(pending_entry):
+                        continue
+
+                    subscription = await touch_pending_youtube_video_check(
+                        subscription,
+                        str(video_id),
+                        pending_entry,
+                    )
+                    await owner._process_youtube_video_candidate(
                         subscription,
                         str(video_id),
                     )
+                    refreshed = await get_youtube_subscription(subscription.id)
+                    if refreshed is None:
+                        break
+                    subscription = refreshed
                     pending = dict(subscription.pending_videos)
-                    continue
-                if not owner._should_check_pending_youtube_video(pending_entry):
-                    continue
-
-                subscription = await touch_pending_youtube_video_check(
-                    subscription,
-                    str(video_id),
-                    pending_entry,
-                )
-                await owner._process_youtube_video_candidate(
-                    subscription,
-                    str(video_id),
-                )
-                refreshed = await get_youtube_subscription(subscription.id)
-                if refreshed is None:
-                    break
-                subscription = refreshed
-                pending = dict(subscription.pending_videos)
+            except Exception:
+                logging.getLogger(__name__).exception("YouTube subscription failed: %s", subscription.id)
 
 
 async def run_youtube_community_posts(owner: YouTubeCommunityOwner) -> None:
@@ -95,4 +104,7 @@ async def run_youtube_community_posts(owner: YouTubeCommunityOwner) -> None:
     for subscription in subscriptions:
         if not subscription.community_alert_enabled:
             continue
-        await owner._poll_youtube_community_posts(subscription)
+        try:
+            await owner._poll_youtube_community_posts(subscription)
+        except Exception:
+            logging.getLogger(__name__).exception("YouTube community subscription failed: %s", subscription.id)

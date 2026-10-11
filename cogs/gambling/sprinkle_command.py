@@ -6,12 +6,14 @@ import random
 import discord
 
 from .services import BalanceService
+from .operations import financial_operation
 from .sprinkle import SprinkleView, build_sprinkle_embed
 
 
 logger = logging.getLogger(__name__)
 
 
+@financial_operation
 async def run_sprinkle(
     interaction: discord.Interaction,
     balance: BalanceService,
@@ -39,14 +41,13 @@ async def run_sprinkle(
         )
         return
 
-    sender_balance = balance.get_balance(guild_id, sender_id)
+    sender_balance = await balance.get_balance(guild_id, sender_id)
     if sender_balance < total_amount:
         await interaction.response.send_message(
             f"❌ 잔액 부족 (현재 {sender_balance:,}원)", ephemeral=True
         )
         return
 
-    balance.set_balance(guild_id, sender_id, sender_balance - total_amount)
 
     parts = _split_amount_randomly(total_amount, people)
     embed = build_sprinkle_embed(interaction.user, total_amount, people)
@@ -58,6 +59,7 @@ async def run_sprinkle(
         timeout=timeout,
     )
 
+    await balance.reserve(view.round_id, guild_id, sender_id, total_amount)
     await interaction.response.send_message(embed=embed, view=view)
     try:
         sent = await interaction.original_response()

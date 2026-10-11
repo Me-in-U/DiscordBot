@@ -15,6 +15,7 @@ import yt_dlp as youtube_dl
 
 from common.http import EXTERNAL_HTTP_TIMEOUT
 from util.music.audio import prepare_opus_source
+from util.music.network import validate_music_url, run_extraction
 from util.music.extractor import (
     resolve_search_result_url,
     select_best_audio_format,
@@ -77,6 +78,7 @@ def _detect_ffmpeg_executable() -> str:
 search_ytdl = youtube_dl.YoutubeDL(
     {
         "default_search": "auto",
+        "socket_timeout": 10,
         "extract_flat": True,
         "noplaylist": True,
         "quiet": True,
@@ -89,6 +91,8 @@ ytdl = youtube_dl.YoutubeDL(
     {
         "noplaylist": True,
         "skip_download": True,
+        "socket_timeout": 10,
+        "retries": 1,
         "simulate": True,
         "quiet": True,
         "verbose": False,
@@ -104,6 +108,8 @@ info_ytdl = youtube_dl.YoutubeDL(
     {
         "noplaylist": True,
         "skip_download": True,
+        "socket_timeout": 10,
+        "retries": 1,
         "simulate": True,
         "quiet": True,
         "verbose": False,
@@ -168,6 +174,8 @@ def _make_ydl_opts(**overrides: Any) -> dict[str, Any]:
     base = {
         "noplaylist": True,
         "skip_download": True,
+        "socket_timeout": 10,
+        "retries": 1,
         "simulate": True,
         "quiet": True,
         "verbose": False,
@@ -177,6 +185,8 @@ def _make_ydl_opts(**overrides: Any) -> dict[str, Any]:
         "nocheckcertificate": True,
         "geo_bypass": True,
         "extractor_retries": 2,
+        "socket_timeout": 10,
+        "retries": 1,
         "source_address": "0.0.0.0",
         "logger": YTDL_LOGGER,
     }
@@ -232,12 +242,15 @@ def _extract_info_with_fallback(url: str) -> dict[str, Any]:
 
 
 async def fetch_stream_info(page_url: str) -> tuple[str, dict[str, Any]]:
+    page_url = validate_music_url(page_url)
     dbg(f"fetch_stream_info: page_url={page_url}")
     async with aiohttp.ClientSession(
         headers=HEADERS,
         timeout=EXTERNAL_HTTP_TIMEOUT,
     ) as session:
-        async with session.get(page_url) as resp:
+        async with session.get(page_url, allow_redirects=False) as resp:
+            if resp.status in range(300, 400):
+                raise ValueError("리디렉션된 음악 주소는 허용하지 않습니다.")
             resp.raise_for_status()
             text = await resp.text()
 
@@ -285,15 +298,16 @@ class YTDLSource:
         if not re.match(r"^https?://", url or ""):
             dbg("YTDLSource.from_url: keyword search path")
             search = f"ytsearch5:{url}"
-            info = await loop.run_in_executor(
-                YTDL_EXECUTOR, lambda: _extract_info_with_fallback(search)
+            info = await run_extraction(
+                lambda: _extract_info_with_fallback(search), YTDL_EXECUTOR
             )
             url = resolve_search_result_url(info)
             dbg(f"YTDLSource.from_url: selected url={url}")
 
+        url = validate_music_url(url)
         try:
-            data = await loop.run_in_executor(
-                YTDL_EXECUTOR, lambda: _extract_info_with_fallback(url)
+            data = await run_extraction(
+                lambda: _extract_info_with_fallback(url), YTDL_EXECUTOR
             )
         except Exception as exc:
             dbg(

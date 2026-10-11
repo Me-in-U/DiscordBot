@@ -10,6 +10,7 @@ from cogs.summarize import DISCORD_SUMMARY_PROMPT_VERSION, SummarizeCommands
 class _FakeInteraction:
     def __init__(self) -> None:
         self.guild = Mock(id=123)
+        self.channel_id = 789
         self.user = Mock(id=456, name="tester")
         self.response = Mock()
         self.response.send_message = AsyncMock()

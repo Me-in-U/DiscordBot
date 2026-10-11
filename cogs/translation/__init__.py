@@ -1,4 +1,5 @@
 import asyncio
+from common.discord_output import send_text, edit_text
 import logging
 
 import discord
@@ -80,7 +81,7 @@ async def translate_message_context_menu(
 
     await interaction.response.defer(thinking=True)
     translated_message = await translate_target(target.text, target.image_url)
-    await interaction.followup.send(translated_message)
+    await send_text(interaction.followup, translated_message)
 
 
 class TranslationSelect(discord.ui.Select):
@@ -156,7 +157,7 @@ class TranslationSelectView(SafeView):
         # 원본 메시지를 번역 결과로 덮어쓰기
         if isinstance(self.original_message, discord.Message):
             try:
-                await self.original_message.edit(content=result_message, view=None)
+                await edit_text(self.original_message, result_message, view=None)
             except (discord.NotFound, discord.Forbidden, discord.HTTPException):
                 logger.debug("번역 결과 메시지 수정 실패", exc_info=True)
 
@@ -220,7 +221,7 @@ class TranslationCommands(commands.Cog):
                 prompt_version=TRANSLATION_PROMPT_VERSION,
             )
 
-            await interaction.followup.send(translated_message)
+            await send_text(interaction.followup, translated_message)
         else:
             messages_options = []
             async for msg in interaction.channel.history(limit=20):

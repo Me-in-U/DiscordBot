@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from util.earthquake.retry import deliver_event
 import json
 import logging
 from collections.abc import Awaitable, Callable
@@ -99,7 +100,7 @@ async def consume_jma_eew_messages(
                 continue
             if event is None:
                 continue
-            results = await process_event(bot, event)
+            results = await deliver_event(bot, event, "jma", process_event, process_jma_eew_event)
             processed_count += 1
             _log_results(results, log)
             continue

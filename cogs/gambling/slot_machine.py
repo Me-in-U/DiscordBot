@@ -10,6 +10,7 @@ import discord
 from common.discord_ui import SafeView
 from .constants import BET_AMOUNT_REQUIRED, SEOUL_TZ
 from .services import BalanceService
+from .operations import financial_operation
 
 
 @dataclass(frozen=True)
@@ -72,6 +73,7 @@ class SlotMachineView(SafeView):
                 pass
 
     @discord.ui.button(label="돌리기", style=discord.ButtonStyle.primary, emoji="🎰")
+    @financial_operation
     async def spin_button(  # type: ignore[override]
         self,
         interaction: discord.Interaction,
@@ -83,7 +85,7 @@ class SlotMachineView(SafeView):
             return
         self._busy = True
         try:
-            embed, _ = self._spin(interaction)
+            embed, _ = await self._spin(interaction)
             # 버튼은 유지하여 같은 임베드에서 계속 플레이 가능
             if interaction.response.is_done():
                 await interaction.followup.edit_message(message_id=self.message.id, embed=embed, view=self)  # type: ignore[arg-type]
@@ -93,8 +95,8 @@ class SlotMachineView(SafeView):
         finally:
             self._busy = False
 
-    def _spin(self, interaction: discord.Interaction) -> tuple[discord.Embed, bool]:
-        current = self.balance.get_balance(self.guild_id, self.user_id)
+    async def _spin(self, interaction: discord.Interaction) -> tuple[discord.Embed, bool]:
+        current = await self.balance.get_balance(self.guild_id, self.user_id)
         if current < self.bet_amount:
             embed = _build_insufficient_embed(
                 interaction=interaction,
@@ -110,9 +112,9 @@ class SlotMachineView(SafeView):
         prize = self.bet_amount * multiplier if is_win else 0
         final_balance = current - self.bet_amount + prize
 
-        self.balance.set_balance(self.guild_id, self.user_id, final_balance)
-        self.balance.add_result(self.guild_id, self.user_id, is_win)
-        wins, losses, rate = self.balance.get_stats(self.guild_id, self.user_id)
+        await self.balance.set_balance(self.guild_id, self.user_id, final_balance)
+        await self.balance.add_result(self.guild_id, self.user_id, is_win)
+        wins, losses, rate = await self.balance.get_stats(self.guild_id, self.user_id)
 
         embed = _build_result_embed(
             interaction=interaction,
@@ -129,6 +131,7 @@ class SlotMachineView(SafeView):
         return embed, False
 
 
+@financial_operation
 async def run_slot_machine(
     interaction: discord.Interaction,
     balance: BalanceService,
@@ -142,7 +145,7 @@ async def run_slot_machine(
         await interaction.response.send_message(BET_AMOUNT_REQUIRED, ephemeral=True)
         return
 
-    current = balance.get_balance(guild_id, user_id)
+    current = await balance.get_balance(guild_id, user_id)
     if current < bet_amount:
         await interaction.response.send_message(
             f"❌ 잔액 부족 (현재 {current:,}원)", ephemeral=True

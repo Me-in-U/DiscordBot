@@ -356,7 +356,7 @@ class VoiceChatRuntimeTests(unittest.IsolatedAsyncioTestCase):
         speaker = SimpleNamespace(name="speaker", display_name="Speaker")
         vc = SimpleNamespace(guild=SimpleNamespace(id=300))
 
-        async def transcribe_and_stop(_filepath):
+        async def transcribe_and_stop(_filepath, **kwargs):
             self.cog.chat_data.pop(300, None)
             return "종료 뒤 결과"
 

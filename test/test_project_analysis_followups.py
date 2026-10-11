@@ -261,6 +261,7 @@ class DbMigrationContractTests(unittest.IsolatedAsyncioTestCase):
                 warnings.warn_explicit("Unexpected schema warning", aiomysql.Warning, "cursors.py", 239, module="aiomysql.cursors")
 
         cursor.execute = AsyncMock(side_effect=execute)
+        cursor.fetchone = AsyncMock(return_value=("InnoDB",))
         connection = MagicMock()
         connection.cursor.return_value.__aenter__.return_value = cursor
         pool = MagicMock()

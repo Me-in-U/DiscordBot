@@ -33,29 +33,29 @@ class GamblingCommands(commands.Cog):
     def balance(self):
         return self._balance
 
-    def get_user_balance(self, guild_id: str, user_id: str) -> int:
-        return self.balance.get_balance(guild_id, user_id)
+    async def get_user_balance(self, guild_id: str, user_id: str) -> int:
+        return await self.balance.get_balance(guild_id, user_id)
 
-    def set_user_balance(self, guild_id: str, user_id: str, amount: int):
-        self.balance.set_balance(guild_id, user_id, amount)
+    async def set_user_balance(self, guild_id: str, user_id: str, amount: int):
+        await self.balance.set_balance(guild_id, user_id, amount)
 
-    def add_result(self, guild_id: str, user_id: str, is_win: bool):
-        self.balance.add_result(guild_id, user_id, is_win)
+    async def add_result(self, guild_id: str, user_id: str, is_win: bool):
+        await self.balance.add_result(guild_id, user_id, is_win)
 
-    def get_stats(self, guild_id: str, user_id: str) -> tuple[int, int, float]:
-        return self.balance.get_stats(guild_id, user_id)
+    async def get_stats(self, guild_id: str, user_id: str) -> tuple[int, int, float]:
+        return await self.balance.get_stats(guild_id, user_id)
 
-    def get_last_daily(self, guild_id: str, user_id: str):
-        return self.balance.get_last_daily(guild_id, user_id)
+    async def get_last_daily(self, guild_id: str, user_id: str):
+        return await self.balance.get_last_daily(guild_id, user_id)
 
-    def set_last_daily(self, guild_id: str, user_id: str, date_str: str):
-        self.balance.set_last_daily(guild_id, user_id, date_str)
+    async def set_last_daily(self, guild_id: str, user_id: str, date_str: str):
+        await self.balance.set_last_daily(guild_id, user_id, date_str)
 
-    def can_use_daily(self, guild_id: str, user_id: str) -> bool:
-        return self.balance.can_use_daily(guild_id, user_id)
+    async def can_use_daily(self, guild_id: str, user_id: str) -> bool:
+        return await self.balance.can_use_daily(guild_id, user_id)
 
-    def get_guild_balances(self, guild_id: str) -> dict:
-        return self.balance.get_guild_balances(guild_id)
+    async def get_guild_balances(self, guild_id: str) -> dict:
+        return await self.balance.get_guild_balances(guild_id)
 
     async def _ensure_gamble_channel(self, interaction: discord.Interaction) -> bool:
         guild_id = interaction.guild_id
@@ -230,6 +230,7 @@ class GamblingCommands(commands.Cog):
 
 
 async def setup(bot: commands.Bot):
+    await balance_service.recover_reservations()
     await bot.add_cog(GamblingCommands(bot))
     print("Gambling Cog : setup 완료!")
 

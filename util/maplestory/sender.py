@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from util.notification_delivery import send_once
+
 import asyncio
 import logging
 import re
@@ -172,7 +174,7 @@ async def send_sunday_maple_event_to_channels(
     results: list[SundayMapleUpdateResult] = []
     for current_guild_id, channel in channels.items():
         try:
-            sent_message = await channel.send(embeds=embeds)
+            sent_message = await send_once(channel, f"sunday-maple:{event.url}", embeds=embeds)
             results.append(
                 SundayMapleUpdateResult(
                     guild_id=current_guild_id,
@@ -222,7 +224,7 @@ async def send_maplestory_notice_to_channel(
         summary_lines = _fallback_maplestory_notice_summary_lines(notice)
 
     try:
-        sent_message = await target.send(
+        sent_message = await send_once(target, f"notice:{notice.url}:{notice.body_text}",
             embed=build_maplestory_notice_embed(notice, summary_lines)
         )
     except (discord.Forbidden, discord.HTTPException) as exc:

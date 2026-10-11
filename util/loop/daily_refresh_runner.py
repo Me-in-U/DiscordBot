@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass
+import logging
 from datetime import datetime
 from typing import Any, Protocol
 
@@ -63,7 +64,14 @@ async def run_daily_refreshes(
     refresh_sunday_maple: RefreshFunc = refresh_sunday_maple_messages,
     log: LogFunc = print,
 ) -> DailyRefreshSummary:
-    celebration_results = await refresh_celebration(bot)
+    async def run(refresh):
+        try:
+            return await refresh(bot)
+        except Exception:
+            logging.getLogger(__name__).exception("Daily refresh failed: %s", refresh)
+            return []
+
+    celebration_results = await run(refresh_celebration)
     celebration_success_count = _count_successes_and_log_failures(
         celebration_results,
         failure_label="기념일 공지 갱신 실패",
@@ -72,7 +80,7 @@ async def run_daily_refreshes(
     if celebration_success_count:
         log(f"[{now}] 기념일 공지 {celebration_success_count}개 채널 갱신 완료.")
 
-    dday_results = await refresh_dday(bot)
+    dday_results = await run(refresh_dday)
     dday_success_count = _count_successes_and_log_failures(
         dday_results,
         failure_label="DDAY 공지 갱신 실패",
@@ -84,7 +92,7 @@ async def run_daily_refreshes(
 
     sunday_maple_success_count = 0
     if now.weekday() == 6:
-        sunday_maple_results = await refresh_sunday_maple(bot)
+        sunday_maple_results = await run(refresh_sunday_maple)
         sunday_maple_success_count = _count_successes_and_log_failures(
             sunday_maple_results,
             failure_label="썬데이메이플 공지 전송 실패",

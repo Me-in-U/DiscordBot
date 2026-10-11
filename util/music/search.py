@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from util.music.network import run_extraction
 from collections.abc import Iterable
 from concurrent.futures import Executor
 from dataclasses import dataclass
@@ -113,10 +114,7 @@ async def run_music_search_query(
         return extractor.extract_info(search, download=False)
 
     loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(
-        executor,
-        _extract,
-    )
+    return await run_extraction(_extract, executor)
 
 
 async def build_music_search_flow(

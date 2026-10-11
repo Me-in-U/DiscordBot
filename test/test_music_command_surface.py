@@ -966,31 +966,11 @@ class MusicCommandSurfaceTests(unittest.TestCase):
         self.assertNotIn("interaction.response.send_message", seek_command_source)
         self.assertNotIn("interaction.followup.send", seek_command_source)
 
-    def test_music_channel_warning_uses_shared_auto_delete_helper(self):
-        source_text = _music_source()
-        tree = ast.parse(source_text)
+    def test_music_does_not_delete_general_chat(self):
+        tree = ast.parse(_music_source())
+        names = {node.name for node in ast.walk(tree) if isinstance(node, ast.AsyncFunctionDef)}
+        self.assertNotIn("on_message", names)
 
-        helper_source = ast.get_source_segment(
-            source_text,
-            _function_node(tree, "_send_channel_auto_delete"),
-        )
-        self.assertIn("await channel.send", helper_source)
-        self.assertIn("_spawn_bg", helper_source)
-        self.assertIn("_auto_delete(sent_message, delay)", helper_source)
-        self.assertIn("discord.NotFound", helper_source)
-        self.assertIn("discord.Forbidden", helper_source)
-        self.assertIn("discord.HTTPException", helper_source)
-        self.assertIn("logger.debug", helper_source)
-        self.assertNotIn("except Exception", helper_source)
-
-        on_message_source = ast.get_source_segment(
-            source_text,
-            _function_node(tree, "on_message"),
-        )
-        self.assertIn("_send_channel_auto_delete", on_message_source)
-        self.assertIn("이 채널은 음악 명령 전용입니다", on_message_source)
-        self.assertNotIn("message.channel.send", on_message_source)
-        self.assertNotIn("self._auto_delete(", on_message_source)
 
     def test_cleanup_paths_use_specific_exception_helpers(self):
         source_text = _music_source()

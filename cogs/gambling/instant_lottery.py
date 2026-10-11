@@ -6,8 +6,10 @@ import discord
 
 from .constants import FINAL_BALANCE_LABEL
 from .services import BalanceService
+from .operations import financial_operation
 
 
+@financial_operation
 async def run_instant_lottery(
     interaction: discord.Interaction,
     balance: BalanceService,
@@ -17,21 +19,21 @@ async def run_instant_lottery(
     guild_id = str(interaction.guild_id)
     user_id = str(interaction.user.id)
 
-    current = balance.get_balance(guild_id, user_id)
+    current = await balance.get_balance(guild_id, user_id)
     if current < ticket_price:
         await interaction.response.send_message(
             f"❌ 잔액 부족 (현재 {current:,}원 / 필요 {ticket_price}원)", ephemeral=True
         )
         return
 
-    balance.set_balance(guild_id, user_id, current - ticket_price)
+    await balance.set_balance(guild_id, user_id, current - ticket_price)
 
     roll = random.uniform(0, 100)
     prize, result_text, color = _determine_prize(roll)
 
-    after_buy = balance.get_balance(guild_id, user_id)
+    after_buy = await balance.get_balance(guild_id, user_id)
     final_balance = after_buy + prize
-    balance.set_balance(guild_id, user_id, final_balance)
+    await balance.set_balance(guild_id, user_id, final_balance)
 
     embed = discord.Embed(title="🎫 즉석복권", description=result_text, color=color)
     embed.add_field(name="구매", value=f"{ticket_price}원", inline=True)

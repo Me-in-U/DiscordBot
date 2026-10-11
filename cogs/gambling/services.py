@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Dict, Tuple
 from datetime import datetime
-from util.db import execute_query, fetch_one, fetch_all
+from util.db import execute_query, fetch_one, fetch_all, transaction
 from .constants import SEOUL_TZ
 
 
@@ -11,6 +11,36 @@ class BalanceService:
 
     def __init__(self):
         pass
+
+    async def reserve(self, round_id, guild_id, user_id, amount):
+        current = await self.get_balance(guild_id, user_id)
+        if amount <= 0 or current < amount:
+            raise ValueError("잔액이 부족합니다.")
+        await self.set_balance(guild_id, user_id, current - amount)
+        await execute_query("""INSERT INTO gambling_rounds (id,guild_id,user_id,amount) VALUES (%s,%s,%s,%s)
+            ON DUPLICATE KEY UPDATE amount=amount+VALUES(amount)""", (round_id,int(guild_id),int(user_id),amount))
+
+    async def settle(self, round_id, prize, *, recipient_id=None, amount=None):
+        row = await fetch_one("SELECT * FROM gambling_rounds WHERE id=%s AND status='open' FOR UPDATE", (round_id,))
+        if row is None:
+            return False
+        consumed = row['amount'] if amount is None else amount
+        if consumed < 0 or consumed > row['amount']:
+            raise ValueError("예약된 금액을 초과했습니다.")
+        user_id = row['user_id'] if recipient_id is None else recipient_id
+        current = await self.get_balance(row['guild_id'],user_id)
+        await self.set_balance(row['guild_id'],user_id,current+prize)
+        await execute_query("UPDATE gambling_rounds SET amount=amount-%s,status=%s WHERE id=%s", (consumed,'settled' if consumed==row['amount'] else 'open',round_id))
+        return True
+
+    async def recover_reservations(self):
+        from .operations import financial_transaction
+        rows = await fetch_all("SELECT * FROM gambling_rounds WHERE status='open'")
+        for row in rows:
+            async with financial_transaction(row['guild_id']):
+                latest = await fetch_one("SELECT * FROM gambling_rounds WHERE id=%s AND status='open' FOR UPDATE", (row['id'],))
+                if latest is not None:
+                    await self.settle(row['id'], latest['amount'])
 
     async def get_balance(self, guild_id: str, user_id: str) -> int:
         query = (

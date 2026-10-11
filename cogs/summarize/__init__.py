@@ -1,4 +1,5 @@
 import asyncio
+from common.discord_output import edit_text
 import logging
 
 import discord
@@ -209,11 +210,13 @@ class SummarizeCommands(commands.Cog):
         recent_messages = get_recent_messages(
             client=self.bot,
             guild_id=guild_id,
+            channel_id=interaction.channel_id, requester=interaction.user,
             limit=150,
         )
         recent_images = get_recent_message_images(
             client=self.bot,
             guild_id=guild_id,
+            channel_id=interaction.channel_id, requester=interaction.user,
             limit=150,
             max_images=4,
         )
@@ -237,7 +240,7 @@ class SummarizeCommands(commands.Cog):
 
         # 응답 출력
         sent_msg = await interaction.original_response()
-        await sent_msg.edit(content=response)
+        await edit_text(sent_msg, response)
 
     @app_commands.command(
         name="요약",

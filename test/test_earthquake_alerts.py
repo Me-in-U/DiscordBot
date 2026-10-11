@@ -1594,7 +1594,7 @@ class EmscStreamTests(unittest.IsolatedAsyncioTestCase):
                 self.url = None
                 self.params = None
 
-            def get(self, url, *, params):
+            def get(self, url, *, params, timeout=None):
                 self.url = url
                 self.params = params
                 return FakeResponse()
@@ -1636,7 +1636,7 @@ class EmscStreamTests(unittest.IsolatedAsyncioTestCase):
                 raise AssertionError("204 must not be decoded as JSON")
 
         class FakeSession:
-            def get(self, _url, *, params):
+            def get(self, _url, *, params, timeout=None):
                 self.params = params
                 return FakeResponse()
 

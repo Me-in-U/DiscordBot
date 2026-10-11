@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from util.notification_delivery import send_once
+
 import logging
 from collections.abc import Awaitable, Callable
 
@@ -245,6 +247,8 @@ async def send_emsc_alert(
     target: object,
     event: EmscEvent,
     notify_everyone: bool | None = None,
+    *,
+    replacement_of: int | None = None,
 ) -> int | None:
     map_file = await build_earthquake_map_file(event)
     show_everyone = _should_show_everyone(event)
@@ -264,7 +268,7 @@ async def send_emsc_alert(
         send_options["content"] = "@everyone"
     if map_file is not None:
         send_options["file"] = map_file
-    message = await target.send(**send_options)
+    message = await send_once(target, f"emsc:{event.event_id}:{event.revision}:{replacement_of}", **send_options)
     return getattr(message, "id", None)
 
 
@@ -281,6 +285,7 @@ async def edit_emsc_alert(
             target,
             event,
             notify_everyone=notify_everyone,
+            replacement_of=message_id,
         )
 
     if notify_everyone and _should_show_everyone(event):
@@ -288,6 +293,7 @@ async def edit_emsc_alert(
             target,
             event,
             notify_everyone=True,
+            replacement_of=message_id,
         )
         try:
             await message.delete()

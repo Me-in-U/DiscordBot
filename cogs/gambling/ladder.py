@@ -10,11 +10,13 @@ import discord
 from common.discord_ui import SafeView
 from .constants import BET_AMOUNT_REQUIRED, SEOUL_TZ
 from .services import BalanceService
+from .operations import financial_operation
 
 
 logger = logging.getLogger(__name__)
 
 
+@financial_operation
 async def run_ladder_game(
     interaction: discord.Interaction,
     balance: BalanceService,
@@ -30,7 +32,7 @@ async def run_ladder_game(
         await interaction.response.send_message(BET_AMOUNT_REQUIRED, ephemeral=True)
         return
 
-    current = balance.get_balance(guild_id, user_id)
+    current = await balance.get_balance(guild_id, user_id)
     if current < bet_amount:
         await interaction.response.send_message(
             f"❌ 잔액 부족 (현재 {current:,}원)", ephemeral=True
@@ -108,6 +110,7 @@ class LadderView(SafeView):
         button.callback = callback
         return button
 
+    @financial_operation
     async def _resolve(self, interaction: discord.Interaction, choice: int) -> None:
         async with self.lock:
             if self.finished:
@@ -123,24 +126,24 @@ class LadderView(SafeView):
                 )
                 return
 
-            current = self._balance.get_balance(self.guild_id, self.user_id)
+            current = await self._balance.get_balance(self.guild_id, self.user_id)
             if current < self.bet_amount:
                 await interaction.response.send_message(
                     "❌ 잔액이 부족합니다.", ephemeral=True
                 )
                 return
 
-            self._balance.set_balance(
+            await self._balance.set_balance(
                 self.guild_id, self.user_id, current - self.bet_amount
             )
 
             end_col, path_positions = trace_ladder_path(choice, self.rungs)
             is_win = end_col == self.winner_bottom
             prize = int(self.bet_amount * self.payout_multiplier) if is_win else 0
-            after_bet = self._balance.get_balance(self.guild_id, self.user_id)
+            after_bet = await self._balance.get_balance(self.guild_id, self.user_id)
             final_balance = after_bet + prize
             if prize:
-                self._balance.set_balance(self.guild_id, self.user_id, final_balance)
+                await self._balance.set_balance(self.guild_id, self.user_id, final_balance)
 
             art = build_ladder_ascii(
                 self.rungs,
@@ -182,6 +185,7 @@ class LadderView(SafeView):
             except (discord.NotFound, discord.Forbidden, discord.HTTPException):
                 logger.debug("사다리 결과 메시지 수정 실패", exc_info=True)
 
+    @financial_operation
     async def on_timeout(self) -> None:
         for child in self.children:
             if isinstance(child, discord.ui.Button):

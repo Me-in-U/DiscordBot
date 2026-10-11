@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from util.notification_delivery import send_once
+
 import asyncio
 import hashlib
 import json
@@ -256,6 +258,7 @@ async def refresh_tibo_daily_log_notifications(bot: object) -> int:
                         summaries_by_day[day] = await summarize_tibo_daily_log(day_entries)
                     updated = any(entry.entry_id in fingerprints for entry in day_entries)
                     embed = build_tibo_daily_log_embed(day_entries, summaries_by_day[day], updated=updated)
+                    delivery_key = f"tibo:{day}:" + ":".join(current[entry.entry_id] for entry in day_entries)
                     if updated:
                         changed_kinds = {entry.kind for entry in changed if entry.day == day}
                         labels = [label for kind, label in (
@@ -263,8 +266,8 @@ async def refresh_tibo_daily_log_notifications(bot: object) -> int:
                             ("banked-reset", "**적립형 리셋**"),
                             ("reset", "리셋"),
                         ) if kind in changed_kinds]
-                        await target.send(content=f"추가 {', '.join(labels)} 사항 업데이트", allowed_mentions=discord.AllowedMentions.none())
-                    await target.send(embed=embed, allowed_mentions=discord.AllowedMentions.none())
+                        await send_once(target, delivery_key + ":announcement", content=f"추가 {', '.join(labels)} 사항 업데이트", allowed_mentions=discord.AllowedMentions.none())
+                    await send_once(target, delivery_key + ":embed", embed=embed, allowed_mentions=discord.AllowedMentions.none())
                     fingerprints.update({entry.entry_id: current[entry.entry_id] for entry in day_entries})
                     await _save_state(guild_id, channel_id, fingerprints)
                     sent_count += 1

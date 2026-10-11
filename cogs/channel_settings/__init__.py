@@ -7,6 +7,7 @@ from discord.ext import commands
 
 from util.earthquake.state import delete_earthquake_alert_state
 from util.codex_resets.tibo import reset_tibo_daily_log_state
+from util.codex_resets.events import seed_codex_reset_state_for_guild
 from util.guild.channel_settings import get_settings_for_guild, set_channel
 from util.lostark.notices import configure_lostark_notice_channel
 
@@ -95,6 +96,8 @@ class ChannelSettings(commands.Cog):
             return
 
         guild_id = int(interaction.guild_id)
+        if purpose.value != "lostark_notice":
+            await interaction.response.defer(ephemeral=True, thinking=True)
         if purpose.value == "lostark_notice":
             await interaction.response.defer(ephemeral=True, thinking=True)
             try:
@@ -109,6 +112,8 @@ class ChannelSettings(commands.Cog):
             await delete_earthquake_alert_state(guild_id)
         if purpose.value == "codex_reset":
             await reset_tibo_daily_log_state(guild_id)
+            if channel is not None:
+                await seed_codex_reset_state_for_guild(guild_id)
 
         action = "해제" if channel is None else "설정"
         channel_text = "설정 해제" if channel is None else channel.mention
@@ -126,10 +131,7 @@ class ChannelSettings(commands.Cog):
         )
         _add_current_channel_fields(embed, summary)
 
-        if purpose.value == "lostark_notice":
-            await interaction.followup.send(embed=embed, ephemeral=True)
-        else:
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
     @app_commands.command(
         name="채널설정확인",

@@ -6,6 +6,8 @@ __pycache__/
 */__pycache__/
 test/
 .env
+.env.*
+cookies.txt
 .deploy-logs/
 youtube_audio.mp3
 youtube_subtitles*.vtt

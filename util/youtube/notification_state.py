@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from collections.abc import Iterable, Mapping
 from dataclasses import replace
+from util.youtube.state_operation import subscription_operation
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -70,6 +71,7 @@ def should_check_pending_youtube_video(
     return scheduled_start - early_window <= current <= scheduled_start + expire_window
 
 
+@subscription_operation
 async def mark_youtube_video_notified(
     subscription: YouTubeSubscription,
     video_id: str,
@@ -90,6 +92,7 @@ async def mark_youtube_video_notified(
     )
 
 
+@subscription_operation
 async def mark_youtube_upload_video_notified(
     subscription: YouTubeSubscription,
     video_id: str,
@@ -106,6 +109,7 @@ async def mark_youtube_upload_video_notified(
     return replace(subscription, notified_upload_video_ids=notified_ids)
 
 
+@subscription_operation
 async def remember_pending_youtube_video(
     subscription: YouTubeSubscription,
     status: YouTubeVideoLiveStatus,
@@ -114,7 +118,10 @@ async def remember_pending_youtube_video(
     update_state: UpdateSubscriptionState = update_youtube_subscription_state,
 ) -> YouTubeSubscription:
     pending = dict(subscription.pending_videos)
-    pending[status.video_id] = build_pending_video_entry(status, now=now)
+    entry = build_pending_video_entry(status, now=now)
+    entry["firstSeenAt"] = pending.get(status.video_id, {}).get("firstSeenAt", _current_utc(now).isoformat())
+    pending[status.video_id] = entry
+    pending = dict(list(pending.items())[-100:])
     await update_state(
         subscription.id,
         pending_videos=pending,
@@ -123,6 +130,7 @@ async def remember_pending_youtube_video(
     return replace(subscription, pending_videos=pending)
 
 
+@subscription_operation
 async def remove_pending_youtube_video(
     subscription: YouTubeSubscription,
     video_id: str,
@@ -138,6 +146,7 @@ async def remove_pending_youtube_video(
     return replace(subscription, pending_videos=pending)
 
 
+@subscription_operation
 async def touch_pending_youtube_video_check(
     subscription: YouTubeSubscription,
     video_id: str,
@@ -147,8 +156,10 @@ async def touch_pending_youtube_video_check(
     update_state: UpdateSubscriptionState = update_youtube_subscription_state,
 ) -> YouTubeSubscription:
     pending = dict(subscription.pending_videos)
+    latest = dict(pending.get(str(video_id), pending_entry))
+    latest.setdefault("firstSeenAt", latest.get("lastCheckedAt") or _current_utc(now).isoformat())
     pending[str(video_id)] = {
-        **dict(pending_entry),
+        **latest,
         "lastCheckedAt": _current_utc(now).isoformat(),
     }
     await update_state(

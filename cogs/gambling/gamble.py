@@ -6,8 +6,10 @@ import discord
 
 from .constants import BET_AMOUNT_REQUIRED, FINAL_BALANCE_LABEL, SEOUL_TZ
 from .services import BalanceService
+from .operations import financial_operation
 
 
+@financial_operation
 async def run_gamble(
     interaction: discord.Interaction,
     balance: BalanceService,

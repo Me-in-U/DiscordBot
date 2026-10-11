@@ -9,7 +9,7 @@ from aiohttp import web
 from discord.ext import commands
 
 from util.celebration.announcements import refresh_celebration_messages
-from util.db import DB_SCHEMA_VERSION
+from util.db import DB_SCHEMA_VERSION, ensure_schema_ready
 from util.env_utils import getenv_clean
 
 
@@ -129,6 +129,22 @@ class StatusApi(commands.Cog):
     async def health_handler(self, request):
         """봇의 상태 정보를 JSON으로 반환"""
         status = "online" if self.bot.is_ready() else "starting"
+        if status == "online":
+            try:
+                await ensure_schema_ready()
+                from bot import REQUIRED_COGS
+                if not getattr(self.bot, "startup_completed", False) or not REQUIRED_COGS.issubset(self.bot.extensions):
+                    status = "starting"
+                loops = self.bot.get_cog("LoopTasks")
+                if loops is None:
+                    status = "degraded"
+                else:
+                    from cogs.loop import LOOP_TASK_NAMES
+                    if any(not getattr(loops, name).is_running() for name in LOOP_TASK_NAMES):
+                        status = "degraded"
+            except Exception:
+                logger.exception("Readiness DB/feature check failed")
+                status = "degraded"
 
         # 봇이 참여 중인 길드 수와 총 유저 수 계산
         guild_count = len(self.bot.guilds)
@@ -152,7 +168,7 @@ class StatusApi(commands.Cog):
             "timestamp_utc": datetime.now(timezone.utc).isoformat(),
             "bot_name": str(self.bot.user) if self.bot.user else "Unknown",
         }
-        return web.json_response(data)
+        return web.json_response(data, status=200 if status == "online" else 503)
 
     async def celebration_update_handler(self, request):
         """기념일 공지를 수정하거나, 없으면 새로 전송합니다."""

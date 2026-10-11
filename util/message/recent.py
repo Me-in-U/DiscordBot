@@ -57,7 +57,14 @@ def _parse_time(message):
         return datetime(1970, 1, 1)
 
 
-def _get_recent_entries(client, guild_id: int, limit: int) -> list[dict]:
+def _get_recent_entries(client, guild_id: int, limit: int, channel_id=None, requester=None) -> list[dict]:
+    if requester is not None:
+        channel = client.get_channel(channel_id)
+        if channel is None:
+            return []
+        permissions = channel.permissions_for(requester)
+        if not permissions.read_message_history or not getattr(permissions, "view_channel", True):
+            return []
     root = getattr(client, "USER_MESSAGES", {})
     if not isinstance(root, dict):
         logger.warning("get_recent_messages: USER_MESSAGES 타입 오류 -> %s", type(root))
@@ -74,7 +81,9 @@ def _get_recent_entries(client, guild_id: int, limit: int) -> list[dict]:
             continue
         for message in messages:
             if isinstance(message, dict):
-                all_messages.append({**message, "author": author})
+                if channel_id is not None and message.get("channel_id") != channel_id:
+                    continue
+                all_messages.append({**message, "author": message.get("author", author)})
 
     logger.debug(
         "get_recent_messages[guild=%s]: 집계된 메시지 수 = %s",
@@ -85,8 +94,8 @@ def _get_recent_entries(client, guild_id: int, limit: int) -> list[dict]:
     return list(reversed(all_messages[: max(limit, 0)]))
 
 
-def get_recent_messages(client, guild_id: int, limit: int = 20):
-    recent = _get_recent_entries(client, guild_id, limit)
+def get_recent_messages(client, guild_id: int, limit: int = 20, *, channel_id=None, requester=None):
+    recent = _get_recent_entries(client, guild_id, limit, channel_id, requester)
     if not recent:
         return ""
 
@@ -107,12 +116,13 @@ def get_recent_message_images(
     guild_id: int,
     limit: int = 150,
     max_images: int = 4,
+    *, channel_id=None, requester=None,
 ) -> tuple[tuple[str, str], ...]:
     if max_images <= 0:
         return ()
 
     images = []
-    for message in _get_recent_entries(client, guild_id, limit):
+    for message in _get_recent_entries(client, guild_id, limit, channel_id, requester):
         author = message.get("author", "unknown")
         timestamp = message.get("time", "")
         for index, url in enumerate(

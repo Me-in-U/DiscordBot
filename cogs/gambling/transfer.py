@@ -3,8 +3,10 @@ from __future__ import annotations
 import discord
 
 from .services import BalanceService
+from .operations import financial_operation
 
 
+@financial_operation
 async def execute_transfer(
     interaction: discord.Interaction,
     balance: BalanceService,

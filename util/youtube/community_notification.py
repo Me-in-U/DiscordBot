@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from util.notification_delivery import send_once
+
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import replace
+from util.youtube.state_operation import subscription_operation
 
 import discord
 
@@ -24,6 +27,7 @@ from util.youtube.subscriptions import (
 UpdateCommunityState = Callable[..., Awaitable[None]]
 
 
+@subscription_operation
 async def mark_youtube_community_post_notified(
     subscription: YouTubeSubscription,
     post_id: str,
@@ -61,7 +65,7 @@ async def send_youtube_community_notification(
     if target is None:
         return False
 
-    await target.send(
+    await send_once(target, f"youtube-post:{post.post_id}",
         content=f"## 📝 {subscription.channel_name} 새 커뮤니티 게시물\n{post.url}",
         embed=_build_youtube_community_embed(subscription, post),
     )

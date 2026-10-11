@@ -64,6 +64,8 @@ async def ensure_music_voice_client(
     missing_channel_message: str,
     busy_channel_message: str,
 ) -> MusicVoiceClientResult:
+    if voice_client is not None and callable(getattr(voice_client, "listen", None)):
+        return MusicVoiceClientResult(voice_client=voice_client, error_message="음성 대화를 종료한 뒤 음악을 재생해주세요.")
     if voice_client is None:
         if user_channel is None:
             return MusicVoiceClientResult(

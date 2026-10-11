@@ -102,6 +102,8 @@ class RankRuntimeTests(unittest.IsolatedAsyncioTestCase):
             side_effect=RuntimeError("database-password-secret")
         )
         interaction = SimpleNamespace(
+            guild=SimpleNamespace(get_channel=lambda _: object()),
+            user=SimpleNamespace(guild_permissions=SimpleNamespace(administrator=True)),
             response=SimpleNamespace(send_message=AsyncMock())
         )
 

@@ -54,7 +54,7 @@ class SearchImageTests(unittest.IsolatedAsyncioTestCase):
                 "image_url": "https://example.com/search.png",
             },
         )
-        interaction.followup.send.assert_awaited_once_with("검색 결과")
+        self.assertEqual(interaction.followup.send.await_args.kwargs["content"], "검색 결과")
 
 
 if __name__ == "__main__":

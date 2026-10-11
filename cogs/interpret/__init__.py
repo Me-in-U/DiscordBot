@@ -1,4 +1,5 @@
 import asyncio
+from common.discord_output import send_text, edit_text
 import logging
 import re
 
@@ -131,7 +132,7 @@ async def interpret_message_context_menu(
         following_messages=context.following_messages,
         context_images=context.images,
     )
-    await interaction.followup.send(interpreted)
+    await send_text(interaction.followup, interpreted)
 
 
 class InterpretSelect(discord.ui.Select):
@@ -218,7 +219,7 @@ class InterpretSelectView(SafeView):
         # 원본 메시지를 번역 결과로 덮어쓰기
         if isinstance(self.original_message, discord.Message):
             try:
-                await self.original_message.edit(content=result_message, view=None)
+                await edit_text(self.original_message, result_message, view=None)
             except (discord.NotFound, discord.Forbidden, discord.HTTPException):
                 logger.debug("해석 결과 메시지 수정 실패", exc_info=True)
 
@@ -279,7 +280,7 @@ class InterpretCommands(commands.Cog):
                 prompt_version=INTERPRET_PROMPT_VERSION,
             )
             try:
-                await interaction.followup.send(interpreted)
+                await send_text(interaction.followup, interpreted)
             except (discord.NotFound, discord.Forbidden, discord.HTTPException):
                 logger.debug("해석 결과 전송 실패", exc_info=True)
         else:

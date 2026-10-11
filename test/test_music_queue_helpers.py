@@ -175,10 +175,10 @@ class MusicQueueHelperTests(unittest.TestCase):
         requester = SimpleNamespace(id=123)
         queue = collections.deque()
 
-        track = enqueue_url_track(queue, "https://example.com/video", requester)
+        track = enqueue_url_track(queue, "https://www.youtube.com/watch?v=video", requester)
 
         self.assertIs(track, queue[0])
-        self.assertEqual(track.url, "https://example.com/video")
+        self.assertEqual(track.url, "https://www.youtube.com/watch?v=video")
         self.assertIs(track.requester, requester)
         self.assertIsNone(track.title)
 
@@ -253,23 +253,23 @@ class MusicQueueHelperTests(unittest.TestCase):
             return {"title": f"title:{url}"}
 
         self.assertEqual(
-            extract_queue_track_metadata("abc", extractor),
-            {"title": "title:abc"},
+            extract_queue_track_metadata("https://www.youtube.com/watch?v=abc", extractor),
+            {"title": "title:https://www.youtube.com/watch?v=abc"},
         )
 
     def test_extract_queue_track_metadata_returns_none_for_extraction_errors(self):
         def extractor(url: str):
             raise ValueError("bad metadata")
 
-        self.assertIsNone(extract_queue_track_metadata("abc", extractor))
+        self.assertIsNone(extract_queue_track_metadata("https://www.youtube.com/watch?v=abc", extractor))
 
 
 class MusicQueueMetadataRunnerTests(unittest.IsolatedAsyncioTestCase):
     async def test_fill_queue_track_metadata_applies_extracted_metadata(self):
-        track = QueuedTrack(url="https://example.com/video")
+        track = QueuedTrack(url="https://www.youtube.com/watch?v=video")
 
         def extractor(url: str):
-            self.assertEqual(url, "https://example.com/video")
+            self.assertEqual(url, "https://www.youtube.com/watch?v=video")
             return {
                 "title": "runner title",
                 "duration": "90",
@@ -286,7 +286,7 @@ class MusicQueueMetadataRunnerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(track.uploader, "runner uploader")
 
     async def test_fill_queue_track_metadata_returns_false_without_metadata(self):
-        track = QueuedTrack(url="https://example.com/video", title="old title")
+        track = QueuedTrack(url="https://www.youtube.com/watch?v=video", title="old title")
 
         updated = await fill_queue_track_metadata(track, lambda url: None)
 

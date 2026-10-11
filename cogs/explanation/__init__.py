@@ -1,4 +1,5 @@
 import asyncio
+from common.discord_output import send_text, edit_text
 import logging
 import re
 
@@ -182,7 +183,7 @@ async def explain_message_context_menu(
         following_messages=context.following_messages,
         context_images=context.images,
     )
-    await interaction.followup.send(explained)
+    await send_text(interaction.followup, explained)
 
 
 class ExplanationSelect(discord.ui.Select):
@@ -260,7 +261,7 @@ class ExplanationSelectView(SafeView):
         )
         if isinstance(self.original_message, discord.Message):
             try:
-                await self.original_message.edit(content=result_message, view=None)
+                await edit_text(self.original_message, result_message, view=None)
             except (discord.NotFound, discord.Forbidden, discord.HTTPException):
                 logger.debug("설명 결과 메시지 수정 실패", exc_info=True)
 
@@ -307,7 +308,7 @@ class ExplanationCommands(commands.Cog):
         if text or image:
             image_url = image.url if image else None
             explained = await explain_target(text or "", image_url)
-            await interaction.followup.send(explained)
+            await send_text(interaction.followup, explained)
             return
 
         messages_options = []

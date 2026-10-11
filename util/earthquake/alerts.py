@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from util.notification_delivery import send_once
+
 import asyncio
 import logging
 from collections.abc import Awaitable, Callable, Mapping
@@ -286,6 +288,8 @@ async def send_jma_eew_alert(
     target: object,
     event: JmaEewEvent,
     notify_everyone: bool | None = None,
+    *,
+    replacement_of: int | None = None,
 ) -> int | None:
     map_file, translated_terms = await asyncio.gather(
         build_jma_eew_map_file(event),
@@ -310,7 +314,7 @@ async def send_jma_eew_alert(
         send_options["content"] = "@everyone"
     if map_file is not None:
         send_options["file"] = map_file
-    message = await target.send(**send_options)
+    message = await send_once(target, f"jma:{event.event_id}:{event.serial}:{replacement_of}", **send_options)
     return getattr(message, "id", None)
 
 
@@ -327,6 +331,7 @@ async def edit_jma_eew_alert(
             target,
             event,
             notify_everyone=notify_everyone,
+            replacement_of=message_id,
         )
 
     if notify_everyone and _should_show_everyone(event):
@@ -334,6 +339,7 @@ async def edit_jma_eew_alert(
             target,
             event,
             notify_everyone=True,
+            replacement_of=message_id,
         )
         try:
             await message.delete()

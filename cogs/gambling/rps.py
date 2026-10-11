@@ -6,8 +6,10 @@ import discord
 
 from .constants import BET_AMOUNT_REQUIRED, FINAL_BALANCE_LABEL
 from .services import BalanceService
+from .operations import financial_operation
 
 
+@financial_operation
 async def run_rock_paper_scissors(
     interaction: discord.Interaction,
     balance: BalanceService,
@@ -22,14 +24,14 @@ async def run_rock_paper_scissors(
         await interaction.response.send_message(BET_AMOUNT_REQUIRED, ephemeral=True)
         return
 
-    current = balance.get_balance(guild_id, user_id)
+    current = await balance.get_balance(guild_id, user_id)
     if current < bet_amount:
         await interaction.response.send_message(
             f"❌ 잔액 부족 (현재 {current:,}원)", ephemeral=True
         )
         return
 
-    balance.set_balance(guild_id, user_id, current - bet_amount)
+    await balance.set_balance(guild_id, user_id, current - bet_amount)
 
     bot_choice = random.choice(["가위", "바위", "보"])
     user_choice = choice_value
@@ -50,8 +52,8 @@ async def run_rock_paper_scissors(
         prize = 0
         color = 0xE74C3C
 
-    final_balance = balance.get_balance(guild_id, user_id) + prize
-    balance.set_balance(guild_id, user_id, final_balance)
+    final_balance = await balance.get_balance(guild_id, user_id) + prize
+    await balance.set_balance(guild_id, user_id, final_balance)
 
     embed = discord.Embed(title="✊✋✌️ 가위바위보", color=color)
     embed.add_field(name="당신", value=user_choice, inline=True)

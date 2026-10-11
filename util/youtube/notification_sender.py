@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from util.notification_delivery import send_once
+
 from collections.abc import Awaitable, Callable
 
 import discord
@@ -73,7 +75,7 @@ async def send_youtube_live_notification(
     if target is None:
         return False
 
-    await target.send(build_youtube_live_notification_message(status.video_id))
+    await send_once(target, f"youtube-live:{status.video_id}", build_youtube_live_notification_message(status.video_id))
     return True
 
 
@@ -100,7 +102,7 @@ async def send_youtube_upload_notification(
     if target is None:
         return False
 
-    await target.send(
+    await send_once(target, f"youtube-upload:{status.video_id}",
         build_youtube_upload_notification_message(
             subscription.channel_name,
             status.title,

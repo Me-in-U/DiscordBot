@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from util.notification_delivery import send_once
+
 from dataclasses import replace
 from urllib.parse import urlsplit
 
@@ -46,7 +48,7 @@ async def send_codex_reset_notification(
 ) -> int | None:
     if urlsplit(event.tweet_url).hostname in {"x.com", "twitter.com"}:
         event = replace(event, text=await translate_codex_reset(event))
-    message = await target.send(embed=build_codex_reset_embed(event))
+    message = await send_once(target, f"codex:{event.tweet_id}", embed=build_codex_reset_embed(event))
     message_id = getattr(message, "id", None)
     return int(message_id) if message_id is not None else None
 

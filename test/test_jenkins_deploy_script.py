@@ -13,7 +13,7 @@ BASH = shutil.which("bash") if os.name == "posix" else shutil.which(
 
 @unittest.skipUnless(BASH, "Deployment script requires Bash or Git Bash")
 class JenkinsDeployScriptTests(unittest.TestCase):
-    def run_deploy(self, *, dockerfile="FROM python:3.11-slim\n", health="ok"):
+    def run_deploy(self, *, dockerfile="FROM python:3.11-slim\n", health="ok", previous=""):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "scripts").mkdir()
@@ -25,8 +25,8 @@ class JenkinsDeployScriptTests(unittest.TestCase):
             (root / ".env").write_text("EXAMPLE=value\n")
             command_log = root / "commands.log"
             for name, content in {
-                "docker": '#!/bin/sh\nprintf "%s\\n" "$*" >> "$COMMAND_LOG"\nexit 0\n',
-                "curl": '#!/bin/sh\nif [ "$FAKE_HEALTH" = fail ]; then echo "curl: (52) Empty reply from server" >&2; exit 52; fi\nexit 0\n',
+                "docker": '#!/bin/sh\nprintf "%s\\n" "$* image=$BOT_IMAGE" >> "$COMMAND_LOG"\nif [ "$1" = inspect ]; then echo "$FAKE_PREVIOUS"; fi\nexit 0\n',
+                "curl": '#!/bin/sh\nif [ "$FAKE_HEALTH" = recover ]; then count=0; [ ! -f "$COMMAND_LOG.count" ] || count=$(cat "$COMMAND_LOG.count"); count=$((count+1)); echo "$count" > "$COMMAND_LOG.count"; [ "$count" -gt 2 ] && exit 0; fi\nif [ "$FAKE_HEALTH" != ok ]; then echo "curl: (52) Empty reply from server" >&2; exit 52; fi\nexit 0\n',
             }.items():
                 executable = root / "bin" / name
                 executable.write_text(content, newline="\n")
@@ -40,6 +40,7 @@ class JenkinsDeployScriptTests(unittest.TestCase):
                 "ENV_FILE": ".env",
                 "COMMAND_LOG": command_log.as_posix(),
                 "FAKE_HEALTH": health,
+                "FAKE_PREVIOUS": previous,
                 "HEALTHCHECK_MAX_ATTEMPTS": "2",
                 "HEALTHCHECK_INTERVAL_SECONDS": "0",
             })
@@ -63,3 +64,17 @@ class JenkinsDeployScriptTests(unittest.TestCase):
         self.assertEqual(result.stdout.count("Empty reply from server"), 1)
         self.assertIn("[ERROR] Last health check response:", result.stdout)
         self.assertNotIn("[SUCCESS]", result.stdout)
+
+    def test_health_failure_attempts_previous_image_rollback(self):
+        result, commands = self.run_deploy(health="fail", previous="sha256:previous")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Restoring previous application image", result.stdout)
+        self.assertIn("--force-recreate discord-bot image=sha256:previous", commands)
+        self.assertIn("Rollback did not become healthy", result.stdout)
+
+    def test_rollback_restores_health_but_keeps_build_failed(self):
+        result, commands = self.run_deploy(health="recover", previous="sha256:previous")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Previous application restored. Deployment remains failed", result.stdout)
+        self.assertNotIn("[SUCCESS]", result.stdout)
+        self.assertIn("--force-recreate discord-bot image=sha256:previous", commands)

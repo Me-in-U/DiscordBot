@@ -122,6 +122,7 @@ async def process_youtube_video_candidate(
                 status.video_id,
             )
             return "upload_notified"
+        await owner._remember_pending_youtube_video(subscription, status)
         return "upload_send_failed"
 
     if status.status == YouTubeVideoStatus.SHORTS:

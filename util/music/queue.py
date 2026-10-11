@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from util.music.network import run_extraction, validate_music_url
 import random
 import time
 from collections.abc import Callable
@@ -216,7 +217,7 @@ def extract_queue_track_metadata(
     extractor: Callable[[str], Any],
 ) -> dict[str, Any] | None:
     try:
-        metadata = extractor(url)
+        metadata = extractor(validate_music_url(url))
     except (DownloadError, OSError, TypeError, ValueError):
         return None
     return metadata if isinstance(metadata, dict) else None
@@ -229,10 +230,7 @@ async def fill_queue_track_metadata(
     executor: Executor | None = None,
 ) -> bool:
     loop = asyncio.get_running_loop()
-    metadata = await loop.run_in_executor(
-        executor,
-        lambda: extract_queue_track_metadata(track.url, extractor),
-    )
+    metadata = await run_extraction(lambda: extract_queue_track_metadata(track.url, extractor), executor)
     if metadata is None:
         return False
     apply_queue_track_metadata(track, metadata)

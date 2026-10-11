@@ -1,4 +1,5 @@
 import asyncio
+from common.discord_output import send_text
 import logging
 
 import discord
@@ -61,7 +62,7 @@ class QuestionCommands(commands.Cog):
                     GENERAL_PROMPT_VERSION,
                     {
                         "recent_messages": get_recent_messages(
-                            client=self.bot, guild_id=interaction.guild.id, limit=20
+                            client=self.bot, guild_id=interaction.guild.id, limit=20, channel_id=interaction.channel_id, requester=interaction.user
                         ),
                         "user_name": interaction.user.name,
                         "question": text.strip(),
@@ -72,7 +73,7 @@ class QuestionCommands(commands.Cog):
             response = log_user_error(logger, "질문", exc)
 
         try:
-            await interaction.followup.send(f"{response}")
+            await send_text(interaction.followup, response)
         except (discord.NotFound, discord.Forbidden, discord.HTTPException):
             logger.debug("질문 응답 전송 실패", exc_info=True)
 
@@ -111,7 +112,7 @@ class QuestionCommands(commands.Cog):
                     GOD_QUESTION_PROMPT_VERSION,
                     {
                         "recent_messages": get_recent_messages(
-                            client=self.bot, guild_id=interaction.guild.id, limit=20
+                            client=self.bot, guild_id=interaction.guild.id, limit=20, channel_id=interaction.channel_id, requester=interaction.user
                         ),
                         "user_name": interaction.user.name,
                         "question": text.strip(),
@@ -122,7 +123,7 @@ class QuestionCommands(commands.Cog):
             response = log_user_error(logger, "신이시여 질문", exc)
 
         try:
-            await interaction.followup.send(f"{response}")
+            await send_text(interaction.followup, response)
         except (discord.NotFound, discord.Forbidden, discord.HTTPException):
             logger.debug("신이시여 응답 전송 실패", exc_info=True)
 

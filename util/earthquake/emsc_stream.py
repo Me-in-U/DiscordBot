@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+from util.earthquake.retry import deliver_event
+from util.db import fetch_one, execute_query
 import json
 import logging
 from collections.abc import Awaitable, Callable
@@ -20,7 +22,7 @@ from util.earthquake.emsc_alerts import process_emsc_event
 
 
 logger = logging.getLogger(__name__)
-EMSC_RECONNECT_BACKFILL_WINDOW = timedelta(minutes=10)
+EMSC_RECONNECT_BACKFILL_WINDOW = timedelta(hours=24)
 EMSC_RECONNECT_LOG_EVERY_FAILURES = 10
 ProcessEvent = Callable[
     [object, EmscEvent],
@@ -38,7 +40,6 @@ async def run_emsc_stream(
 ) -> None:
     reconnect_delay = 2
     consecutive_failures = 0
-    has_connected = False
     while not bot.is_closed():
         try:
             timeout = aiohttp.ClientTimeout(total=None, connect=15)
@@ -52,14 +53,12 @@ async def run_emsc_stream(
                     reconnect_delay = 2
                     consecutive_failures = 0
                     log("EMSC 전 세계 지진 WebSocket 연결 완료")
-                    if has_connected:
-                        await _recover_emsc_updates(
-                            bot,
-                            session,
-                            process_event=process_event,
-                            log=log,
-                        )
-                    has_connected = True
+                    await _recover_emsc_updates(
+                        bot,
+                        session,
+                        process_event=process_event,
+                        log=log,
+                    )
                     await consume_emsc_messages(
                         bot,
                         websocket,
@@ -100,6 +99,12 @@ async def _recover_emsc_updates(
 ) -> int:
     current_time = now or datetime.now(timezone.utc)
     updated_after = current_time - EMSC_RECONNECT_BACKFILL_WINDOW
+    persistent = process_event is process_emsc_event
+    if persistent:
+        row = await fetch_one("SELECT setting_value FROM setting_data WHERE setting_key=%s", ("emscRecoveryCursor",))
+        if row:
+            cursor = json.loads(row["setting_value"]) if isinstance(row["setting_value"], str) else row["setting_value"]
+            updated_after = datetime.fromisoformat(cursor) - timedelta(minutes=1)
     params = {
         "format": "json",
         "minmag": f"{EMSC_BACKFILL_MIN_MAGNITUDE:.1f}",
@@ -107,42 +112,39 @@ async def _recover_emsc_updates(
         "orderby": "time-asc",
         "limit": "100",
     }
-    try:
-        async with session.get(
-            EMSC_FDSN_EVENT_URL,
-            params=params,
-        ) as response:
-            if getattr(response, "status", None) == 204:
-                return 0
-            response.raise_for_status()
-            payload = await response.json()
-    except (
-        aiohttp.ClientError,
-        asyncio.TimeoutError,
-        json.JSONDecodeError,
-        ValueError,
-    ):
-        logger.warning("EMSC 재연결 누락분 조회 실패", exc_info=True)
-        return 0
-
-    features = payload.get("features") if isinstance(payload, dict) else None
-    if not isinstance(features, list):
-        return 0
-
     processed_count = 0
-    for feature in features:
+    offset = 1
+    while True:
+        params["offset"] = str(offset)
         try:
-            event = parse_emsc_message(
-                {"action": "update", "data": feature}
-            )
-        except ValueError:
-            logger.warning("EMSC 누락분 메시지 형식 오류", exc_info=True)
-            continue
-        if event is None:
-            continue
-        results = await process_event(bot, event)
-        processed_count += 1
-        _log_results(results, log)
+            async with session.get(EMSC_FDSN_EVENT_URL, params=params,
+                                   timeout=aiohttp.ClientTimeout(total=15, connect=5)) as response:
+                if getattr(response, "status", None) == 204:
+                    features = []
+                else:
+                    response.raise_for_status()
+                    payload = await response.json()
+                    features = payload.get("features") if isinstance(payload, dict) else None
+                    if not isinstance(features, list):
+                        raise ValueError("Invalid EMSC backfill payload")
+        except (aiohttp.ClientError, asyncio.TimeoutError, json.JSONDecodeError, ValueError):
+            logger.warning("EMSC 재연결 누락분 조회 실패", exc_info=True)
+            return processed_count
+        for feature in features:
+            try:
+                event = parse_emsc_message({"action": "update", "data": feature})
+            except ValueError:
+                logger.warning("EMSC 누락분 메시지 형식 오류", exc_info=True)
+                continue
+            if event is not None:
+                results = await deliver_event(bot, event, "emsc", process_event, process_emsc_event)
+                processed_count += 1
+                _log_results(results, log)
+        if len(features) < 100:
+            break
+        offset += len(features)
+    if persistent:
+        await execute_query("INSERT INTO setting_data (setting_key,setting_value) VALUES (%s,%s) ON DUPLICATE KEY UPDATE setting_value=VALUES(setting_value)", ("emscRecoveryCursor",json.dumps(current_time.isoformat())))
     if processed_count:
         log(f"EMSC 재연결 누락분 처리 완료: {processed_count}건")
     return processed_count
@@ -177,7 +179,7 @@ async def consume_emsc_messages(
                 continue
             if event is None:
                 continue
-            results = await process_event(bot, event)
+            results = await deliver_event(bot, event, "emsc", process_event, process_emsc_event)
             processed_count += 1
             _log_results(results, log)
             continue

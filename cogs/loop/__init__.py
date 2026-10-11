@@ -1,4 +1,5 @@
 import logging
+import asyncio
 from datetime import datetime, timedelta, time
 
 import aiohttp
@@ -17,7 +18,7 @@ from util.earthquake.emsc_stream import run_emsc_stream
 from util.earthquake.stream import run_jma_eew_stream
 from util.loop.daily_refresh_runner import run_daily_refreshes
 from util.env_utils import getenv_clean
-from util.loop.task_lifecycle import cancel_loop_tasks, start_loop_tasks
+from util.loop.task_lifecycle import cancel_loop_tasks, start_loop_tasks, supervise_loop_tasks
 from util.maplestory.notice_loop_runner import run_maplestory_notice_loop
 from util.lostark.notices import run_lostark_notice_loop
 from util.loop.presence_status import build_presence_activity_name
@@ -76,6 +77,7 @@ LOOP_TASK_NAMES = (
     "codex_reset_notification_check",
     "jma_eew_stream",
     "emsc_earthquake_stream",
+    "earthquake_retry_check",
     "youtube_websub_renewal",
 )
 logger = logging.getLogger(__name__)
@@ -85,9 +87,11 @@ class LoopTasks(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         api_key = getenv_clean("GOOGLE_API_KEY")
-        self._youtube = build("youtube", "v3", developerKey=api_key)
+        self._youtube = None
+        self._youtube_candidate_lock = asyncio.Lock()
         self._legacy_youtube_setting_removed = False
         self._youtube_feed_fallback = YouTubeFeedFallbackState()
+        supervise_loop_tasks(self, LOOP_TASK_NAMES)
         start_loop_tasks(self, LOOP_TASK_NAMES)
         print("LoopTasks Cog : init 완료!")
 
@@ -131,6 +135,14 @@ class LoopTasks(commands.Cog):
             now=datetime.now(SEOUL_TZ),
         )
 
+    @new_day_clear.before_loop
+    async def before_new_day_clear(self):
+        await self.bot.wait_until_ready()
+
+    @weekly_1557_report.before_loop
+    async def before_weekly_1557_report(self):
+        await self.bot.wait_until_ready()
+
     def _build_youtube_websub_callback_url(self) -> str:
         return build_configured_youtube_websub_callback_url(
             getenv_clean("YOUTUBE_WEBSUB_CALLBACK_URL", ""),
@@ -165,6 +177,8 @@ class LoopTasks(commands.Cog):
         )
 
     async def _fetch_youtube_video_status(self, video_id: str):
+        if self._youtube is None:
+            self._youtube = build("youtube", "v3", developerKey=getenv_clean("GOOGLE_API_KEY"))
         return await fetch_youtube_video_status(self._youtube, video_id)
 
     def _get_notified_video_ids(self, subscription: YouTubeSubscription) -> set[str]:
@@ -237,7 +251,12 @@ class LoopTasks(commands.Cog):
         subscription: YouTubeSubscription,
         video_id: str,
     ) -> str:
-        return await process_youtube_video_candidate(self, subscription, video_id)
+        from util.youtube.subscriptions import get_youtube_subscription
+        async with self._youtube_candidate_lock:
+            latest = await get_youtube_subscription(subscription.id)
+            if latest is None:
+                return "missing_subscription"
+            return await process_youtube_video_candidate(self, latest, video_id)
 
     async def _poll_youtube_community_posts(
         self,
@@ -323,6 +342,18 @@ class LoopTasks(commands.Cog):
             await run_emsc_stream(self.bot)
         except Exception:
             logger.exception("EMSC 전 세계 지진 스트림 오류")
+
+    @tasks.loop(seconds=30)
+    async def earthquake_retry_check(self):
+        from util.earthquake.retry import retry_pending_events
+        try:
+            await retry_pending_events(self.bot)
+        except Exception:
+            logger.exception("Earthquake retry loop failed")
+
+    @earthquake_retry_check.before_loop
+    async def before_earthquake_retry_check(self):
+        await self.bot.wait_until_ready()
 
     @tasks.loop(hours=12)
     async def youtube_websub_renewal(self):

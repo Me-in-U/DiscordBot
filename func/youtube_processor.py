@@ -1,4 +1,5 @@
 import asyncio
+from functools import wraps
 import logging
 import os
 import subprocess
@@ -31,6 +32,24 @@ from func.youtube_transcript import read_subtitles_file
 from func.youtube_workspace import youtube_audio_path, youtube_summary_workspace
 
 logger = logging.getLogger(__name__)
+_summary_slot = asyncio.Semaphore(1)
+
+def limited_summary(func):
+    @wraps(func)
+    async def wrapped(*args, **kwargs):
+        try:
+            await asyncio.wait_for(_summary_slot.acquire(), timeout=3)
+        except TimeoutError as exc:
+            raise YouTubeSummaryError("다른 영상을 요약 중입니다. 잠시 후 다시 시도해주세요.") from exc
+        task = asyncio.create_task(func(*args, **kwargs))
+        def completed(finished):
+            _summary_slot.release()
+            if not finished.cancelled():
+                finished.exception()
+        task.add_done_callback(completed)
+        return await asyncio.shield(task)
+    return wrapped
+
 
 
 class YouTubeSummaryError(Exception):
@@ -88,6 +107,8 @@ async def process_youtube_video_link(url: str) -> str:
                 if not subtitles_text.strip():
                     logger.debug("자막 파일이 비어 있습니다. STT로 진행합니다.")
                     raise ValueError("자막 파일이 비어 있습니다.")
+                if len(subtitles_text) > 200000:
+                    raise YouTubeSummaryError("자막이 너무 긴 영상은 요약할 수 없습니다.")
                 summary_text = await summarize_text_with_gpt(subtitles_text)
             else:
                 logger.debug("자막이 없습니다. STT를 진행합니다.")
@@ -123,6 +144,7 @@ async def process_youtube_video_link(url: str) -> str:
     return summary_text.strip()
 
 
+@limited_summary
 async def process_youtube_link(url: str) -> str:
     try:
         link_kind = get_youtube_link_kind(url)

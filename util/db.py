@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import os
+import asyncio
+from contextlib import asynccontextmanager
+from contextvars import ContextVar
 import warnings
 from collections.abc import Sequence
 from typing import Any, TypeAlias
@@ -26,9 +29,12 @@ DB_NAME = getenv_clean("DB_DATABASE")
 
 QueryArgs: TypeAlias = Sequence[Any] | dict[str, Any] | None
 DbRow: TypeAlias = dict[str, Any]
-DB_SCHEMA_VERSION = 1
+DB_SCHEMA_VERSION = 2
 SCHEMA_MIGRATION_KEY = "core"
 pool: aiomysql.Pool | None = None
+_pool_lock = asyncio.Lock()
+_transaction_connection = ContextVar("transaction_connection", default=None)
+DB_OPERATION_TIMEOUT = 20
 
 
 class SchemaMigrationRequiredError(RuntimeError):
@@ -38,15 +44,19 @@ class SchemaMigrationRequiredError(RuntimeError):
 async def get_db_pool() -> aiomysql.Pool:
     global pool
     if pool is None:
-        pool = await aiomysql.create_pool(
-            host=DB_HOST,
-            port=DB_PORT,
-            user=DB_USER,
-            password=DB_PASSWORD,
-            db=DB_NAME,
-            autocommit=True,
-            charset="utf8mb4",
-        )
+        async with _pool_lock:
+            if pool is not None:
+                return pool
+            pool = await aiomysql.create_pool(
+                host=DB_HOST,
+                port=DB_PORT,
+                user=DB_USER,
+                password=DB_PASSWORD,
+                db=DB_NAME,
+                autocommit=True,
+                charset="utf8mb4",
+                connect_timeout=10,
+            )
     return pool
 
 
@@ -60,8 +70,7 @@ async def close_db_pool() -> None:
 
 async def execute_query(query: str, args: QueryArgs = None) -> int:
     """Executes a query (INSERT, UPDATE, DELETE) and returns lastrowid."""
-    pool = await get_db_pool()
-    async with pool.acquire() as conn:
+    async with db_connection() as conn:
         async with conn.cursor() as cur:
             await cur.execute(query, args)
             return cur.lastrowid
@@ -69,8 +78,7 @@ async def execute_query(query: str, args: QueryArgs = None) -> int:
 
 async def fetch_one(query: str, args: QueryArgs = None) -> DbRow | None:
     """Fetches a single row."""
-    pool = await get_db_pool()
-    async with pool.acquire() as conn:
+    async with db_connection() as conn:
         async with conn.cursor(aiomysql.DictCursor) as cur:
             await cur.execute(query, args)
             return await cur.fetchone()
@@ -78,16 +86,65 @@ async def fetch_one(query: str, args: QueryArgs = None) -> DbRow | None:
 
 async def fetch_all(query: str, args: QueryArgs = None) -> list[DbRow]:
     """Fetches all rows."""
-    pool = await get_db_pool()
-    async with pool.acquire() as conn:
+    async with db_connection() as conn:
         async with conn.cursor(aiomysql.DictCursor) as cur:
             await cur.execute(query, args)
             return await cur.fetchall()
 
 
+@asynccontextmanager
+async def db_connection():
+    active = _transaction_connection.get()
+    async with asyncio.timeout(DB_OPERATION_TIMEOUT):
+        if active is not None and active[0] is asyncio.current_task():
+            yield active[1]
+        else:
+            db_pool = await get_db_pool()
+            async with db_pool.acquire() as conn:
+                yield conn
+
+
+@asynccontextmanager
+async def transaction():
+    active = _transaction_connection.get()
+    if active is not None and active[0] is asyncio.current_task():
+        yield active[1]
+        return
+    async with db_connection() as conn:
+        await conn.begin()
+        token = _transaction_connection.set((asyncio.current_task(), conn))
+        try:
+            yield conn
+            await conn.commit()
+        except BaseException:
+            try:
+                await asyncio.wait_for(conn.rollback(), timeout=5)
+            except BaseException:
+                conn.close()
+            raise
+        finally:
+            _transaction_connection.reset(token)
+
+
 async def run_schema_migrations() -> None:
     """Apply schema DDL and record the current schema version."""
     queries = [
+        """CREATE TABLE IF NOT EXISTS financial_operations (
+            interaction_id BIGINT UNSIGNED PRIMARY KEY,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)""",
+        """CREATE TABLE IF NOT EXISTS notification_deliveries (
+            delivery_key CHAR(64) PRIMARY KEY, channel_id BIGINT UNSIGNED NOT NULL,
+            message_id BIGINT UNSIGNED NULL, payload LONGTEXT NOT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            attempted_at DATETIME NULL, lease_until DATETIME NULL)""",
+        """CREATE TABLE IF NOT EXISTS earthquake_pending (
+            event_key VARCHAR(160) PRIMARY KEY, source VARCHAR(8) NOT NULL,
+            payload LONGTEXT NOT NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)""",
+        "CREATE TABLE IF NOT EXISTS financial_locks (guild_id BIGINT UNSIGNED PRIMARY KEY)",
+        """CREATE TABLE IF NOT EXISTS gambling_rounds (
+            id VARCHAR(36) PRIMARY KEY, guild_id BIGINT UNSIGNED NOT NULL,
+            user_id BIGINT UNSIGNED NOT NULL, amount BIGINT NOT NULL DEFAULT 0,
+            status VARCHAR(16) NOT NULL DEFAULT 'open')""",
         """
         CREATE TABLE IF NOT EXISTS guild (
             guild_id BIGINT UNSIGNED PRIMARY KEY,
@@ -309,6 +366,11 @@ async def run_schema_migrations() -> None:
                 "updated_at",
                 "DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)",
             )
+            for table_name in ("gambling_balances", "financial_locks", "financial_operations", "gambling_rounds", "notification_deliveries", "earthquake_pending"):
+                await cur.execute("SELECT ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA=%s AND TABLE_NAME=%s", (DB_NAME,table_name))
+                row = await cur.fetchone()
+                if row is not None and str(row[0]).lower() != "innodb":
+                    await cur.execute(f"ALTER TABLE {table_name} ENGINE=InnoDB")
             await cur.execute(
                 "DELETE FROM setting_data WHERE setting_key = %s",
                 ("youtubeLiveChecker",),

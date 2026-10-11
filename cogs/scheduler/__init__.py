@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from util.notification_delivery import send_once
+
 import logging
 from typing import Any, TypedDict
 
@@ -9,7 +11,7 @@ from discord.ext import commands, tasks
 import uuid
 from datetime import datetime, timedelta
 from bot import SEOUL_TZ
-from util.db import execute_query, fetch_all
+from util.db import execute_query, fetch_all, fetch_one
 
 logger = logging.getLogger(__name__)
 
@@ -103,6 +105,16 @@ class SchedulerCog(commands.Cog):
 
     schedule_group = app_commands.Group(name="예약", description="예약 메시지 관리")
 
+    async def _validate_reservation(self, interaction, message):
+        if interaction.guild_id is None or not 1 <= len(message) <= 1900:
+            await interaction.response.send_message("서버에서 1~1900자 메시지만 예약할 수 있습니다.", ephemeral=True)
+            return False
+        row = await fetch_one("SELECT COUNT(*) AS total FROM scheduled_messages WHERE guild_id=%s AND user_id=%s", (interaction.guild_id,interaction.user.id))
+        if row and row['total'] >= 25:
+            await interaction.response.send_message("사용자당 예약은 최대 25개입니다.", ephemeral=True)
+            return False
+        return True
+
     @schedule_group.command(
         name="일반", description="지정된 날짜와 시간에 메시지를 예약합니다."
     )
@@ -114,6 +126,8 @@ class SchedulerCog(commands.Cog):
     async def add_one_time(
         self, interaction: discord.Interaction, date: str, time_str: str, message: str
     ) -> None:
+        if not await self._validate_reservation(interaction, message):
+            return
         current_year = datetime.now(SEOUL_TZ).year
         if len(date.split("-")) == 2:
             date = f"{current_year}-{date}"
@@ -169,6 +183,8 @@ class SchedulerCog(commands.Cog):
         value: str,
         message: str,
     ) -> None:
+        if not await self._validate_reservation(interaction, message):
+            return
         now = datetime.now(SEOUL_TZ)
         try:
             trigger_time = calculate_recurring_trigger_time(now, repeat_type, value)
@@ -236,6 +252,8 @@ class SchedulerCog(commands.Cog):
         for row in rows:
             try:
                 channel = self.bot.get_channel(int(row["channel_id"]))
+                if channel is None and callable(getattr(self.bot, "fetch_channel", None)):
+                    channel = await self.bot.fetch_channel(int(row["channel_id"]))
                 if channel is None:
                     logger.warning(
                         "예약 메시지 채널을 찾지 못해 재시도합니다: "
@@ -246,12 +264,14 @@ class SchedulerCog(commands.Cog):
                     continue
 
                 prefix = "🔄" if row["is_recurring"] else "⏰"
-                await channel.send(
+                await send_once(channel, f"schedule:{row['id']}:{row['trigger_time']}",
                     f"{prefix} 예약 메시지 (<@{row['user_id']}>):\n{row['message']}"
                 )
 
                 if row["is_recurring"]:
                     next_run = self.calculate_next_run(row, row["trigger_time"])
+                    while next_run is not None and next_run <= now:
+                        next_run = self.calculate_next_run(row, next_run)
                     if next_run:
                         await execute_query(
                             "UPDATE scheduled_messages SET trigger_time = %s "
@@ -268,6 +288,13 @@ class SchedulerCog(commands.Cog):
                         "DELETE FROM scheduled_messages WHERE id = %s",
                         (row["id"],),
                     )
+            except (discord.Forbidden, discord.NotFound) as exc:
+                await execute_query("DELETE FROM scheduled_messages WHERE id=%s", (row["id"],))
+                logger.warning("Unrecoverable scheduled destination: %s %s", row["id"], exc)
+            except discord.HTTPException as exc:
+                if exc.status == 400:
+                    await execute_query("DELETE FROM scheduled_messages WHERE id=%s", (row["id"],))
+                logger.exception("Scheduled Discord request failed: %s", row["id"])
             except Exception:
                 logger.exception(
                     "예약 메시지 전송 또는 상태 갱신 실패: schedule_id=%s",
