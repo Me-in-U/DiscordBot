@@ -59,6 +59,20 @@ class CodexResetsSenderTests(unittest.IsolatedAsyncioTestCase):
         translate.assert_not_awaited()
         self.assertEqual(channel.send.await_args.kwargs["embed"].description, event.text)
 
+    async def test_reset_source_reaches_translation_api_before_embed_delivery(self):
+        channel = SimpleNamespace(send=AsyncMock(return_value=SimpleNamespace(id=1)))
+        translated = "사용량 한도가 초기화되었습니다."
+        with patch("api.chatGPT.clientGPT.responses.create") as create:
+            create.return_value.output_text = translated
+            await send_codex_reset_notification(channel, self.event)
+
+        create.assert_called_once()
+        self.assertEqual(
+            create.call_args.kwargs["input"],
+            [{"role": "user", "content": [{"type": "input_text", "text": self.event.text}]}],
+        )
+        self.assertEqual(channel.send.await_args.kwargs["embed"].description, translated)
+
     async def test_translation_failure_does_not_send_an_error_as_notification(self):
         channel = SimpleNamespace(send=AsyncMock())
         with patch("cogs.translation.translate_text", AsyncMock(side_effect=RuntimeError("translation unavailable"))):

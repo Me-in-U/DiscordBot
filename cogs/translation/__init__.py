@@ -32,10 +32,19 @@ async def translate_text(
     if image_url and not normalized_message:
         normalized_message = "첨부 이미지의 텍스트나 내용을 한국어로 번역해줘."
 
+    input_content = build_single_image_content(image_url)
+    if instructions is not None:
+        # Custom instructions must receive the source independently of the saved prompt.
+        if input_content is None:
+            input_content = [{"role": "user", "content": []}]
+        input_content[0]["content"].insert(
+            0, {"type": "input_text", "text": normalized_message}
+        )
+
     options = {"instructions": instructions} if instructions is not None else {}
     return await asyncio.to_thread(
         custom_prompt_model,
-        image_content=build_single_image_content(image_url),
+        image_content=input_content,
         prompt=build_prompt(
             TRANSLATION_PROMPT_ID,
             prompt_version,

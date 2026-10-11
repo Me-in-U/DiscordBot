@@ -13,7 +13,7 @@ from cogs.translation import (
 
 
 class TranslationTargetTests(unittest.IsolatedAsyncioTestCase):
-    async def test_translate_target_uses_translation_prompt_version_7(self):
+    async def test_translate_target_uses_current_translation_prompt(self):
         captured_kwargs = {}
 
         def fake_custom_prompt_model(**kwargs):
@@ -54,9 +54,39 @@ class TranslationTargetTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(await translate_text("source", instructions="한국어로 요약"), "요약")
         self.assertEqual(model.call_args.kwargs["instructions"], "한국어로 요약")
         self.assertEqual(model.call_args.kwargs["prompt"]["id"], TRANSLATION_PROMPT_ID)
+        self.assertEqual(
+            model.call_args.kwargs["image_content"],
+            [{"role": "user", "content": [{"type": "input_text", "text": "source"}]}],
+        )
         with patch("cogs.translation.custom_prompt_model", side_effect=RuntimeError("failure")):
             with self.assertRaises(RuntimeError):
                 await translate_text("source")
+
+    async def test_custom_translation_sends_source_as_api_input_and_preserves_image(self):
+        from api.chatGPT import custom_prompt_model
+
+        with patch("cogs.translation.custom_prompt_model", custom_prompt_model):
+            with patch("api.chatGPT.clientGPT.responses.create") as create:
+                create.return_value.output_text = "리셋이 모든 계정에 반영됐습니다."
+                await translate_text(
+                    " All propagated. ",
+                    "https://example.com/image.png",
+                    instructions="한국어 번역문만 반환하세요.",
+                )
+
+        self.assertEqual(
+            create.call_args.kwargs["input"],
+            [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "input_text", "text": "All propagated."},
+                        {"type": "input_image", "image_url": "https://example.com/image.png"},
+                    ],
+                }
+            ],
+        )
+        self.assertEqual(create.call_args.kwargs["instructions"], "한국어 번역문만 반환하세요.")
 
     def test_custom_prompt_forwards_optional_instructions(self):
         from api.chatGPT import custom_prompt_model
