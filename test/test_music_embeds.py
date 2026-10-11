@@ -71,10 +71,12 @@ class MusicEmbedHelperTests(unittest.TestCase):
         )
         data = embed.to_dict()
 
-        self.assertEqual([field["name"] for field in data["fields"]], ["곡 제목", "진행", "대기열(3개)"])
+        self.assertEqual([field["name"] for field in data["fields"]], ["곡 제목", "일시정지", "대기열(3개)"])
         self.assertEqual(data["fields"][0]["value"], "테스트 곡")
-        self.assertIn("00:30", data["fields"][1]["value"])
-        self.assertIn("02:00", data["fields"][1]["value"])
+        self.assertEqual(
+            data["fields"][1]["value"],
+            "━━━━●━━━━━━━━━━━━━━\n00:30 / 02:00    25%",
+        )
         self.assertEqual(data["fields"][2]["value"], "`1` 노래1\n`2` 노래2\n`3` 노래3")
         self.assertEqual(data["thumbnail"]["url"], "https://example.com/thumb.png")
         self.assertIn("반복: 켜짐", data["footer"]["text"])
@@ -96,7 +98,10 @@ class MusicEmbedHelperTests(unittest.TestCase):
             elapsed=0,
             fallback_requester_icon_url="https://example.com/bot.png",
         )
-        footer = embed.to_dict()["footer"]
+        data = embed.to_dict()
+        self.assertEqual(data["fields"][1]["name"], "재생 중")
+        self.assertEqual(data["fields"][1]["value"], "●━━━━━━━━━━━━━━━━━━\n00:00 / 00:00    0%")
+        footer = data["footer"]
 
         self.assertIn("신청자: 알 수 없음", footer["text"])
         self.assertIn("반복: 꺼짐", footer["text"])
