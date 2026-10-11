@@ -186,7 +186,7 @@ class BoundaryTests(unittest.IsolatedAsyncioTestCase):
         extract.assert_not_called()
 
     def test_buffer_keeps_ffmpeg_exit_error_visible(self):
-        source=SimpleNamespace(read=Mock(side_effect=[b"opus"]*10+[b""]),_current_error=RuntimeError("ffmpeg exit"))
+        source=SimpleNamespace(read=Mock(side_effect=[b"opus"]*10+[b""]),_current_error=RuntimeError("ffmpeg exit"),cleanup=Mock())
         buffered=BufferedOpusSource(source);buffered.prime()
         for _ in range(10): buffered.read()
         self.assertEqual(buffered.read(),b"")
