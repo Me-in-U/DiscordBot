@@ -1,4 +1,4 @@
-H_BAR = "\u2015"
+H_BAR = "━"
 
 
 def format_music_time(seconds: int) -> str:
@@ -26,7 +26,7 @@ def make_progress_bar(elapsed: int, total: int, length: int = 23) -> tuple[str, 
     return "▰" * filled + "▱" * (normalized_length - filled), filled
 
 
-def make_timeline_line(elapsed: int, total: int, length: int = 16) -> str:
+def make_timeline_line(elapsed: int, total: int, length: int = 18) -> str:
     normalized_total = max(0, int(total or 0))
     normalized_elapsed = _clamp_elapsed(elapsed, normalized_total)
     elapsed_fmt = format_music_time(normalized_elapsed)
@@ -36,4 +36,4 @@ def make_timeline_line(elapsed: int, total: int, length: int = 16) -> str:
     normalized_length = max(0, int(length or 0))
     left = H_BAR * filled
     right = H_BAR * (normalized_length - filled)
-    return f"{left}{elapsed_fmt}{right} {total_fmt} ({pct}%)"
+    return f"{left}●{right}\n{elapsed_fmt} / {total_fmt}    {pct}%"

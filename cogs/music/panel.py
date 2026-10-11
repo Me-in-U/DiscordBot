@@ -80,7 +80,7 @@ class MusicPanelMixin:
         configured_channel_id = await get_channel(message.guild.id, MUSIC_CHANNEL_TYPE)
         return bool(configured_channel_id and message.channel.id == configured_channel_id)
 
-    def make_timeline_line(self, elapsed: int, total: int, length: int = 16) -> str:
+    def make_timeline_line(self, elapsed: int, total: int, length: int = 18) -> str:
         return build_music_timeline_line(elapsed, total, length)
 
     def make_progress_bar(

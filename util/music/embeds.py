@@ -6,7 +6,7 @@ from typing import Any, Protocol
 
 from discord import Embed
 
-from util.music.progress import make_progress_bar, make_timeline_line
+from util.music.progress import make_timeline_line
 from util.music.queue import QueuedTrack, build_queue_preview
 
 
@@ -74,8 +74,11 @@ def make_playing_music_embed(
     embed.add_field(name="곡 제목", value=player.title, inline=False)
 
     timeline = make_timeline_line(elapsed, total)
-    bar, _ = make_progress_bar(elapsed, total)
-    embed.add_field(name="진행", value=f"\n{timeline}\n`{bar}`", inline=False)
+    embed.add_field(
+        name="일시정지" if is_paused else "재생 중",
+        value=timeline,
+        inline=False,
+    )
 
     queue_preview = build_queue_preview(queue)
     if queue_preview:
