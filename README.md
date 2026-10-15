@@ -139,6 +139,14 @@ YouTube 알림은 다음 경로를 조합합니다.
 - 커뮤니티 게시물 10분 polling
 - WebSub 구독 12시간 주기 갱신
 
+### 마인크래프트
+
+| 명령어 | 설명 |
+| --- | --- |
+| `/마크서버` | `mc.ios.kr` 서버 상태와 Fabric 26.3, Sodium, Iris 설치 안내를 하나의 임베드로 표시 |
+
+온라인 여부, 접속 인원, 서버 버전을 [mcsrvstat.us API](https://api.mcsrvstat.us/)로 조회합니다. API 결과는 5분간 캐시될 수 있으며 조회 실패 시에도 설치 안내는 표시합니다. 안내에는 FPS 향상과 렉 감소를 위한 Sodium, 셰이더 적용을 위한 Iris 다운로드 링크와 `.minecraft/mods` 설치 순서가 포함됩니다.
+
 ### MapleStory
 
 | 명령어/기능 | 설명 |
