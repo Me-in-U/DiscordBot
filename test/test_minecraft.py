@@ -30,7 +30,7 @@ class MinecraftCommandTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(set(interaction.followup.send.call_args.kwargs), {"embed"})
         embed = interaction.followup.send.call_args.kwargs["embed"]
         self.assertIn("mc.ios.kr", embed.description)
-        guide = embed.fields[-1].value
+        guide = next(field.value for field in embed.fields if field.name == "FPS 향상, 렉 감소, 셰이더 적용")
         for text in (
             "https://fabricmc.net/use/installer/",
             "https://modrinth.com/mod/sodium/versions?g=26.3",
@@ -39,6 +39,16 @@ class MinecraftCommandTests(unittest.IsolatedAsyncioTestCase):
             ".minecraft/mods", "Fabric 26.3",
         ):
             self.assertIn(text, guide)
+        shader_guide = embed.fields[-1].value
+        self.assertEqual(embed.fields[-1].name, "SEUS PTGI 셰이더 다운로드")
+        for text in (
+            "https://www.9minecraft.net/seus-ptgi-shaders-pack/",
+            "**E12**: E 시리즈 최종판, 화질 중심 / 무거움",
+            "**HRR 2.1**: E12 기반 최적화, FPS 향상 / 비교적 가벼움",
+            "**HRR 3.0**: 광원, 반사, 구름 개선, 추적 범위 확대 / HRR 2.1보다 무거움",
+            ".minecraft/shaderpacks", "압축 해제하지 않고", "비디오 설정",
+        ):
+            self.assertIn(text, shader_guide)
         self.assertIn("5분", embed.footer.text)
         return {field.name: field.value for field in embed.fields}
 

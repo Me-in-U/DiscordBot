@@ -142,7 +142,7 @@ class HelpCommand(commands.Cog):
             "검색": [
                 (
                     "`/마크서버`",
-                    "mc.ios.kr 서버 상태와 Fabric 26.3, Sodium, Iris 설치 안내를 하나의 임베드로 보여줍니다.",
+                    "mc.ios.kr 서버 상태와 Fabric 26.3, Sodium, Iris 설치 및 SEUS PTGI 셰이더 다운로드 안내를 하나의 임베드로 보여줍니다.",
                 ),
                 (
                     "`/검색 [내용] [(선택)이미지]`",

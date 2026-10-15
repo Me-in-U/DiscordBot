@@ -143,9 +143,11 @@ YouTube 알림은 다음 경로를 조합합니다.
 
 | 명령어 | 설명 |
 | --- | --- |
-| `/마크서버` | `mc.ios.kr` 서버 상태와 Fabric 26.3, Sodium, Iris 설치 안내를 하나의 임베드로 표시 |
+| `/마크서버` | `mc.ios.kr` 서버 상태와 Fabric 26.3, Sodium, Iris 설치 및 SEUS PTGI 셰이더 다운로드 안내를 하나의 임베드로 표시 |
 
 온라인 여부, 접속 인원, 서버 버전을 [mcsrvstat.us API](https://api.mcsrvstat.us/)로 조회합니다. API 결과는 5분간 캐시될 수 있으며 조회 실패 시에도 설치 안내는 표시합니다. 안내에는 FPS 향상과 렉 감소를 위한 Sodium, 셰이더 적용을 위한 Iris 다운로드 링크와 `.minecraft/mods` 설치 순서가 포함됩니다.
+
+같은 임베드에 [SEUS PTGI 다운로드 페이지](https://www.9minecraft.net/seus-ptgi-shaders-pack/)와 버전별 특징도 표시합니다. E12는 E 시리즈 최종판으로 화질 중심이며 무겁고, HRR 2.1은 E12 기반 최적화로 FPS를 높여 비교적 가볍습니다. HRR 3.0은 광원, 반사, 구름 개선과 추적 범위 확대로 HRR 2.1보다 무겁습니다. 셰이더 ZIP은 압축 해제하지 않고 `.minecraft/shaderpacks`에 넣은 뒤 게임의 비디오 설정에서 선택합니다.
 
 ### MapleStory
 

@@ -76,6 +76,18 @@ class MinecraftCommands(commands.Cog):
             ),
             inline=False,
         )
+        embed.add_field(
+            name="SEUS PTGI 셰이더 다운로드",
+            value=(
+                "[다운로드 페이지](https://www.9minecraft.net/seus-ptgi-shaders-pack/)\n\n"
+                "**E12**: E 시리즈 최종판, 화질 중심 / 무거움\n"
+                "**HRR 2.1**: E12 기반 최적화, FPS 향상 / 비교적 가벼움\n"
+                "**HRR 3.0**: 광원, 반사, 구름 개선, 추적 범위 확대 / HRR 2.1보다 무거움\n\n"
+                "원하는 버전의 ZIP 파일을 압축 해제하지 않고 `.minecraft/shaderpacks`에 넣은 뒤, "
+                "게임의 비디오 설정에서 셰이더 팩을 선택해 적용하세요."
+            ),
+            inline=False,
+        )
         embed.set_footer(text="서버 상태: mcsrvstat.us | 최대 5분 전 정보일 수 있습니다.")
         await interaction.followup.send(embed=embed)
 
