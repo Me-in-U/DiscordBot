@@ -6,6 +6,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from common.discord_ui import SafeView
+
 
 logger = logging.getLogger(__name__)
 SERVER_ADDRESS = "mc.ios.kr"
@@ -18,7 +20,7 @@ class MinecraftCommands(commands.Cog):
 
     @app_commands.command(
         name="마크서버",
-        description="mc.ios.kr 서버 상태와 FPS 향상, 렉 감소, 셰이더 설치 방법을 보여줍니다.",
+        description="mc.ios.kr 서버 상태를 표시하고 버튼으로 모드와 셰이더 설치 방법을 안내합니다.",
     )
     async def minecraft_server(self, interaction: discord.Interaction):
         await interaction.response.defer(thinking=True)
@@ -62,6 +64,23 @@ class MinecraftCommands(commands.Cog):
                 inline=False,
             )
 
+        embed.set_footer(text="서버 상태: mcsrvstat.us | 최대 5분 전 정보일 수 있습니다.")
+        await interaction.followup.send(embed=embed, view=MinecraftGuideView())
+
+
+class MinecraftGuideView(SafeView):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(
+        label="Fabric, Sodium, Iris, SEUS",
+        style=discord.ButtonStyle.primary,
+        custom_id="minecraft_installation_guide",
+    )
+    async def installation_guide(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ):
+        embed = discord.Embed(title="마인크래프트 설치 안내", color=discord.Color.green())
         embed.add_field(
             name="FPS 향상, 렉 감소, 셰이더 적용",
             value=(
@@ -88,9 +107,9 @@ class MinecraftCommands(commands.Cog):
             ),
             inline=False,
         )
-        embed.set_footer(text="서버 상태: mcsrvstat.us | 최대 5분 전 정보일 수 있습니다.")
-        await interaction.followup.send(embed=embed)
+        await interaction.response.send_message(embed=embed)
 
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(MinecraftCommands(bot))
+    bot.add_view(MinecraftGuideView())
