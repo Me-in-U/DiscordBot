@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiohttp
+import discord
 
 os.environ.setdefault("OPENAI_KEY", "test-key")
 
@@ -104,7 +105,15 @@ class TiboNotificationTests(unittest.IsolatedAsyncioTestCase):
         self.fetch = AsyncMock(return_value=self.entries)
         self.load = AsyncMock(return_value=None)
         self.execute = AsyncMock()
-        self.target = SimpleNamespace(send=AsyncMock(return_value=SimpleNamespace(id=1)))
+        self.message = SimpleNamespace(id=1, edit=AsyncMock(return_value=SimpleNamespace(id=1)))
+        self.history = MagicMock()
+        self.history.return_value.__aiter__.return_value = []
+        self.target = SimpleNamespace(
+            send=AsyncMock(return_value=SimpleNamespace(id=1)),
+            get_partial_message=MagicMock(return_value=self.message),
+            history=self.history,
+        )
+        self.bot = SimpleNamespace(user=SimpleNamespace(id=99))
         self.resolve = AsyncMock(return_value=self.target)
         self.summarize = AsyncMock(side_effect=lambda entries: tuple(("한국어 제목", "한국어 요약") for entry in entries))
         for name, mock in (
@@ -119,10 +128,11 @@ class TiboNotificationTests(unittest.IsolatedAsyncioTestCase):
             patcher.start()
             self.addCleanup(patcher.stop)
 
-    def set_state(self, entries, channel_id=100):
+    def set_state(self, entries, channel_id=100, messages=None):
         self.load.return_value = {"setting_value": json.dumps({
             "channelId": channel_id,
             "entries": {entry.entry_id: entry.fingerprint() for entry in entries},
+            "messages": messages if messages is not None else ({"5": 1} if any(entry.day == 5 for entry in entries) else {}),
         })}
 
     async def test_first_poll_seeds_without_sending_history(self):
@@ -133,55 +143,94 @@ class TiboNotificationTests(unittest.IsolatedAsyncioTestCase):
         key, payload = self.execute.call_args.args[1]
         self.assertEqual(key, "tiboDailyLog:10")
         self.assertEqual(len(json.loads(payload)["entries"]), 2)
+        self.assertEqual(json.loads(payload)["messages"], {})
 
-    async def test_new_and_edited_entries_send_and_persist(self):
-        self.set_state([self.entries[0]])
+    async def test_new_and_edited_entries_send_then_edit_and_persist(self):
+        self.set_state([self.entries[0]], messages={})
         self.assertEqual(await refresh_tibo_daily_log_notifications(object()), 1)
         self.resolve.assert_awaited_once_with(unittest.mock.ANY, 100)
         self.assertEqual(self.target.send.call_args.kwargs["embed"].fields[-1].value, "새 Daily log")
         saved = self.execute.call_args.args[1][1]
+        self.assertEqual(json.loads(saved)["messages"], {"5": 1})
         self.load.return_value = {"setting_value": saved}
         self.assertEqual(await refresh_tibo_daily_log_notifications(object()), 0)
         self.fetch.return_value = (self.entries[0], replace(self.entries[-1], description="Corrected description"))
         self.assertEqual(await refresh_tibo_daily_log_notifications(object()), 1)
-        self.assertEqual(self.target.send.call_args.kwargs["embed"].fields[-1].value, "Daily log 갱신")
+        self.target.send.assert_awaited_once()
+        self.target.get_partial_message.assert_called_once_with(1)
+        self.assertEqual(self.message.edit.call_args.kwargs["embed"].fields[-1].value, "Daily log 갱신")
 
-    async def test_one_changed_item_sends_entire_day_once(self):
+    async def test_one_changed_item_edits_entire_day_once(self):
         first = self.entries[-1]
         second = replace(first, entry_id="second", title="Second announcement")
         third = replace(first, entry_id="third", title="Third announcement")
         self.set_state([first, second])
         self.fetch.return_value = (first, second, third)
         self.assertEqual(await refresh_tibo_daily_log_notifications(object()), 1)
-        self.assertEqual(self.target.send.await_count, 2)
-        self.assertEqual(self.target.send.await_args_list[0].kwargs["content"], "추가 개선 사항 업데이트")
-        self.assertIn("embed", self.target.send.await_args_list[1].kwargs)
+        self.target.send.assert_not_awaited()
+        self.message.edit.assert_awaited_once()
         self.summarize.assert_awaited_once_with((first, second, third))
-        embed = self.target.send.call_args.kwargs["embed"]
+        embed = self.message.edit.call_args.kwargs["embed"]
         self.assertEqual(len(embed.fields), 5)
         self.assertIn("3건", embed.description)
         saved = json.loads(self.execute.call_args.args[1][1])
         self.assertEqual(len(saved["entries"]), 3)
 
-    async def test_update_notice_lists_only_changed_types_and_bolds_banked_reset(self):
+    async def test_reset_updates_also_edit_existing_message(self):
         unchanged = self.entries[-1]
         reset = replace(unchanged, entry_id="new-reset", kind="reset")
         banked = replace(unchanged, entry_id="new-banked", kind="banked-reset")
         self.set_state([unchanged])
         self.fetch.return_value = (unchanged, reset, banked)
         self.assertEqual(await refresh_tibo_daily_log_notifications(object()), 1)
-        self.assertEqual(self.target.send.await_args_list[0].kwargs["content"], "추가 **적립형 리셋**, 리셋 사항 업데이트")
-        self.assertIn("embed", self.target.send.await_args_list[1].kwargs)
+        self.target.send.assert_not_awaited()
+        self.message.edit.assert_awaited_once()
+        self.assertEqual(len(self.message.edit.call_args.kwargs["embed"].fields), 5)
 
-    async def test_notice_failure_stops_embed_and_keeps_state(self):
+    async def test_edit_failure_keeps_state_without_sending(self):
         self.set_state(self.entries)
         self.fetch.return_value = (self.entries[0], replace(self.entries[-1], description="Updated description"))
-        self.target.send.side_effect = RuntimeError("Notice failed")
+        self.message.edit.side_effect = discord.Forbidden(SimpleNamespace(status=403, reason="Forbidden"), "Edit failed")
         with self.assertLogs("util.codex_resets.tibo", level="ERROR"):
             self.assertEqual(await refresh_tibo_daily_log_notifications(object()), 0)
-        self.target.send.assert_awaited_once()
-        self.assertEqual(self.target.send.call_args.kwargs["content"], "추가 개선 사항 업데이트")
+        self.target.send.assert_not_awaited()
+        self.message.edit.assert_awaited_once()
         self.execute.assert_not_awaited()
+
+    async def test_legacy_state_adopts_latest_matching_bot_embed(self):
+        self.set_state(self.entries)
+        state = json.loads(self.load.return_value["setting_value"])
+        del state["messages"]
+        self.load.return_value = {"setting_value": json.dumps(state)}
+        changed = replace(self.entries[-1], description="Updated description")
+        self.fetch.return_value = (self.entries[0], changed)
+        self.history.return_value.__aiter__.return_value = [
+            SimpleNamespace(id=20, author=SimpleNamespace(id=2), embeds=[SimpleNamespace(url=f"{TIBO_URL}#day-5")]),
+            SimpleNamespace(id=21, author=self.bot.user, embeds=[SimpleNamespace(url=f"{TIBO_URL}#day-3")]),
+            SimpleNamespace(id=22, author=self.bot.user, embeds=[SimpleNamespace(url=f"{TIBO_URL}#day-5")]),
+        ]
+        self.message.edit.return_value = SimpleNamespace(id=22)
+        self.assertEqual(await refresh_tibo_daily_log_notifications(self.bot), 1)
+        self.target.get_partial_message.assert_called_once_with(22)
+        self.target.send.assert_not_awaited()
+        self.message.edit.assert_awaited_once()
+        self.assertEqual(json.loads(self.execute.call_args.args[1][1])["messages"], {"5": 22})
+
+    async def test_missing_legacy_message_sends_one_embed_and_stores_id(self):
+        self.set_state(self.entries, messages={})
+        self.fetch.return_value = (self.entries[0], replace(self.entries[-1], description="Updated description"))
+        self.assertEqual(await refresh_tibo_daily_log_notifications(self.bot), 1)
+        self.target.send.assert_awaited_once()
+        self.assertNotIn("content", self.target.send.call_args.kwargs)
+        self.assertEqual(json.loads(self.execute.call_args.args[1][1])["messages"], {"5": 1})
+
+    async def test_deleted_message_is_replaced_with_one_embed(self):
+        self.set_state(self.entries)
+        self.fetch.return_value = (self.entries[0], replace(self.entries[-1], description="Updated description"))
+        self.message.edit.side_effect = discord.NotFound(SimpleNamespace(status=404, reason="Not Found"), "Deleted")
+        self.assertEqual(await refresh_tibo_daily_log_notifications(object()), 1)
+        self.target.send.assert_awaited_once()
+        self.assertNotIn("content", self.target.send.call_args.kwargs)
 
     async def test_translation_failure_keeps_state_for_retry(self):
         self.set_state([])

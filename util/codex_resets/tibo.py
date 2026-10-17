@@ -216,11 +216,11 @@ async def reset_tibo_daily_log_state(guild_id: int) -> None:
         await execute_query("DELETE FROM setting_data WHERE setting_key = %s", (f"tiboDailyLog:{guild_id}",))
 
 
-async def _save_state(guild_id: int, channel_id: int, fingerprints: dict[str, str]) -> None:
+async def _save_state(guild_id: int, channel_id: int, fingerprints: dict[str, str], messages: dict[str, int]) -> None:
     await execute_query(
         "INSERT INTO setting_data (setting_key, setting_value) VALUES (%s, %s) "
         "ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)",
-        (f"tiboDailyLog:{guild_id}", json.dumps({"channelId": channel_id, "entries": fingerprints})),
+        (f"tiboDailyLog:{guild_id}", json.dumps({"channelId": channel_id, "entries": fingerprints, "messages": messages})),
     )
 
 
@@ -241,11 +241,14 @@ async def refresh_tibo_daily_log_notifications(bot: object) -> int:
                 row = await fetch_one("SELECT setting_value FROM setting_data WHERE setting_key = %s", (f"tiboDailyLog:{guild_id}",))
                 state = json.loads(row["setting_value"]) if row else None
                 if state is None or state.get("channelId") != channel_id:
-                    await _save_state(guild_id, channel_id, current)
+                    await _save_state(guild_id, channel_id, current, {})
                     continue
                 fingerprints = state["entries"]
                 if not isinstance(fingerprints, dict):
                     raise ValueError("Invalid Tibo Daily log state")
+                messages = state.get("messages", {})
+                if not isinstance(messages, dict):
+                    raise ValueError("Invalid Tibo Daily log messages")
                 changed = [entry for entry in entries if fingerprints.get(entry.entry_id) != current[entry.entry_id]]
                 if not changed:
                     continue
@@ -259,17 +262,26 @@ async def refresh_tibo_daily_log_notifications(bot: object) -> int:
                     updated = any(entry.entry_id in fingerprints for entry in day_entries)
                     embed = build_tibo_daily_log_embed(day_entries, summaries_by_day[day], updated=updated)
                     delivery_key = f"tibo:{day}:" + ":".join(current[entry.entry_id] for entry in day_entries)
-                    if updated:
-                        changed_kinds = {entry.kind for entry in changed if entry.day == day}
-                        labels = [label for kind, label in (
-                            ("improvement", "개선"),
-                            ("banked-reset", "**적립형 리셋**"),
-                            ("reset", "리셋"),
-                        ) if kind in changed_kinds]
-                        await send_once(target, delivery_key + ":announcement", content=f"추가 {', '.join(labels)} 사항 업데이트", allowed_mentions=discord.AllowedMentions.none())
-                    await send_once(target, delivery_key + ":embed", embed=embed, allowed_mentions=discord.AllowedMentions.none())
+                    message_id = messages.get(str(day))
+                    if updated and message_id is None:
+                        # Older state did not store message IDs; adopt the latest bot embed for this Day.
+                        async for previous in target.history(limit=None):
+                            if previous.author.id == bot.user.id and any(item.url == embed.url for item in previous.embeds):
+                                message_id = previous.id
+                                break
+                    message = None
+                    if message_id is not None:
+                        try:
+                            message = await target.get_partial_message(message_id).edit(
+                                content=None, embed=embed, allowed_mentions=discord.AllowedMentions.none(),
+                            )
+                        except discord.NotFound:
+                            pass
+                    if message is None:
+                        message = await send_once(target, delivery_key + ":embed", embed=embed, allowed_mentions=discord.AllowedMentions.none())
+                    messages[str(day)] = message.id
                     fingerprints.update({entry.entry_id: current[entry.entry_id] for entry in day_entries})
-                    await _save_state(guild_id, channel_id, fingerprints)
+                    await _save_state(guild_id, channel_id, fingerprints, messages)
                     sent_count += 1
             except Exception:
                 logger.exception("Tibo Daily log 알림 실패: guild=%s channel=%s", guild_id, channel_id)
