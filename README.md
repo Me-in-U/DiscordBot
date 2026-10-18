@@ -143,11 +143,28 @@ YouTube 알림은 다음 경로를 조합합니다.
 
 | 명령어 | 설명 |
 | --- | --- |
-| `/마크서버` | `mc.ios.kr` 서버 상태 표시. `Fabric, Sodium, Iris, SEUS` 버튼으로 설치 안내를 별도 메시지로 전송 |
+| `/마크서버` | `mc.ios.kr` 서버 상태 표시. 설치 안내 버튼과 화이트리스트 등록 버튼 제공 |
 
 온라인 여부, 접속 인원, 서버 버전을 [mcsrvstat.us API](https://api.mcsrvstat.us/)로 조회해 상태 임베드에 표시합니다. API 결과는 5분간 캐시될 수 있으며 조회 실패 시에도 설치 안내 버튼은 표시합니다. 누구나 `Fabric, Sodium, Iris, SEUS` 버튼을 누르면 같은 채널에 설치 안내 임베드를 새 메시지로 보냅니다. 버튼은 봇 재시작 후에도 사용할 수 있습니다. 안내에는 FPS 향상과 렉 감소를 위한 Sodium, 셰이더 적용을 위한 Iris 다운로드 링크와 `.minecraft/mods` 설치 순서가 포함됩니다.
 
 버튼으로 전송하는 안내 임베드에는 [SEUS PTGI 다운로드 페이지](https://www.9minecraft.net/seus-ptgi-shaders-pack/)와 버전별 특징도 표시합니다. E12는 E 시리즈 최종판으로 화질 중심이며 무겁고, HRR 2.1은 E12 기반 최적화로 FPS를 높여 비교적 가볍습니다. HRR 3.0은 광원, 반사, 구름 개선과 추적 범위 확대로 HRR 2.1보다 무겁습니다. 셰이더 ZIP은 압축 해제하지 않고 `.minecraft/shaderpacks`에 넣은 뒤 게임의 비디오 설정에서 선택합니다.
+
+#### 화이트리스트 등록 설정
+
+디스코드 서버 멤버 누구나 `화이트리스트 등록` 버튼을 눌러 Java Edition 닉네임을 입력할 수 있습니다. 봇은 RCON으로 `whitelist add <닉네임>`만 실행하며 서버 응답을 신청자에게만 표시합니다. 이미 등록된 닉네임이나 존재하지 않는 닉네임도 서버 응답으로 안내하며, 응답을 받지 못한 경우 성공으로 표시하지 않습니다. DM에서는 등록할 수 없습니다. 이 기능은 게임 계정 소유권을 인증하지 않습니다.
+
+마크 서버의 `server.properties`를 다음과 같이 설정하고 서버를 재시작하세요. 비밀번호는 직접 생성한 긴 무작위 값으로 바꾸세요.
+
+```properties
+enable-rcon=true
+rcon.port=25575
+rcon.password=replace-with-long-random-password
+white-list=true
+```
+
+봇의 실행 환경에는 `MINECRAFT_RCON_HOST`(마크 서버 컴퓨터의 내부 IP), `MINECRAFT_RCON_PORT`(기본 `25575`), `MINECRAFT_RCON_PASSWORD`(위와 동일한 비밀번호)를 설정하세요. 로컬 봇은 `.env`, 배포 봇은 `.env.deploy`에 설정하고, Jenkins 배포에서는 `discordbot-env` 자격 증명에도 전체 `.env.deploy` 내용을 반영해야 합니다. 비밀번호는 Git에 올리지 마세요.
+
+같은 공유기에서 마크 서버 컴퓨터의 내부 IP를 고정하거나 DHCP 예약을 사용하고, 해당 컴퓨터의 방화벽에서 배포 서버 IP만 TCP RCON 포트에 접근하도록 허용하세요. 공유기에서 RCON 포트를 인터넷으로 포트포워딩하지 마세요. RCON은 암호화되지 않은 관리자 연결입니다. 마크 서버 컴퓨터가 꺼져 있거나 절전 상태이면 등록할 수 없습니다. Docker 환경변수 등으로 화이트리스트를 매번 덮어쓰는 구성이라면 재시작 시 등록 내역이 사라지지 않도록 해당 설정도 조정하세요.
 
 ### MapleStory
 

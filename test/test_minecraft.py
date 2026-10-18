@@ -1,8 +1,10 @@
 import asyncio
 import unittest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
-from cogs.minecraft import MinecraftCommands, MinecraftGuideView, STATUS_API_URL, setup
+from cogs.minecraft import (
+    MinecraftCommands, MinecraftGuideView, MinecraftWhitelistModal, STATUS_API_URL, setup,
+)
 
 
 class MinecraftCommandTests(unittest.IsolatedAsyncioTestCase):
@@ -35,8 +37,9 @@ class MinecraftCommandTests(unittest.IsolatedAsyncioTestCase):
         view = interaction.followup.send.call_args.kwargs["view"]
         self.assertIsInstance(view, MinecraftGuideView)
         self.assertTrue(view.is_persistent())
-        self.assertEqual(len(view.children), 1)
+        self.assertEqual(len(view.children), 2)
         self.assertEqual(view.children[0].label, "Fabric, Sodium, Iris, SEUS")
+        self.assertEqual(view.children[1].label, "화이트리스트 등록")
         return {field.name: field.value for field in embed.fields}
 
     async def test_button_sends_installation_guide_as_new_message(self):
@@ -78,6 +81,66 @@ class MinecraftCommandTests(unittest.IsolatedAsyncioTestCase):
         view = bot.add_view.call_args.args[0]
         self.assertIsInstance(view, MinecraftGuideView)
         self.assertTrue(view.is_persistent())
+
+    async def test_member_can_open_whitelist_modal(self):
+        interaction = MagicMock()
+        interaction.response.send_modal = AsyncMock()
+        view = MinecraftGuideView()
+        await view.children[1].callback(interaction)
+        self.assertIsInstance(
+            interaction.response.send_modal.call_args.args[0], MinecraftWhitelistModal
+        )
+
+    async def test_whitelist_button_rejects_dm(self):
+        interaction = MagicMock(guild=None)
+        interaction.response.send_message = AsyncMock()
+        interaction.response.send_modal = AsyncMock()
+        view = MinecraftGuideView()
+        await view.children[1].callback(interaction)
+        interaction.response.send_modal.assert_not_awaited()
+        self.assertTrue(interaction.response.send_message.call_args.kwargs["ephemeral"])
+
+    async def test_whitelist_submit_validates_name_and_returns_server_response(self):
+        for username, valid in (("Steve", True), ("foo\nstop", False), ("한글이름", False)):
+            with self.subTest(username=username):
+                interaction = MagicMock()
+                interaction.response.defer = AsyncMock()
+                interaction.response.send_message = AsyncMock()
+                interaction.followup.send = AsyncMock()
+                modal = MinecraftWhitelistModal()
+                with patch.object(type(modal.username), "value", new_callable=PropertyMock, return_value=username):
+                    with patch("cogs.minecraft.add_whitelist_player", new_callable=AsyncMock) as add:
+                        add.return_value = "Added Steve to the whitelist"
+                        await modal.on_submit(interaction)
+                if valid:
+                    add.assert_awaited_once_with(username)
+                    interaction.response.defer.assert_awaited_once_with(thinking=True, ephemeral=True)
+                    self.assertIn("Added Steve", interaction.followup.send.call_args.args[0])
+                    self.assertTrue(interaction.followup.send.call_args.kwargs["ephemeral"])
+                    self.assertFalse(interaction.followup.send.call_args.kwargs["allowed_mentions"].everyone)
+                else:
+                    add.assert_not_awaited()
+                    interaction.response.send_message.assert_awaited_once()
+
+    async def test_whitelist_submit_rejects_dm(self):
+        interaction = MagicMock(guild=None)
+        interaction.response.send_message = AsyncMock()
+        with patch("cogs.minecraft.add_whitelist_player", new_callable=AsyncMock) as add:
+            await MinecraftWhitelistModal().on_submit(interaction)
+        add.assert_not_awaited()
+        interaction.response.send_message.assert_awaited_once()
+
+    async def test_whitelist_timeout_does_not_claim_success(self):
+        interaction = MagicMock()
+        interaction.response.defer = AsyncMock()
+        interaction.followup.send = AsyncMock()
+        modal = MinecraftWhitelistModal()
+        with patch.object(type(modal.username), "value", new_callable=PropertyMock, return_value="Steve"):
+            with patch("cogs.minecraft.add_whitelist_player", new_callable=AsyncMock, side_effect=asyncio.TimeoutError()):
+                with self.assertLogs("cogs.minecraft", level="ERROR"):
+                    await modal.on_submit(interaction)
+        self.assertIn("등록 결과를 확인하지 못했습니다", interaction.followup.send.call_args.args[0])
+        self.assertTrue(interaction.followup.send.call_args.kwargs["ephemeral"])
 
     async def test_online_status_has_guide_button(self):
         fields = await self.invoke_command({

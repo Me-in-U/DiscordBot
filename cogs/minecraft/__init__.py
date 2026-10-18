@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import re
 
 import aiohttp
 import discord
@@ -7,6 +8,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from common.discord_ui import SafeView
+from util.minecraft_rcon import add_whitelist_player
 
 
 logger = logging.getLogger(__name__)
@@ -20,7 +22,7 @@ class MinecraftCommands(commands.Cog):
 
     @app_commands.command(
         name="마크서버",
-        description="mc.ios.kr 서버 상태를 표시하고 버튼으로 모드와 셰이더 설치 방법을 안내합니다.",
+        description="mc.ios.kr 서버 상태와 설치 안내, 화이트리스트 등록 버튼을 표시합니다.",
     )
     async def minecraft_server(self, interaction: discord.Interaction):
         await interaction.response.defer(thinking=True)
@@ -108,6 +110,68 @@ class MinecraftGuideView(SafeView):
             inline=False,
         )
         await interaction.response.send_message(embed=embed)
+
+    @discord.ui.button(
+        label="화이트리스트 등록",
+        style=discord.ButtonStyle.success,
+        custom_id="minecraft_whitelist_register",
+    )
+    async def whitelist_register(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ):
+        if interaction.guild is None:
+            await interaction.response.send_message(
+                "디스코드 서버 안에서만 등록할 수 있습니다.", ephemeral=True
+            )
+            return
+        await interaction.response.send_modal(MinecraftWhitelistModal())
+
+
+class MinecraftWhitelistModal(discord.ui.Modal, title="마인크래프트 화이트리스트 등록"):
+    username = discord.ui.TextInput(
+        label="마인크래프트 Java 닉네임",
+        placeholder="게임 닉네임을 입력하세요 (디스코드 이름 아님)",
+        min_length=3,
+        max_length=16,
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        if interaction.guild is None:
+            await interaction.response.send_message(
+                "디스코드 서버 안에서만 등록할 수 있습니다.", ephemeral=True
+            )
+            return
+        username = self.username.value.strip()
+        if re.fullmatch(r"[A-Za-z0-9_]{3,16}", username) is None:
+            await interaction.response.send_message(
+                "닉네임은 영문, 숫자, 밑줄(_)로 된 3~16자여야 합니다.", ephemeral=True
+            )
+            return
+        await interaction.response.defer(thinking=True, ephemeral=True)
+        try:
+            response = await add_whitelist_player(username)
+        except (OSError, asyncio.TimeoutError, asyncio.IncompleteReadError, ValueError):
+            logger.exception("마인크래프트 화이트리스트 등록 응답 확인 실패")
+            await interaction.followup.send(
+                "등록 결과를 확인하지 못했습니다. 서버 관리자에게 RCON 설정과 연결 상태를 확인해 달라고 요청하세요. "
+                "응답이 끊기기 전에 등록됐을 수도 있으니 잠시 후 다시 시도해 주세요.",
+                ephemeral=True,
+            )
+            return
+        await interaction.followup.send(
+            f"`{username}` 화이트리스트 등록 요청의 서버 응답:\n"
+            + discord.utils.escape_markdown(response[:1500]),
+            ephemeral=True,
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
+
+    async def on_error(self, interaction: discord.Interaction, error: Exception):
+        logger.error(
+            "마인크래프트 화이트리스트 입력 처리 실패",
+            exc_info=(type(error), error, error.__traceback__),
+        )
+        send = interaction.followup.send if interaction.response.is_done() else interaction.response.send_message
+        await send("등록 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.", ephemeral=True)
 
 
 async def setup(bot: commands.Bot):
