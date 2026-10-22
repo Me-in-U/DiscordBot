@@ -192,7 +192,6 @@ def build_tibo_daily_log_embed(
     embed = discord.Embed(
         title=f"{'🔄' if has_reset else '🚀'} Day {entry.day:02d} / 28 | {label}",
         url=f"{TIBO_URL}#day-{entry.day}",
-        description=f"오늘의 발표 {len(entries)}건을 한국어로 요약했습니다.",
         color=0xF2C14E if has_reset and has_improvement else 0xF28C45 if has_reset else 0x9B8AFB,
     )
     embed.set_author(name="Tibo의 28일 챌린지")

@@ -82,6 +82,8 @@ class TiboParserTests(unittest.TestCase):
         self.assertEqual(improvement.color.value, 0x9B8AFB)
         self.assertEqual(reset.color.value, 0xF28C45)
         self.assertIn("Day 05 / 28", improvement.title)
+        self.assertIsNone(improvement.description)
+        self.assertIsNone(reset.description)
         self.assertEqual(improvement.fields[-1].value, "Daily log 갱신")
         self.assertIn("원문 발표", improvement.fields[0].value)
         bounded = build_tibo_daily_log_embed((self.entries[-1],), (("*" * 10000, "*" * 10000),))
@@ -172,7 +174,7 @@ class TiboNotificationTests(unittest.IsolatedAsyncioTestCase):
         self.summarize.assert_awaited_once_with((first, second, third))
         embed = self.message.edit.call_args.kwargs["embed"]
         self.assertEqual(len(embed.fields), 5)
-        self.assertIn("3건", embed.description)
+        self.assertIsNone(embed.description)
         saved = json.loads(self.execute.call_args.args[1][1])
         self.assertEqual(len(saved["entries"]), 3)
 
