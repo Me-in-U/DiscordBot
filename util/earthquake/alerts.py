@@ -345,7 +345,7 @@ async def edit_jma_eew_alert(
             await message.delete()
         except discord.DiscordException:
             logger.warning(
-                "M7.0 이상 일본 EEW 기존 메시지 삭제 실패: message=%s",
+                "M7.5 이상 일본 EEW 기존 메시지 삭제 실패: message=%s",
                 message_id,
                 exc_info=True,
             )

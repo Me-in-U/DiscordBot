@@ -15,6 +15,7 @@ from util.earthquake.alerts import (
 from util.earthquake.emsc import (
     EMSC_CREATE_ACTIONS,
     EMSC_KOREA_EVERYONE_MAGNITUDE,
+    EMSC_MIN_MAGNITUDE,
     EmscEvent,
     is_earthquake_emsc_event,
     is_japan_emsc_event,
@@ -299,7 +300,7 @@ async def edit_emsc_alert(
             await message.delete()
         except discord.DiscordException:
             logger.warning(
-                "한국 M5.5 이상 EMSC 기존 메시지 삭제 실패: message=%s",
+                "EMSC 전체 멘션 기준 이상 기존 메시지 삭제 실패: message=%s",
                 message_id,
                 exc_info=True,
             )
@@ -405,9 +406,12 @@ def build_emsc_embed(
 def _should_show_everyone(event: EmscEvent) -> bool:
     return (
         not event.is_deleted
-        and is_korea_emsc_event(event)
         and event.magnitude is not None
-        and event.magnitude >= EMSC_KOREA_EVERYONE_MAGNITUDE
+        and event.magnitude >= (
+            EMSC_KOREA_EVERYONE_MAGNITUDE
+            if is_korea_emsc_event(event)
+            else EMSC_MIN_MAGNITUDE
+        )
     )
 
 

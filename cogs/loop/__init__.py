@@ -329,7 +329,7 @@ class LoopTasks(commands.Cog):
 
     @tasks.loop(seconds=5)
     async def jma_eew_stream(self):
-        """일본 JMA M5.9 이상 긴급지진속보를 실시간 수신합니다."""
+        """일본 JMA M6.5 이상 긴급지진속보를 실시간 수신합니다."""
         try:
             await run_jma_eew_stream(self.bot)
         except Exception:
@@ -337,7 +337,7 @@ class LoopTasks(commands.Cog):
 
     @tasks.loop(seconds=5)
     async def emsc_earthquake_stream(self):
-        """한국 M5.0 이상과 기타 국가 M6.5 이상 EMSC 지진을 수신합니다."""
+        """한국 M5.5 이상과 기타 국가 M7.5 이상 EMSC 지진을 수신합니다."""
         try:
             await run_emsc_stream(self.bot)
         except Exception:

@@ -40,7 +40,7 @@ class EarthquakeAlertCommands(commands.Cog):
 
     @app_commands.command(
         name="지진알림",
-        description="일본 JMA M5.9, 한국 EMSC M5.0, 기타 EMSC M6.5 이상 알림을 설정합니다.",
+        description="일본 JMA M6.5, 한국 EMSC M5.5, 기타 EMSC M7.5 이상 알림을 설정합니다.",
     )
     @app_commands.describe(
         status="true면 현재 채널로 알림을 받고 false면 알림을 해제합니다."
@@ -82,8 +82,8 @@ class EarthquakeAlertCommands(commands.Cog):
         await interaction.followup.send(
             "지진 알림을 설정했습니다.\n"
             f"알림 채널: <#{channel_id}>\n"
-            "일본 JMA M5.9 이상, 한국 EMSC M5.0 이상, 기타 EMSC M6.5 이상 지진을 알립니다.\n"
-            "일본 M7.0 이상과 한국 M5.5 이상은 사건당 한 번 @everyone을 전송합니다.",
+            "일본 JMA M6.5 이상, 한국 EMSC M5.5 이상, 기타 EMSC M7.5 이상 지진을 알립니다.\n"
+            "일본과 기타 지역 M7.5 이상, 한국 및 한반도 근처 M6.0 이상은 사건당 한 번 @everyone을 전송합니다.",
             ephemeral=True,
         )
 
