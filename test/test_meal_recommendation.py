@@ -84,7 +84,7 @@ class MealRecommendationTests(unittest.TestCase):
 
         def fake_custom_prompt_model(*args, **kwargs):
             calls.append((args, kwargs))
-            return "# 제육\n설명"
+            return "# 제육덮밥\n설명"
 
         cog = MealRecommendationCommands(Mock())
         interaction = _FakeInteraction()
@@ -100,12 +100,12 @@ class MealRecommendationTests(unittest.TestCase):
                 asyncio.run(cog.recommend_meal.callback(cog, interaction))
 
         interaction.response.defer.assert_awaited_once_with(thinking=True)
-        interaction.followup.send.assert_awaited_once_with("# 제육")
+        interaction.followup.send.assert_awaited_once_with("# 제육덮밥")
         self.assertEqual(len(calls), 1)
         args, kwargs = calls[0]
         self.assertEqual(args, ())
         from cogs.meal_recommendation import (
-            MEAL_RECOMMENDATION_CUISINES,
+            MEAL_RECOMMENDATION_CATEGORIES,
             MEAL_RECOMMENDATION_PROMPT_ID,
             MEAL_RECOMMENDATION_PROMPT_VERSION,
         )
@@ -113,7 +113,10 @@ class MealRecommendationTests(unittest.TestCase):
         self.assertEqual(kwargs["prompt"]["id"], MEAL_RECOMMENDATION_PROMPT_ID)
         self.assertEqual(kwargs["prompt"]["version"], MEAL_RECOMMENDATION_PROMPT_VERSION)
         variables = kwargs["prompt"]["variables"]
-        self.assertIn(variables["cuisine"], MEAL_RECOMMENDATION_CUISINES)
+        category, allowed_menus = variables["cuisine"].split("\n허용 메뉴: ")
+        self.assertIn(category, MEAL_RECOMMENDATION_CATEGORIES)
+        self.assertEqual(allowed_menus.split(" | "), list(MEAL_RECOMMENDATION_CATEGORIES[category]))
+        self.assertEqual(MEAL_RECOMMENDATION_PROMPT_VERSION, "2")
         self.assertEqual(variables["recent_menus"], "없음")
         self.assertTrue(variables["selection_seed"].isdigit())
 
@@ -121,7 +124,7 @@ class MealRecommendationTests(unittest.TestCase):
         from cogs.meal_recommendation import MealRecommendationCommands
 
         calls = []
-        outputs = iter(["제육", "제육", "돈까스"])
+        outputs = iter(["제육덮밥", "제육덮밥", "돈까스"])
 
         def fake_custom_prompt_model(*args, **kwargs):
             calls.append((args, kwargs))
@@ -142,20 +145,21 @@ class MealRecommendationTests(unittest.TestCase):
                 asyncio.run(cog.recommend_meal.callback(cog, first_interaction))
                 asyncio.run(cog.recommend_meal.callback(cog, second_interaction))
 
-        first_interaction.followup.send.assert_awaited_once_with("# 제육")
+        first_interaction.followup.send.assert_awaited_once_with("# 제육덮밥")
         second_interaction.followup.send.assert_awaited_once_with("# 돈까스")
         self.assertEqual(len(calls), 3)
-        self.assertEqual(calls[1][1]["prompt"]["variables"]["recent_menus"], "제육")
-        self.assertEqual(calls[2][1]["prompt"]["variables"]["recent_menus"], "제육")
+        self.assertEqual(calls[1][1]["prompt"]["variables"]["recent_menus"], "제육덮밥")
+        self.assertEqual(calls[2][1]["prompt"]["variables"]["recent_menus"], "제육덮밥")
 
     def test_cuisine_cycle_rejects_older_menu_and_keeps_twenty_recent_menus(self):
         from cogs.meal_recommendation import (
-            MEAL_RECOMMENDATION_CUISINES,
+            MEAL_RECOMMENDATION_CATEGORIES,
             MealRecommendationCommands,
         )
 
         calls = []
-        outputs = iter(["메뉴0", "메뉴1", "메뉴0", "메뉴2"] + [f"메뉴{i}" for i in range(3, 22)])
+        menus = [menu for group in MEAL_RECOMMENDATION_CATEGORIES.values() for menu in group][:22]
+        outputs = iter(menus[:2] + [menus[0]] + menus[2:])
 
         def fake_custom_prompt_model(**kwargs):
             calls.append(kwargs["prompt"]["variables"])
@@ -167,18 +171,47 @@ class MealRecommendationTests(unittest.TestCase):
                 for _ in range(22):
                     asyncio.run(cog.recommend_meal.callback(cog, _FakeInteraction()))
 
-        self.assertEqual(calls[2]["recent_menus"], "메뉴0\n메뉴1")
+        self.assertEqual(calls[2]["recent_menus"], "\n".join(menus[:2]))
         self.assertEqual(calls[2]["cuisine"], calls[3]["cuisine"])
         successful_calls = calls[:3] + calls[4:]
-        first_cycle = successful_calls[:len(MEAL_RECOMMENDATION_CUISINES)]
-        self.assertEqual({call["cuisine"] for call in first_cycle}, set(MEAL_RECOMMENDATION_CUISINES))
-        self.assertEqual(list(cog._recent_menus["guild:123"]), [f"메뉴{i}" for i in range(2, 22)])
+        first_cycle = successful_calls[:len(MEAL_RECOMMENDATION_CATEGORIES)]
+        self.assertEqual({call["cuisine"].split("\n")[0] for call in first_cycle}, set(MEAL_RECOMMENDATION_CATEGORIES))
+        self.assertEqual(list(cog._recent_menus["guild:123"]), menus[2:])
+
+    def test_command_rejects_menu_outside_domestic_delivery_catalogue_and_retries(self):
+        from cogs.meal_recommendation import MealRecommendationCommands
+
+        cog = MealRecommendationCommands(Mock())
+        interaction = _FakeInteraction()
+        with patch(
+            "cogs.meal_recommendation.custom_prompt_model",
+            side_effect=["쿠스쿠스", "돈까스"],
+        ) as generate:
+            with patch("cogs.meal_recommendation.asyncio.to_thread", _immediate_to_thread):
+                asyncio.run(cog.recommend_meal.callback(cog, interaction))
+
+        self.assertEqual(generate.call_count, 2)
+        interaction.followup.send.assert_awaited_once_with("# 돈까스")
+        self.assertEqual(list(cog._recent_menus["guild:123"]), ["돈까스"])
+
+    def test_command_returns_safe_error_if_both_outputs_are_outside_catalogue(self):
+        from cogs.meal_recommendation import MealRecommendationCommands
+
+        cog = MealRecommendationCommands(Mock())
+        interaction = _FakeInteraction()
+        with patch("cogs.meal_recommendation.custom_prompt_model", side_effect=["쿠스쿠스", "커피"]):
+            with patch("cogs.meal_recommendation.asyncio.to_thread", _immediate_to_thread):
+                with self.assertLogs("cogs.meal_recommendation", level="ERROR"):
+                    asyncio.run(cog.recommend_meal.callback(cog, interaction))
+
+        self.assertIn("오류", interaction.followup.send.await_args.args[0])
+        self.assertEqual(list(cog._recent_menus["guild:123"]), [])
 
     def test_previous_menu_state_is_separate_by_guild_and_dm_user(self):
         from cogs.meal_recommendation import MealRecommendationCommands
 
         calls = []
-        outputs = iter(["제육", "제육", "라멘", "라멘"])
+        outputs = iter(["제육덮밥", "제육덮밥", "라멘", "라멘"])
 
         def fake_custom_prompt_model(*args, **kwargs):
             calls.append((args, kwargs))
@@ -203,8 +236,8 @@ class MealRecommendationTests(unittest.TestCase):
                 asyncio.run(cog.recommend_meal.callback(cog, dm_user_one))
                 asyncio.run(cog.recommend_meal.callback(cog, dm_user_two))
 
-        guild_one.followup.send.assert_awaited_once_with("# 제육")
-        guild_two.followup.send.assert_awaited_once_with("# 제육")
+        guild_one.followup.send.assert_awaited_once_with("# 제육덮밥")
+        guild_two.followup.send.assert_awaited_once_with("# 제육덮밥")
         dm_user_one.followup.send.assert_awaited_once_with("# 라멘")
         dm_user_two.followup.send.assert_awaited_once_with("# 라멘")
         self.assertEqual(len(calls), 4)
@@ -220,7 +253,7 @@ class MealRecommendationTests(unittest.TestCase):
     def test_menu_response_removes_list_markers_and_trailing_punctuation(self):
         from cogs.meal_recommendation import format_meal_recommendation_response
 
-        self.assertEqual(format_meal_recommendation_response("1. 제육."), "# 제육")
+        self.assertEqual(format_meal_recommendation_response("1. 제육덮밥."), "# 제육덮밥")
         self.assertEqual(format_meal_recommendation_response("- 돈까스"), "# 돈까스")
 
     def test_empty_model_output_returns_no_menu(self):
@@ -255,7 +288,7 @@ class MealRecommendationTests(unittest.TestCase):
     def test_command_uses_safe_error_when_retry_still_repeats_previous_menu(self):
         from cogs.meal_recommendation import MealRecommendationCommands
 
-        outputs = iter(["제육", "제육", "제육"])
+        outputs = iter(["제육덮밥", "제육덮밥", "제육덮밥"])
 
         def fake_custom_prompt_model(*args, **kwargs):
             return next(outputs)
@@ -276,7 +309,7 @@ class MealRecommendationTests(unittest.TestCase):
                 with self.assertLogs("cogs.meal_recommendation", level="ERROR"):
                     asyncio.run(cog.recommend_meal.callback(cog, second_interaction))
 
-        first_interaction.followup.send.assert_awaited_once_with("# 제육")
+        first_interaction.followup.send.assert_awaited_once_with("# 제육덮밥")
         sent_message = second_interaction.followup.send.await_args.args[0]
         self.assertIn("오류", sent_message)
         self.assertNotIn("김치볶음밥", sent_message)
