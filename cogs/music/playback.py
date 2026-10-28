@@ -104,8 +104,9 @@ class MusicPlaybackMixin:
                         embed = self._make_playing_embed(
                             state.player, guild_id, min(elapsed, total) if total else elapsed
                         )
+                        state.control_view = await self._build_control_view(guild_id, state)
                         await self._edit_msg(state, embed, state.control_view)
-                await asyncio.sleep(1 if paused else 5)
+                await asyncio.sleep(1 if paused else 15)
         finally:
             if state.updater_task is asyncio.current_task():
                 state.updater_task = None

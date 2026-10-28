@@ -8,6 +8,7 @@ from discord import Embed
 
 from util.music.progress import make_timeline_line
 from util.music.queue import QueuedTrack, build_queue_preview
+from util.music.chapters import music_chapters, current_chapter_index
 
 
 PANEL_TITLE = "🎵 신창섭의 다해줬잖아"
@@ -29,7 +30,7 @@ def make_default_music_embed(
     embed = Embed(
         title=PANEL_TITLE,
         description=(
-            "명령어로 음악을 재생·일시정지·스킵할 수 있습니다.\n"
+            "명령어로 음악을 재생, 일시정지, 스킵할 수 있습니다.\n"
             "재생 이후 버튼을 통해 제어도 가능합니다.\n"
             "(재생 후 첫 대기열 추가 시 노래가 일시 끊길 수도 있습니다.)"
         ),
@@ -79,6 +80,13 @@ def make_playing_music_embed(
         value=timeline,
         inline=False,
     )
+
+    chapters = music_chapters(player.data)
+    chapter_index = current_chapter_index(chapters, elapsed)
+    if chapter_index >= 0:
+        chapter = chapters[chapter_index]
+        embed.add_field(name=f"챕터 {chapter_index + 1}/{len(chapters)}",
+                        value=chapter.title[:1024], inline=False)
 
     queue_preview = build_queue_preview(queue)
     if queue_preview:

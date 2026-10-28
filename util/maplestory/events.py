@@ -126,7 +126,7 @@ async def refresh_maplestory_notice_messages(
     try:
         notices = await fetch()
     except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as exc:
-        logger.warning("메이플스토리 공지 목록 조회 실패", exc_info=True)
+        logger.warning("%s 공지 목록 조회 실패", channel_type, exc_info=True)
         return [
             MapleStoryNoticeUpdateResult(
                 guild_id=guild_id,
@@ -613,11 +613,13 @@ async def _load_maplestory_notice_state(state_key: str = MAPLESTORY_NOTICE_STATE
 async def _save_maplestory_notice_state(state: dict[str, Any], state_key: str = MAPLESTORY_NOTICE_STATE_KEY) -> None:
     from util.db import execute_query
 
+    payload = json.dumps(state, ensure_ascii=False)
     await execute_query(
         "INSERT INTO setting_data (setting_key, setting_value) VALUES (%s, %s) "
-        "ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)",
+        "ON DUPLICATE KEY UPDATE setting_value = %s",
         (
             state_key,
-            json.dumps(state, ensure_ascii=False),
+            payload,
+            payload,
         ),
     )

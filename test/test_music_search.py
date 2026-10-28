@@ -71,7 +71,7 @@ class MusicSearchHelperTests(unittest.TestCase):
 
         result = build_music_search_action(
             "lofi",
-            {"entries": [{"url": "https://youtu.be/nope", "title": "short"}]},
+            {"entries": [{"url": "https://example.com/watch?v=nope", "title": "external"}]},
         )
 
         self.assertEqual(result.user_message, "❌ 검색 결과가 없습니다.")
@@ -172,9 +172,9 @@ class MusicSearchFlowTests(unittest.IsolatedAsyncioTestCase):
         result = await build_music_search_flow("lofi", extractor)
 
         self.assertIsNone(result.user_message)
-        self.assertEqual([video["title"] for video in result.videos], ["ytsearch10:lofi"])
+        self.assertEqual([video["title"] for video in result.videos], ["ytsearch10:lofi", "ignored"])
         self.assertEqual(result.embed_title, "🔍 `lofi` 검색 결과")
-        self.assertEqual(result.embed_description, "1. ytsearch10:lofi")
+        self.assertEqual(result.embed_description, "1. ytsearch10:lofi\n2. ignored")
 
     async def test_build_music_search_flow_preserves_favorite_slot_mapping(self):
         from util.music.search import build_music_search_flow

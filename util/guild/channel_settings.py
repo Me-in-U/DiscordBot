@@ -20,9 +20,9 @@ async def set_channel(guild_id: int, purpose: str, channel_id: Optional[int]) ->
         query = """
             INSERT INTO channel_settings (guild_id, channel_type, channel_id) 
             VALUES (%s, %s, %s)
-            ON DUPLICATE KEY UPDATE channel_id = VALUES(channel_id)
+            ON DUPLICATE KEY UPDATE channel_id = %s
         """
-        await execute_query(query, (int(guild_id), purpose, int(channel_id)))
+        await execute_query(query, (int(guild_id), purpose, int(channel_id), int(channel_id)))
 
 
 async def get_channels_by_purpose(purpose: str) -> Dict[int, int]:

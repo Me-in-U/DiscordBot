@@ -7,6 +7,7 @@ from html.parser import HTMLParser
 from urllib.parse import urljoin, urlsplit
 
 import aiohttp
+from common.http import fetch_text_with_retry
 
 from util.guild.channel_settings import set_channel
 from util.maplestory.events import (
@@ -104,7 +105,9 @@ def parse_lostark_notice_list(html: str) -> list[MapleStoryNotice]:
     parser.feed(html)
     notices = sorted(parser.notices.values(), key=lambda notice: int(notice.notice_id), reverse=True)
     if not notices:
-        raise ValueError("로스트아크 공지 목록을 찾지 못했습니다.")
+        title = re.search(r"<title[^>]*>(.*?)</title>", html, re.I | re.S)
+        page_title = " ".join(title.group(1).split())[:160] if title else "제목 없음"
+        raise ValueError(f"로스트아크 공지 목록을 찾지 못했습니다. 점검 또는 응답 형식 변경 확인 필요: {page_title}")
     return notices
 
 
@@ -128,9 +131,7 @@ async def fetch_latest_lostark_notices(fetch_html=None, *, limit: int = 20) -> l
         async def fetch(url):
             if fetch_html is not None:
                 return await fetch_html(url)
-            async with session.get(url) as response:
-                response.raise_for_status()
-                return await response.text()
+            return await fetch_text_with_retry(session, url)
 
         notices = await asyncio.to_thread(parse_lostark_notice_list, await fetch(LOSTARK_NOTICE_LIST_URL))
         # A failed detail must not replace the saved body with an empty fingerprint.

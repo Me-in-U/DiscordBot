@@ -14,7 +14,7 @@ async def deliver_event(bot, event, source, process_event, default_process):
     revision = event.serial if source == "jma" else event.revision
     key = f"{source}:{event.event_id}:{revision}"
     payload = json.dumps(asdict(event), default=lambda value: value.isoformat(), ensure_ascii=False)
-    await execute_query("INSERT IGNORE INTO earthquake_pending (event_key,source,payload) VALUES (%s,%s,%s)", (key,source,payload))
+    await execute_query("INSERT INTO earthquake_pending (event_key,source,payload) VALUES (%s,%s,%s) ON DUPLICATE KEY UPDATE event_key=event_key", (key,source,payload))
     results = await process_event(bot,event)
     if not any(result.status == "error" for result in results):
         await execute_query("DELETE FROM earthquake_pending WHERE event_key=%s", (key,))

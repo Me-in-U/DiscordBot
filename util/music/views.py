@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+import time
 
 import discord
 from discord.ui import Button
@@ -16,6 +17,7 @@ from util.music.favorites import (
     build_music_favorite_search_submit_action,
 )
 from util.music.queue import parse_seek_seconds
+from util.music.chapters import music_chapters, current_chapter_index
 
 
 def _favorite_by_slot(favorites: list[MusicFavorite]) -> dict[int, MusicFavorite]:
@@ -291,6 +293,34 @@ class MusicControlView(SafeView):
 
         self.add_control_buttons()
         _add_music_favorite_buttons(self, cog, self.favorites, row=3)
+        self.add_chapter_buttons()
+
+    def add_chapter_buttons(self):
+        player = getattr(self.state, "player", None)
+        chapters = music_chapters(player.data) if player else []
+        if not chapters:
+            return
+        now = self.state.paused_at if self.state.paused_at is not None else time.time()
+        elapsed = max(0, now - self.state.start_ts) if self.state.start_ts else 0
+        current = current_chapter_index(chapters, elapsed)
+        for direction, name in ((-1, "이전 챕터"), (1, "다음 챕터")):
+            target = current + direction
+            chapter = chapters[target] if 0 <= target < len(chapters) else None
+            title = chapter.title if chapter else name
+            title = title[:68] + "…" if len(title) > 68 else title
+            button = Button(
+                label=f"◀ {title}" if direction == -1 else f"{title} ▶",
+                style=discord.ButtonStyle.secondary,
+                custom_id=f"music_chapter_{'previous' if direction == -1 else 'next'}",
+                row=4,
+                disabled=chapter is None,
+            )
+
+            async def on_chapter(interaction: discord.Interaction, _direction=direction):
+                await self.cog._seek_chapter(interaction, _direction, player)
+
+            button.callback = on_chapter
+            self.add_item(button)
 
     def add_control_buttons(self):
         skip_btn = Button(

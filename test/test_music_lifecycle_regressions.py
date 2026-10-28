@@ -12,6 +12,7 @@ class VoiceClient:
     def __init__(self):
         self.channel = SimpleNamespace(members=[object(), object()])
         self.active = False
+        self.paused = False
         self.callbacks = []
         self.played = []
 
@@ -19,7 +20,7 @@ class VoiceClient:
         return self.active
 
     def is_paused(self):
-        return False
+        return self.paused
 
     def play(self, source, *, after):
         if self.active:
@@ -30,6 +31,11 @@ class VoiceClient:
 
     def stop(self):
         self.active = False
+        self.paused = False
+
+    def pause(self):
+        self.active = False
+        self.paused = True
 
     async def disconnect(self):
         self.stop()
@@ -95,6 +101,51 @@ class MusicLifecycleRegressionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(self.state.queue), 1)
         self.assertEqual(self.voice.played, ['old', 'seek'])
         self.cog._schedule_idle_disconnect.assert_not_called()
+
+    async def test_chapter_navigation_uses_click_time_instead_of_old_button_label(self):
+        self.state.player = player('chapters')
+        self.state.player.data['chapters'] = [
+            {'title': 'first', 'start_time': 0},
+            {'title': 'second', 'start_time': 60},
+            {'title': 'third', 'start_time': 120},
+        ]
+        self.state.start_ts = 100
+        self.cog._seek = AsyncMock()
+        with patch('cogs.music.controls.time.time', return_value=180):
+            interaction = self.interaction()
+            await self.cog._seek_chapter(interaction, 1, self.state.player)
+        self.cog._seek.assert_awaited_once_with(interaction, 120)
+
+    async def test_stale_chapter_button_cannot_seek_replacement_track(self):
+        old = player('old')
+        self.state.player = player('replacement')
+        self.cog._seek = AsyncMock()
+        await self.cog._seek_chapter(self.interaction(), 1, old)
+        self.cog._seek.assert_not_awaited()
+        self.assertIn('곡이 변경', self.cog._send_auto_delete.await_args.args[1])
+
+    async def test_seek_keeps_pause_and_chapters_when_fallback_metadata_omits_them(self):
+        old = player('old')
+        old.data['chapters'] = [{'title': 'first', 'start_time': 0}]
+        self.state.player = old
+        self.state.paused_at = 100
+        self.voice.paused = True
+        new = player('seek')
+        with patch('cogs.music.controls.prepare_music_player', AsyncMock(return_value=new)):
+            await self.cog._seek(self.interaction(), 30)
+        self.assertTrue(self.voice.is_paused())
+        self.assertIsNotNone(self.state.paused_at)
+        self.assertEqual(new.data['chapters'], old.data['chapters'])
+        self.cog._build_control_view.assert_awaited_with(1, self.state)
+
+    async def test_chapter_seek_reuses_same_voice_channel_restriction(self):
+        self.state.player = player('old')
+        interaction = self.interaction()
+        interaction.user.voice.channel = object()
+        with patch('cogs.music.controls.prepare_music_player', new_callable=AsyncMock) as prepare:
+            await self.cog._seek(interaction, 30)
+        prepare.assert_not_awaited()
+        self.assertIn('같은 음성 채널', self.cog._send_auto_delete.await_args.args[1])
 
     async def test_callback_waiting_for_lock_checks_generation_after_acquiring(self):
         self.state.player = player('old')

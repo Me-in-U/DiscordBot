@@ -14,7 +14,7 @@ from urllib.parse import quote, urlsplit
 import aiohttp
 import discord
 
-from common.http import EXTERNAL_HTTP_TIMEOUT
+from common.http import EXTERNAL_HTTP_TIMEOUT, fetch_text_with_retry
 from common.openai_prompt import build_prompt
 from util.codex_resets.events import CODEX_RESET_CHANNEL_TYPE, resolve_codex_reset_channel
 from util.codex_resets.sender import _truncate_text
@@ -145,9 +145,10 @@ def parse_tibo_daily_log(html: str) -> tuple[TiboLogEntry, ...]:
 
 async def fetch_tibo_daily_log() -> tuple[TiboLogEntry, ...]:
     async with aiohttp.ClientSession(timeout=EXTERNAL_HTTP_TIMEOUT) as session:
-        async with session.get(TIBO_URL, headers={"User-Agent": "DiscordBot Tibo Daily log notifier"}, timeout=aiohttp.ClientTimeout(total=15)) as response:
-            response.raise_for_status()
-            return parse_tibo_daily_log(await response.text())
+        html = await fetch_text_with_retry(session, TIBO_URL,
+            headers={"User-Agent": "DiscordBot Tibo Daily log notifier"},
+            timeout=aiohttp.ClientTimeout(total=15))
+        return await asyncio.to_thread(parse_tibo_daily_log, html)
 
 
 async def summarize_tibo_daily_log(entries: tuple[TiboLogEntry, ...]) -> tuple[tuple[str, str], ...]:
@@ -216,10 +217,11 @@ async def reset_tibo_daily_log_state(guild_id: int) -> None:
 
 
 async def _save_state(guild_id: int, channel_id: int, fingerprints: dict[str, str], messages: dict[str, int]) -> None:
+    payload = json.dumps({"channelId": channel_id, "entries": fingerprints, "messages": messages})
     await execute_query(
         "INSERT INTO setting_data (setting_key, setting_value) VALUES (%s, %s) "
-        "ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)",
-        (f"tiboDailyLog:{guild_id}", json.dumps({"channelId": channel_id, "entries": fingerprints, "messages": messages})),
+        "ON DUPLICATE KEY UPDATE setting_value = %s",
+        (f"tiboDailyLog:{guild_id}", payload, payload),
     )
 
 

@@ -110,6 +110,8 @@ def validate_seek_playback_action(
     *,
     seconds: int,
 ) -> PlaybackActionResult | None:
+    if seconds < 0:
+        return PlaybackActionResult(user_message="❌ 이동할 시간은 0초 이상이어야 합니다.")
     total = int(state.player.data.get("duration", 0) or 0)
     if total and seconds >= total:
         return PlaybackActionResult(

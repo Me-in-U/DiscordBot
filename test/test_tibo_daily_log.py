@@ -303,7 +303,7 @@ class TiboFetcherTests(unittest.IsolatedAsyncioTestCase):
         response = SimpleNamespace(raise_for_status=unittest.mock.Mock(), text=AsyncMock(return_value=FIXTURE.read_text(encoding="utf-8")))
         session = MagicMock()
         session.get.return_value.__aenter__.return_value = response
-        with patch("util.codex_resets.tibo.aiohttp.ClientSession") as client:
+        with patch("util.codex_resets.tibo.aiohttp.ClientSession") as client, patch("common.http.asyncio.sleep", new_callable=AsyncMock):
             client.return_value.__aenter__.return_value = session
             entries = await fetch_tibo_daily_log()
             response.raise_for_status.side_effect = aiohttp.ClientResponseError(
@@ -313,7 +313,7 @@ class TiboFetcherTests(unittest.IsolatedAsyncioTestCase):
                 await fetch_tibo_daily_log()
             self.assertEqual(error.exception.status, 429)
         self.assertEqual(len(entries), 2)
-        self.assertEqual(response.raise_for_status.call_count, 2)
+        self.assertEqual(response.raise_for_status.call_count, 4)
         response.text.assert_awaited_once()
         self.assertEqual(session.get.call_args.args[0], TIBO_URL)
 

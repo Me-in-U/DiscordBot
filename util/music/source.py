@@ -36,7 +36,7 @@ HEADERS = {
 }
 
 ffmpeg_options = {
-    "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
+    "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_on_network_error 1 -reconnect_on_http_error 429,5xx -reconnect_delay_max 5",
     "options": "-threads 2 -vn -ac 2 -ar 48000 -acodec libopus -compression_level 5 -application audio -frame_duration 20 -page_duration 20000 -hide_banner -nostats -loglevel error",
 }
 

@@ -5,6 +5,8 @@ import logging
 from collections.abc import Awaitable, Callable
 
 import aiohttp
+from common.http import fetch_text_with_retry
+from urllib.parse import urlsplit, urlunsplit
 
 from util.maplestory.parser import (
     MAPLESTORY_NOTICE_LIST_URL,
@@ -111,6 +113,10 @@ async def _fetch_html(url: str) -> str:
         timeout=timeout,
         trust_env=False,
     ) as session:
-        async with session.get(url) as response:
-            response.raise_for_status()
-            return await response.text()
+        try:
+            return await fetch_text_with_retry(session, url)
+        except aiohttp.ClientResponseError as exc:
+            redirected = urlsplit(str(exc.request_info.real_url))
+            if exc.status != 403 or redirected.scheme != "http" or redirected.hostname != "gamebulletin.nexon.com":
+                raise
+            return await fetch_text_with_retry(session, urlunsplit(redirected._replace(scheme="https")))

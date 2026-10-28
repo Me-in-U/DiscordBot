@@ -48,7 +48,7 @@ class MusicFavoritesMixin:
             return hit_action.favorites
         try:
             favorites = await list_music_favorites(cache_action.guild_id)
-        except (aiomysql.Error, TypeError, ValueError, KeyError):
+        except (aiomysql.Error, OSError, TimeoutError, TypeError, ValueError, KeyError):
             failure_action = build_music_favorite_load_failure_action(
                 guild_id=cache_action.guild_id,
             )
@@ -57,7 +57,7 @@ class MusicFavoritesMixin:
                 failure_action.guild_id,
                 exc_info=True,
             )
-            favorites = failure_action.favorites
+            return self._favorite_cache.get(cache_action.guild_id, failure_action.favorites)
         store_action = build_music_favorite_cache_store_action(
             guild_id=cache_action.guild_id,
             favorites=favorites,
@@ -140,12 +140,22 @@ class MusicFavoritesMixin:
         interaction: discord.Interaction,
         payload: MusicFavoriteSavePayload,
     ) -> None:
-        save_result = await save_music_favorite_payload(payload)
+        if not interaction.response.is_done():
+            await interaction.response.defer(thinking=True, ephemeral=True)
+        try:
+            save_result = await save_music_favorite_payload(payload)
+        except (aiomysql.Error, OSError, TimeoutError, TypeError, ValueError):
+            logger.warning("음악 즐겨찾기 저장 실패: guild_id=%s slot=%s", payload.guild_id, payload.slot, exc_info=True)
+            await self._send_auto_delete(interaction, "❌ 즐겨찾기를 저장하지 못했습니다. 잠시 후 다시 시도해주세요.")
+            return
         response_action = build_music_favorite_save_response_action(save_result)
         if response_action.should_refresh_favorites:
             await self._load_music_favorites(response_action.guild_id, refresh=True)
         if response_action.should_refresh_panel:
-            await self._refresh_music_panel_for_favorites(response_action.guild_id)
+            try:
+                await self._refresh_music_panel_for_favorites(response_action.guild_id)
+            except (discord.HTTPException, aiomysql.Error, OSError, TimeoutError):
+                logger.warning("즐겨찾기 저장 후 음악 패널 갱신 실패", exc_info=True)
         await self._send_auto_delete(
             interaction,
             response_action.user_message,
@@ -229,7 +239,7 @@ class MusicFavoritesMixin:
         play_request = build_music_favorite_play_request_action(slot)
         try:
             favorite = await get_music_favorite(interaction.guild.id, play_request.slot)
-        except (aiomysql.Error, TypeError, ValueError, KeyError):
+        except (aiomysql.Error, OSError, TimeoutError, TypeError, ValueError, KeyError):
             logger.warning("음악 즐겨찾기 조회 실패", exc_info=True)
             await self._send_ephemeral_response(interaction, "❌ 즐겨찾기를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.")
             return

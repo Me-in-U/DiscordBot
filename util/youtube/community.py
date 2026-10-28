@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import asyncio
-import json
 from dataclasses import dataclass, field
 from typing import Any
 
 import aiohttp
 
-from common.http import EXTERNAL_HTTP_TIMEOUT
+from common.http import EXTERNAL_HTTP_TIMEOUT, fetch_text_with_retry
+from func.youtube_post import _extract_json_object_after
 
 YOUTUBE_COMMUNITY_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
@@ -72,9 +72,7 @@ async def fetch_latest_youtube_community_posts(
         timeout=EXTERNAL_HTTP_TIMEOUT,
         trust_env=False,
     ) as session:
-        async with session.get(url) as response:
-            response.raise_for_status()
-            html = await response.text()
+        html = await fetch_text_with_retry(session, url)
 
     posts = await asyncio.to_thread(parse_youtube_community_posts_html, html)
     return posts[:limit]
@@ -93,43 +91,6 @@ def trim_notified_community_post_ids(
     limit: int = 30,
 ) -> list[str]:
     return [str(post_id) for post_id in notified_post_ids if post_id][-limit:]
-
-
-def _extract_json_object_after(text: str, marker: str) -> dict:
-    marker_index = text.find(marker)
-    if marker_index == -1:
-        raise ValueError(f"{marker} marker not found")
-
-    start_index = text.find("{", marker_index)
-    if start_index == -1:
-        raise ValueError(f"{marker} JSON start not found")
-
-    depth = 0
-    in_string = False
-    escaped = False
-
-    for index in range(start_index, len(text)):
-        char = text[index]
-
-        if in_string:
-            if escaped:
-                escaped = False
-            elif char == "\\":
-                escaped = True
-            elif char == '"':
-                in_string = False
-            continue
-
-        if char == '"':
-            in_string = True
-        elif char == "{":
-            depth += 1
-        elif char == "}":
-            depth -= 1
-            if depth == 0:
-                return json.loads(text[start_index : index + 1])
-
-    raise ValueError(f"{marker} JSON end not found")
 
 
 def _find_renderer_values(data: Any, renderer_key: str):

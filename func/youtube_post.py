@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 
 from func.youtube_links import extract_post_id
@@ -102,40 +103,13 @@ def _find_first_key_value(data, target_key: str):
 
 
 def _extract_json_object_after(text: str, marker: str) -> dict:
-    marker_index = text.find(marker)
-    if marker_index == -1:
+    assignment = re.search(r'''(?:\bytInitialData|window\s*\[\s*["']ytInitialData["']\s*\])\s*=\s*''', text)
+    if assignment is None:
         raise ValueError(f"{marker} marker not found")
-
-    start_index = text.find("{", marker_index)
-    if start_index == -1:
-        raise ValueError(f"{marker} JSON start not found")
-
-    depth = 0
-    in_string = False
-    escaped = False
-
-    for index in range(start_index, len(text)):
-        char = text[index]
-
-        if in_string:
-            if escaped:
-                escaped = False
-            elif char == "\\":
-                escaped = True
-            elif char == '"':
-                in_string = False
-            continue
-
-        if char == '"':
-            in_string = True
-        elif char == "{":
-            depth += 1
-        elif char == "}":
-            depth -= 1
-            if depth == 0:
-                return json.loads(text[start_index : index + 1])
-
-    raise ValueError(f"{marker} JSON end not found")
+    data, _ = json.JSONDecoder().raw_decode(text[assignment.end():].lstrip())
+    if not isinstance(data, dict):
+        raise ValueError("ytInitialData must be an object")
+    return data
 
 
 def _best_thumbnail_url(thumbnails: list[dict]) -> str:

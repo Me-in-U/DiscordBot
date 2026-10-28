@@ -40,12 +40,14 @@ async def save_codex_reset_notification_state(
         "lastTweetId": state.last_tweet_id,
         "lastAnnouncedAt": state.last_announced_at,
     }
+    encoded_payload = json.dumps(payload, ensure_ascii=False)
     await execute_query(
         "INSERT INTO setting_data (setting_key, setting_value) VALUES (%s, %s) "
-        "ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)",
+        "ON DUPLICATE KEY UPDATE setting_value = %s",
         (
             _state_key(guild_id),
-            json.dumps(payload, ensure_ascii=False),
+            encoded_payload,
+            encoded_payload,
         ),
     )
 

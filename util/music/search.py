@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import asyncio
-from util.music.network import run_extraction
+import logging
+from util.music.network import run_extraction, validate_music_url
+from urllib.parse import urlsplit, parse_qs
 from collections.abc import Iterable
 from concurrent.futures import Executor
 from dataclasses import dataclass
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -32,6 +36,8 @@ def normalize_search_entry_url(entry: dict[str, Any]) -> str:
     raw_url = entry.get("webpage_url") or entry.get("url") or ""
     if isinstance(raw_url, str) and raw_url.startswith("/watch"):
         return f"https://www.youtube.com{raw_url}"
+    if not is_http_url(raw_url) and entry.get("id"):
+        return f"https://www.youtube.com/watch?v={entry['id']}"
     return raw_url if isinstance(raw_url, str) else ""
 
 
@@ -44,9 +50,16 @@ def filter_youtube_watch_entries(
     for entry in entries:
         if not isinstance(entry, dict):
             continue
-        url = entry.get("url")
-        if isinstance(url, str) and "watch?v=" in url:
-            videos.append(entry)
+        url = normalize_search_entry_url(entry)
+        try:
+            url = validate_music_url(url)
+        except ValueError:
+            continue
+        parsed = urlsplit(url)
+        if ((parsed.path == "/watch" and parse_qs(parsed.query).get("v"))
+                or (parsed.hostname == "youtu.be" and parsed.path.strip("/"))
+                or parsed.path.startswith(("/shorts/", "/live/"))):
+            videos.append({**entry, "url": url})
             if len(videos) >= limit:
                 break
     return videos
@@ -74,7 +87,7 @@ def build_music_search_action(
     favorite_slot: int | None = None,
     limit: int = 10,
 ) -> MusicSearchActionResult:
-    raw_entries = info.get("entries", []) or []
+    raw_entries = (info.get("entries") or []) if "entries" in info else [info]
     videos = filter_youtube_watch_entries(raw_entries, limit=limit)
     if not videos:
         return MusicSearchActionResult(
@@ -108,7 +121,7 @@ async def run_music_search_query(
     executor: Executor | None = None,
 ) -> Any:
     def _extract() -> Any:
-        search = f"ytsearch10:{query}"
+        search = validate_music_url(query) if is_http_url(query) else f"ytsearch10:{query}"
         if callable(extractor):
             return extractor(search)
         return extractor.extract_info(search, download=False)
@@ -124,11 +137,13 @@ async def build_music_search_flow(
     executor: Executor | None = None,
     favorite_slot: int | None = None,
 ) -> MusicSearchActionResult:
-    info = await run_music_search_query(
-        query,
-        extractor,
-        executor=executor,
-    )
+    try:
+        info = await run_music_search_query(query, extractor, executor=executor)
+    except Exception:
+        logger.warning("음악 검색 실패", exc_info=True)
+        return MusicSearchActionResult(videos=[], user_message="❌ 음악 검색에 실패했습니다. 잠시 후 다시 시도해주세요.")
+    if not isinstance(info, dict):
+        return MusicSearchActionResult(videos=[], user_message="❌ 검색 결과가 없습니다.")
     return build_music_search_action(
         query,
         info,

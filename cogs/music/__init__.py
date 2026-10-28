@@ -115,6 +115,7 @@ class MusicCog(
         view: Any | None = None,
     ) -> None:
         try:
+            view_kwargs = {"view": view} if view is not None else {}
             response_is_done = getattr(interaction.response, "is_done", None)
             response_done = (
                 response_is_done()
@@ -125,14 +126,14 @@ class MusicCog(
                 await interaction.response.send_message(
                     content,
                     embed=embed,
-                    view=view,
+                    **view_kwargs,
                     ephemeral=True,
                 )
             else:
                 await interaction.followup.send(
                     content,
                     embed=embed,
-                    view=view,
+                    **view_kwargs,
                     ephemeral=True,
                 )
         except (discord.NotFound, discord.Forbidden, discord.HTTPException):

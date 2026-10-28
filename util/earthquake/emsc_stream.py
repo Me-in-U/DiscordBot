@@ -144,7 +144,8 @@ async def _recover_emsc_updates(
             break
         offset += len(features)
     if persistent:
-        await execute_query("INSERT INTO setting_data (setting_key,setting_value) VALUES (%s,%s) ON DUPLICATE KEY UPDATE setting_value=VALUES(setting_value)", ("emscRecoveryCursor",json.dumps(current_time.isoformat())))
+        payload = json.dumps(current_time.isoformat())
+        await execute_query("INSERT INTO setting_data (setting_key,setting_value) VALUES (%s,%s) ON DUPLICATE KEY UPDATE setting_value=%s", ("emscRecoveryCursor", payload, payload))
     if processed_count:
         log(f"EMSC 재연결 누락분 처리 완료: {processed_count}건")
     return processed_count

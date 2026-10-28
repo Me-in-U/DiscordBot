@@ -7,7 +7,7 @@ _slots_by_loop = WeakKeyDictionary()
 
 def validate_music_url(url):
     parsed = urlparse(url)
-    if parsed.scheme not in {"http", "https"} or parsed.hostname not in {"youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be"} or parsed.username or parsed.password or parsed.port not in {None, 443}:
+    if parsed.scheme not in {"http", "https"} or parsed.hostname not in {"youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com", "youtu.be"} or parsed.username or parsed.password or parsed.port not in {None, 443}:
         raise ValueError("YouTube 링크만 재생할 수 있습니다.")
     return urlunparse(parsed._replace(scheme="https"))
 

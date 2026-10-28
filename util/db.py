@@ -419,19 +419,19 @@ async def upsert_guild(guild_id: int, guild_name: str) -> None:
     query = """
     INSERT INTO guild (guild_id, guild_name)
     VALUES (%s, %s)
-    ON DUPLICATE KEY UPDATE guild_name = VALUES(guild_name)
+    ON DUPLICATE KEY UPDATE guild_name = %s
     """
     # store Discord snowflake as numeric (BIGINT UNSIGNED)
-    await execute_query(query, (int(guild_id), guild_name))
+    await execute_query(query, (int(guild_id), guild_name, guild_name))
 
 
 async def upsert_user(user_id: int, username: str) -> None:
     query = """
     INSERT INTO discord_user (user_id, username)
     VALUES (%s, %s)
-    ON DUPLICATE KEY UPDATE username = VALUES(username)
+    ON DUPLICATE KEY UPDATE username = %s
     """
-    await execute_query(query, (int(user_id), username))
+    await execute_query(query, (int(user_id), username, username))
 
 
 async def _ensure_bigint_unsigned(conn, table_name: str, column_name: str):

@@ -570,17 +570,23 @@ async def upsert_music_favorite(
         )
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         ON DUPLICATE KEY UPDATE
-            title = VALUES(title),
-            url = VALUES(url),
-            duration = VALUES(duration),
-            uploader = VALUES(uploader),
-            thumbnail = VALUES(thumbnail),
-            updated_by = VALUES(updated_by),
+            title = %s,
+            url = %s,
+            duration = %s,
+            uploader = %s,
+            thumbnail = %s,
+            updated_by = %s,
             updated_at = CURRENT_TIMESTAMP(6)
         """,
         (
             int(guild_id),
             slot,
+            clean_title,
+            clean_url,
+            int(duration or 0),
+            uploader,
+            thumbnail,
+            int(updated_by) if updated_by else None,
             clean_title,
             clean_url,
             int(duration or 0),

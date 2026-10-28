@@ -18,6 +18,7 @@ from util.music.playback_actions import (
 )
 from util.music.source import YTDLSource
 from util.music.voice import same_voice_channel_error
+from util.music.chapters import music_chapters, current_chapter_index
 from .runtime import MSG_NO_PLAYING, dbg, logger
 
 
@@ -137,10 +138,27 @@ class MusicControlsMixin:
             # ! 메시지
             await self._send_auto_delete(interaction, result.user_message)
 
+    async def _seek_chapter(self, interaction: discord.Interaction, direction: int, expected_player):
+        await interaction.response.defer(thinking=True, ephemeral=True)
+        async with self._music_operation(interaction.guild.id):
+            state = self._get_state(interaction.guild.id)
+            if state.player is None or state.player is not expected_player:
+                await self._send_auto_delete(interaction, "❌ 곡이 변경되었습니다. 현재 음악 패널에서 다시 선택해주세요.")
+                return
+            chapters = music_chapters(state.player.data)
+            now = state.paused_at if state.paused_at is not None else time.time()
+            elapsed = max(0, now - state.start_ts) if state.start_ts else 0
+            target = current_chapter_index(chapters, elapsed) + direction
+            if not 0 <= target < len(chapters):
+                await self._send_auto_delete(interaction, "❌ 이동할 챕터가 없습니다.")
+                return
+            await self._seek(interaction, chapters[target].start_time)
+
     async def _seek(self, interaction: discord.Interaction, seconds: int):
         dbg(f"_seek: seconds={seconds}")
         # ! 기본정보 로드
-        await interaction.response.defer(thinking=True, ephemeral=True)
+        if not interaction.response.is_done():
+            await interaction.response.defer(thinking=True, ephemeral=True)
         async with self._music_operation(interaction.guild.id):
             guild_id = interaction.guild.id
             state = self._get_state(guild_id)
@@ -154,6 +172,7 @@ class MusicControlsMixin:
                 return
             player = None
             restart_started = False
+            was_paused = state.paused_at is not None
             try:
                 validation_result = validate_seek_playback_action(state, seconds=seconds)
                 if validation_result:
@@ -164,6 +183,7 @@ class MusicControlsMixin:
                     )
                     return
                 # ! 새로운 player 생성 (start_time 포함)
+                previous_player = state.player
                 player = await prepare_music_player(
                     YTDLSource.from_url,
                     state.player.webpage_url,
@@ -171,6 +191,8 @@ class MusicControlsMixin:
                     start_time=seconds,
                     requester=state.player.requester,
                 )
+                if not player.data.get("chapters") and previous_player.data.get("chapters"):
+                    player.data["chapters"] = previous_player.data["chapters"]
                 # ! 멈추고 재생 위치부터 새 소스 생성
                 restart_started = True
                 begin_seek_playback_action(state)
@@ -185,6 +207,9 @@ class MusicControlsMixin:
                 )
                 # ! play & updater 재시작
                 self._vc_play(guild_id=guild_id, source=player.source)
+                if was_paused:
+                    voice_client.pause()
+                    state.paused_at = time.time()
                 await self._restart_updater(guild_id)
                 # ! 메시지 수정(임베드, 뷰)
                 embed = self._make_playing_embed(
@@ -192,6 +217,7 @@ class MusicControlsMixin:
                     guild_id,
                     elapsed=result.elapsed,
                 )
+                state.control_view = await self._build_control_view(guild_id, state)
                 await self._edit_msg(state, embed, state.control_view)
                 # ! 메시지
                 await self._send_auto_delete(interaction, result.user_message)
