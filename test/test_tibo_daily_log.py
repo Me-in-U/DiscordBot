@@ -142,8 +142,9 @@ class TiboNotificationTests(unittest.IsolatedAsyncioTestCase):
         self.channels.assert_awaited_once_with("codex_reset")
         self.target.send.assert_not_awaited()
         self.summarize.assert_not_awaited()
-        key, payload = self.execute.call_args.args[1]
+        key, payload, update_payload = self.execute.call_args.args[1]
         self.assertEqual(key, "tiboDailyLog:10")
+        self.assertEqual(update_payload, payload)
         self.assertEqual(len(json.loads(payload)["entries"]), 2)
         self.assertEqual(json.loads(payload)["messages"], {})
 
