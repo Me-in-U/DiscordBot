@@ -9,6 +9,7 @@ from discord.ext import commands
 from api.chatGPT import custom_prompt_model
 from common.discord_ui import SafeView
 from common.openai_prompt import build_labeled_image_content, build_prompt
+from func.youtube_api import YouTubeSummaryUnavailable
 from func.youtube_summary import (
     YOUTUBE_POST_KIND,
     YOUTUBE_VIDEO_KIND,
@@ -92,6 +93,10 @@ class YouTubeSummarySelect(discord.ui.Select):
 
         try:
             summary_result = await process_youtube_link(selected_candidate.url)
+        except YouTubeSummaryUnavailable as exc:
+            await self.view.original_message.edit(content=str(exc), view=None)
+            self.view.stop()
+            return
         except Exception as exc:
             await self.view.original_message.edit(
                 content=log_user_error(logger, "유튜브 요약", exc),
@@ -161,6 +166,9 @@ async def summarize_youtube_message_context_menu(
     link_kind = get_youtube_link_kind(youtube_url) or YOUTUBE_VIDEO_KIND
     try:
         summary_result = await process_youtube_link(youtube_url)
+    except YouTubeSummaryUnavailable as exc:
+        await interaction.edit_original_response(content=str(exc))
+        return
     except Exception as exc:
         await interaction.edit_original_response(
             content=log_user_error(logger, "유튜브 요약", exc)

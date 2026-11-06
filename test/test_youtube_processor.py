@@ -100,7 +100,7 @@ class YouTubeProcessorVideoTests(unittest.IsolatedAsyncioTestCase):
         import func.youtube_processor as youtube_processor
 
         with patch("func.youtube_processor.extract_video_id", return_value="video-id"):
-            with patch("func.youtube_processor.is_live_video", return_value=False):
+            with patch("func.youtube_processor.check_video_summary_available", return_value=None):
                 with patch("func.youtube_processor.download_youtube_subtitles", return_value=""):
                     with patch("func.youtube_processor.youtube_to_mp3", new=AsyncMock()):
                         with patch(

@@ -1,7 +1,7 @@
 import asyncio
 import os
 import unittest
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, Mock, patch
 
 from func.youtube_links import YOUTUBE_POST_KIND, YOUTUBE_VIDEO_KIND
 from func.youtube_summary_ui import (
@@ -32,7 +32,8 @@ class YouTubeSummaryUiTests(unittest.TestCase):
     def test_check_youtube_link_replies_with_summary_view(self):
         message = _FakeMessage("확인 https://youtu.be/test-video")
 
-        asyncio.run(check_youtube_link(message, processor=_fake_processor))
+        with patch("func.youtube_summary_ui.check_video_summary_available"):
+            asyncio.run(check_youtube_link(message, processor=_fake_processor))
 
         self.assertEqual(
             message.replies[0]["content"],

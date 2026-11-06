@@ -7,7 +7,11 @@ from collections.abc import Awaitable, Callable
 import discord
 
 from common.discord_ui import SafeView
+from func.youtube_api import (
+    YouTubeApiError, YouTubeLiveInProgress, YouTubeSummaryUnavailable, check_video_summary_available,
+)
 from func.youtube_links import (
+    extract_video_id,
     YOUTUBE_POST_KIND,
     YOUTUBE_VIDEO_KIND,
     extract_youtube_link,
@@ -67,6 +71,10 @@ class YouTubeSummaryView(SafeView):
                     view=None,
                 )
 
+        except YouTubeSummaryUnavailable as exc:
+            if self.original_message:
+                await self.original_message.edit(content=str(exc), view=None)
+
         except Exception as exc:
             button.disabled = True
             button.label = "오류!"
@@ -107,6 +115,17 @@ async def check_youtube_link(
     youtube_url = extract_youtube_link(message.content)
     if youtube_url:
         link_kind = get_youtube_link_kind(youtube_url) or YOUTUBE_VIDEO_KIND
+        if link_kind == YOUTUBE_VIDEO_KIND:
+            try:
+                await asyncio.to_thread(check_video_summary_available, extract_video_id(youtube_url))
+            except YouTubeLiveInProgress:
+                return
+            except YouTubeSummaryUnavailable as exc:
+                await message.reply(content=str(exc))
+                return
+            except YouTubeApiError:
+                logger.warning("YouTube 자동 요약 안내 상태 조회 실패", exc_info=True)
+                return
         view = YouTubeSummaryView(youtube_url, link_kind, processor=processor)
         sent_msg = await message.reply(
             content=get_youtube_prompt_text(link_kind),

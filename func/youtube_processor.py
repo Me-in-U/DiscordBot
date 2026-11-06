@@ -9,7 +9,7 @@ from yt_dlp.utils import DownloadError
 
 from api.chatGPT import OpenAIModelError
 from common.http import EXTERNAL_HTTP_TIMEOUT
-from func.youtube_api import YouTubeApiError, fetch_youtube_comments, is_live_video
+from func.youtube_api import YouTubeApiError, fetch_youtube_comments, check_video_summary_available
 from func.youtube_links import (
     YOUTUBE_POST_KIND,
     extract_video_id,
@@ -90,8 +90,7 @@ async def process_youtube_video_link(url: str) -> str:
             if not video_id:
                 raise ValueError("영상 ID를 추출하지 못했습니다.")
 
-            if await asyncio.to_thread(is_live_video, video_id):
-                raise ValueError("라이브(또는 예정) 방송은 요약을 진행할 수 없습니다.")
+            await asyncio.to_thread(check_video_summary_available, video_id)
 
             subtitle_path = await asyncio.to_thread(
                 download_youtube_subtitles,
