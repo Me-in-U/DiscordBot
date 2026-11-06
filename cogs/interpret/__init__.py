@@ -1,6 +1,7 @@
 import asyncio
 from common.discord_output import send_text, edit_text
 import logging
+import json
 import re
 
 import discord
@@ -24,7 +25,7 @@ from util.message.context import (
 from util.logging_utils import log_user_error
 
 INTERPRET_PROMPT_ID = "pmpt_68abf98a25b481938994e409ffd1ecf20db1ff235be9e7ab"
-INTERPRET_PROMPT_VERSION = "20"
+INTERPRET_PROMPT_VERSION = "21"
 logger = logging.getLogger(__name__)
 _INTERPRET_RESPONSE_LABEL_PATTERN = re.compile(
     r"(?i)\b(Reasoning|Conclusion|Hidden meaning)\s*:"
@@ -71,10 +72,27 @@ async def interpret_target(
     following_messages: str = "",
     prompt_version: str = INTERPRET_PROMPT_VERSION,
     context_images: tuple[MessageContextImage, ...] = (),
+    source_message=None,
 ) -> str:
     normalized_question = question.strip()
     if image_url and not normalized_question:
         normalized_question = "첨부 이미지를 해석해줘."
+
+    if source_message is not None:
+        author = getattr(source_message, "author", None)
+        created_at = getattr(source_message, "created_at", None)
+        reference = getattr(source_message, "reference", None)
+        normalized_question = json.dumps(
+            {
+                "author": str(getattr(author, "display_name", "") or author or "Unknown"),
+                "author_id": getattr(author, "id", None),
+                "message_id": getattr(source_message, "id", None),
+                "created_at": created_at.isoformat() if created_at else None,
+                "reply_to_message_id": getattr(reference, "message_id", None),
+                "text": normalized_question,
+            },
+            ensure_ascii=False,
+        )
 
     try:
         if context_images:
@@ -130,6 +148,7 @@ async def interpret_message_context_menu(
         previous_messages=context.previous_messages,
         following_messages=context.following_messages,
         context_images=context.images,
+        source_message=message,
     )
     await send_text(interaction.followup, interpreted)
 
@@ -212,6 +231,7 @@ class InterpretSelectView(SafeView):
             previous_messages=context.previous_messages,
             following_messages=context.following_messages,
             context_images=context.images,
+            source_message=source_message,
         )
 
         # 원본 메시지를 번역 결과로 덮어쓰기

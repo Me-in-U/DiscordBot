@@ -1,4 +1,7 @@
 import os
+import json
+from datetime import datetime, timezone
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
@@ -77,7 +80,7 @@ class InterpretTargetTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(variables["previous_messages"], "")
         self.assertEqual(variables["following_messages"], "")
         self.assertEqual(captured_kwargs["prompt"]["version"], INTERPRET_PROMPT_VERSION)
-        self.assertEqual(INTERPRET_PROMPT_VERSION, "20")
+        self.assertEqual(INTERPRET_PROMPT_VERSION, "21")
         self.assertEqual(
             result,
             "**의미 분석**\n표면 의미입니다.\n\n**결론**\n최종 해석입니다.",
@@ -149,6 +152,36 @@ class InterpretTargetTests(unittest.IsolatedAsyncioTestCase):
             captured_kwargs["prompt"]["variables"]["previous_messages"],
             "Alice: 레전드 복구 좀 했다 (이전 메시지 첨부 이미지 1)",
         )
+
+    async def test_target_metadata_preserves_speaker_reply_and_multiline_text(self):
+        question = '민규 나 대신 생각해주는 기계 없냐\n머리쓰기 싫다'
+        source = SimpleNamespace(
+            author=SimpleNamespace(id=123, display_name='기사따고싶다'),
+            id=456,
+            created_at=datetime(2026, 10, 14, 3, 19, tzinfo=timezone.utc),
+            reference=SimpleNamespace(message_id=789),
+        )
+        with patch("cogs.interpret.custom_prompt_model", return_value="해석") as model:
+            await interpret_target(
+                question, None,
+                previous_messages="타향살이: 앱스토어에 디코가 없음",
+                source_message=source,
+            )
+        variables = model.call_args.kwargs["prompt"]["variables"]
+        self.assertEqual(json.loads(variables["question"]), {
+            "author": "기사따고싶다", "author_id": 123,
+            "message_id": 456, "created_at": "2026-10-14T03:19:00+00:00",
+            "reply_to_message_id": 789, "text": question,
+        })
+        self.assertEqual(variables["previous_messages"], "타향살이: 앱스토어에 디코가 없음")
+
+    async def test_target_without_reply_does_not_invent_a_reply(self):
+        source = SimpleNamespace(author=SimpleNamespace(id=123, display_name="작성자"), id=456)
+        with patch("cogs.interpret.custom_prompt_model", return_value="해석") as model:
+            await interpret_target("갑자기 든 생각", None, source_message=source)
+        payload = json.loads(model.call_args.kwargs["prompt"]["variables"]["question"])
+        self.assertIsNone(payload["reply_to_message_id"])
+        self.assertIsNone(payload["created_at"])
 
     async def test_interpret_target_returns_safe_message_on_model_failure(self):
         def fake_custom_prompt_model(**kwargs):
