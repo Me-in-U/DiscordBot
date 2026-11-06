@@ -423,6 +423,18 @@ class SensitiveLogPolicyTests(unittest.TestCase):
 
         print_mock.assert_not_called()
 
+    def test_stored_prompt_preserves_optional_output_limit(self):
+        import api.chatGPT as chatgpt
+
+        class FakeResponse:
+            output_text = "요약 결과"
+
+        with patch.object(chatgpt.clientGPT.responses, "create", return_value=FakeResponse()) as create:
+            chatgpt.custom_prompt_model(prompt={"id": "pmpt_test"}, max_output_tokens=320)
+            self.assertEqual(create.call_args.kwargs["max_output_tokens"], 320)
+            chatgpt.custom_prompt_model(prompt={"id": "pmpt_test"})
+            self.assertNotIn("max_output_tokens", create.call_args.kwargs)
+
     def test_generate_text_model_uses_supported_reasoning_effort(self):
         import api.chatGPT as chatgpt
 

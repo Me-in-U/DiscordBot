@@ -99,15 +99,18 @@ class LostArkNoticeTests(unittest.IsolatedAsyncioTestCase):
         notice = parse_lostark_notice_detail(DETAIL_HTML, parse_lostark_notice_list(LIST_HTML)[0])
         calls = []
 
-        def generate(*args):
-            calls.append(args)
+        def generate(**kwargs):
+            calls.append(kwargs)
             return "일정 안내\n서비스 안정화\n세부 내용은 링크에서 확인."
 
         await summarize_maplestory_notice_with_openai(notice, generate_text=generate)
-        self.assertIn("로스트아크 공식 공지", calls[0][1])
-        self.assertNotIn("메이플스토리", calls[0][1])
+        source = calls[0]["image_content"][0]["content"][0]["text"]
+        self.assertIn("게임: 로스트아크", source)
+        self.assertNotIn("메이플스토리", source)
+        self.assertIn("prompt", calls[0])
+        self.assertNotIn("instructions", calls[0])
 
-        def unavailable(*args):
+        def unavailable(**kwargs):
             raise RuntimeError("offline")
 
         with self.assertLogs("util.maplestory.sender", level="WARNING") as logs:

@@ -179,8 +179,8 @@ class MapleStorySenderTests(unittest.IsolatedAsyncioTestCase):
 
         calls = []
 
-        def fake_generate_text_model(user_input, instructions, model, max_output_tokens):
-            calls.append((user_input, instructions, model, max_output_tokens))
+        def fake_generate_text_model(**kwargs):
+            calls.append(kwargs)
             return "1. 7/1까지 보상 수령 가능\n- 월드 내 1회 지급\n불필요한 인사말 제거\n네번째 줄 제거"
 
         lines = await summarize_maplestory_notice_with_openai(
@@ -192,11 +192,15 @@ class MapleStorySenderTests(unittest.IsolatedAsyncioTestCase):
             lines,
             ["7/1까지 보상 수령 가능", "월드 내 1회 지급", "불필요한 인사말 제거", "네번째 줄 제거"],
         )
-        self.assertIn("3~4줄", calls[0][1])
-        self.assertNotIn("알아서", calls[0][1])
-        self.assertNotIn("핵심은", calls[0][1])
-        self.assertNotIn("헛걸음", calls[0][1])
-        self.assertIn(notice.summary, calls[0][0])
+        from util.maplestory.sender import GAME_NOTICE_SUMMARY_PROMPT_ID, GAME_NOTICE_SUMMARY_PROMPT_VERSION
+        self.assertEqual(calls[0]["prompt"], {
+            "id": GAME_NOTICE_SUMMARY_PROMPT_ID, "version": GAME_NOTICE_SUMMARY_PROMPT_VERSION,
+        })
+        source = calls[0]["image_content"][0]["content"][0]["text"]
+        self.assertIn("게임: 메이플스토리", source)
+        self.assertIn(notice.summary, source)
+        self.assertNotIn("instructions", calls[0])
+        self.assertEqual(calls[0]["max_output_tokens"], 320)
 
     async def test_short_notice_summary_input_includes_full_body_text(self):
         with warnings.catch_warnings():
@@ -271,7 +275,7 @@ class MapleStorySenderTests(unittest.IsolatedAsyncioTestCase):
             ),
         )
 
-        def failing_generate_text_model(user_input, instructions, model, max_output_tokens):
+        def failing_generate_text_model(**kwargs):
             raise RuntimeError("boom")
 
         with patch("util.maplestory.sender.logger.warning"):

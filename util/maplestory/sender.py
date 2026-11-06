@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from util.notification_delivery import send_once
+from common.openai_prompt import build_prompt
 
 import asyncio
 import logging
@@ -15,7 +16,8 @@ from util.maplestory.parser import MapleStoryEvent, MapleStoryNotice
 logger = logging.getLogger(__name__)
 
 
-MAPLESTORY_NOTICE_SUMMARY_MODEL = "gpt-6-luna"
+GAME_NOTICE_SUMMARY_PROMPT_ID = "pmpt_6aedb402631c8194a37d69483f3b22fd0394b3a05c1b7b24"
+GAME_NOTICE_SUMMARY_PROMPT_VERSION = "2"
 MAPLESTORY_NOTICE_SUMMARY_MAX_OUTPUT_TOKENS = 320
 MAPLESTORY_NOTICE_SUMMARY_LINE_LIMIT = 90
 MAPLESTORY_NOTICE_SUMMARY_MIN_LINES = 3
@@ -23,17 +25,6 @@ MAPLESTORY_NOTICE_SUMMARY_MAX_LINES = 4
 MAPLESTORY_NOTICE_FULL_BODY_LIMIT = 1200
 MAPLESTORY_NOTICE_IMPORTANT_BODY_LIMIT = 2200
 MAPLESTORY_NOTICE_IMPORTANT_BLOCK_LIMIT = 6
-MAPLESTORY_NOTICE_SUMMARY_INSTRUCTIONS = (
-    "너는 메이플스토리 공식 공지를 Discord 임베드 알림용으로 재밌게 요약한다.\n"
-    "한국어로 3~4줄만 출력한다.\n"
-    "말투는 짧고 직설적인 커뮤니티 반말 말투로 쓰되, 같은 시작 문장을 반복하지 않는다.\n"
-    "욕설, 혐오, 특정 집단 비하, 성적 표현은 쓰지 않는다.\n"
-    "원문에 없는 날짜, 시간, 대상, 보상, 원인을 만들지 않는다.\n"
-    "인사말, 사과문, 중복 표현은 버리고 핵심 일정, 대상, 영향, 보상만 남긴다.\n"
-    "월드나 채널별 시간이 복잡하면 세부 채널은 링크에서 확인하라는 식으로 압축한다.\n"
-    "고정 접두사, 과한 훈계, 낡은 농담, 불필요한 원문 유도 문구는 쓰지 않는다.\n"
-    "번호, 불릿, 제목, 머리말 없이 줄바꿈으로만 구분한다."
-)
 _NOTICE_SECTION_LABEL_PATTERN = re.compile(r"\[\s*([^\]]{1,60})\s*\]")
 _IMPORTANT_NOTICE_LABEL_KEYWORDS = (
     "작업일시",
@@ -54,7 +45,7 @@ _IMPORTANT_NOTICE_DIRECT_PHRASES = (
     "점검시간과 작업영향",
     "점검 시간과 작업 영향",
 )
-GenerateText = Callable[[str, str, str, int | None], str]
+GenerateText = Callable[..., str]
 SummarizeNotice = Callable[[MapleStoryNotice], Awaitable[list[str]]]
 
 
@@ -119,10 +110,12 @@ async def summarize_maplestory_notice_with_openai(
     try:
         output = await asyncio.to_thread(
             text_generator,
-            _build_maplestory_notice_summary_input(notice),
-            MAPLESTORY_NOTICE_SUMMARY_INSTRUCTIONS.replace("메이플스토리", notice.source_name),
-            MAPLESTORY_NOTICE_SUMMARY_MODEL,
-            MAPLESTORY_NOTICE_SUMMARY_MAX_OUTPUT_TOKENS,
+            prompt=build_prompt(GAME_NOTICE_SUMMARY_PROMPT_ID, GAME_NOTICE_SUMMARY_PROMPT_VERSION),
+            max_output_tokens=MAPLESTORY_NOTICE_SUMMARY_MAX_OUTPUT_TOKENS,
+            image_content=[{"role": "user", "content": [{
+                "type": "input_text",
+                "text": f"게임: {notice.source_name}\n{_build_maplestory_notice_summary_input(notice)}",
+            }]}],
         )
     except Exception:
         logger.warning(
@@ -335,9 +328,9 @@ def _truncate_discord_text(text: str, max_length: int) -> str:
 
 
 def _load_openai_text_generator() -> GenerateText:
-    from api.chatGPT import generate_text_model
+    from api.chatGPT import custom_prompt_model
 
-    return generate_text_model
+    return custom_prompt_model
 
 
 def _build_maplestory_notice_summary_input(notice: MapleStoryNotice) -> str:
