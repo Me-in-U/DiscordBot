@@ -96,17 +96,6 @@ def build_recent_message_option(message) -> dict | None:
     }
 
 
-def _is_same_author(left, right) -> bool:
-    if left is None or right is None:
-        return False
-    if left is right:
-        return True
-
-    left_id = getattr(left, "id", None)
-    right_id = getattr(right, "id", None)
-    return left_id is not None and left_id == right_id
-
-
 def _author_display_name(message) -> str:
     author = getattr(message, "author", None)
     for attribute in ("display_name", "global_name", "name"):
@@ -133,13 +122,7 @@ def _format_context_message(message, image_label: str | None = None) -> str:
     return f"{_author_display_name(message)}: {content}"
 
 
-def _is_surrounding_context_candidate(message, bot_user=None) -> bool:
-    if bot_user is not None and _is_same_author(
-        getattr(message, "author", None),
-        bot_user,
-    ):
-        return False
-
+def _is_surrounding_context_candidate(message) -> bool:
     target = build_message_action_target(message)
     if not target.has_input:
         return False
@@ -184,7 +167,6 @@ def _collect_surrounding_context_images(
 async def build_surrounding_message_context(
     message,
     *,
-    bot_user=None,
     limit: int = 10,
 ) -> SurroundingMessageContext:
     channel = getattr(message, "channel", None)
@@ -199,7 +181,7 @@ async def build_surrounding_message_context(
             before=message,
             oldest_first=False,
         ):
-            if not _is_surrounding_context_candidate(context_message, bot_user):
+            if not _is_surrounding_context_candidate(context_message):
                 continue
             previous_messages.append(context_message)
             if len(previous_messages) >= limit:
@@ -212,7 +194,7 @@ async def build_surrounding_message_context(
             after=message,
             oldest_first=True,
         ):
-            if not _is_surrounding_context_candidate(context_message, bot_user):
+            if not _is_surrounding_context_candidate(context_message):
                 continue
             following_messages.append(context_message)
             if len(following_messages) >= limit:

@@ -123,7 +123,6 @@ async def interpret_message_context_menu(
     await interaction.response.defer(thinking=True)
     context = await build_surrounding_message_context(
         message,
-        bot_user=getattr(interaction.client, "user", None),
     )
     interpreted = await interpret_target(
         target.text,
@@ -205,7 +204,6 @@ class InterpretSelectView(SafeView):
         source_message = self.selected_message.get("message")
         context = await build_surrounding_message_context(
             source_message,
-            bot_user=getattr(interaction.client, "user", None),
         )
 
         result_message = await interpret_target(

@@ -174,7 +174,6 @@ async def explain_message_context_menu(
     await interaction.response.defer(thinking=True)
     context = await build_surrounding_message_context(
         message,
-        bot_user=getattr(interaction.client, "user", None),
     )
     explained = await explain_target(
         target.text,
@@ -249,7 +248,6 @@ class ExplanationSelectView(SafeView):
         source_message = self.selected_message.get("message")
         context = await build_surrounding_message_context(
             source_message,
-            bot_user=getattr(interaction.client, "user", None),
         )
 
         result_message = await explain_target(

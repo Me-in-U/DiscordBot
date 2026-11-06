@@ -203,7 +203,7 @@ class SurroundingMessageContextTests(unittest.IsolatedAsyncioTestCase):
             "\n".join(f"Alice: 이후 {index}" for index in range(21, 31)),
         )
 
-    async def test_build_surrounding_context_skips_bot_and_command_messages(self):
+    async def test_build_surrounding_context_includes_bot_but_skips_commands(self):
         user = DummyAuthor(1, "Alice")
         bot = DummyAuthor(2, "Bot")
         target = DummyMessage("설명할 대상", message_id=5, author=user)
@@ -218,10 +218,10 @@ class SurroundingMessageContextTests(unittest.IsolatedAsyncioTestCase):
             ]
         )
 
-        context = await build_surrounding_message_context(target, bot_user=bot)
+        context = await build_surrounding_message_context(target)
 
-        self.assertEqual(context.previous_messages, "Alice: 이전 정상")
-        self.assertEqual(context.following_messages, "Alice: 이후 정상")
+        self.assertEqual(context.previous_messages, "Alice: 이전 정상\nBot: 봇 응답")
+        self.assertEqual(context.following_messages, "Alice: 이후 정상\nBot: 봇 후속")
 
     async def test_build_surrounding_context_includes_nearby_image_inputs(self):
         author = DummyAuthor(1, "Alice")
