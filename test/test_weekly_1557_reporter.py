@@ -39,6 +39,7 @@ class Weekly1557ReporterTests(unittest.IsolatedAsyncioTestCase):
             calls.append("fetch")
             return [
                 {"user_id": 2, "count": 3},
+                {"user_id": 3, "count": 0},
                 {"user_id": 1, "count": 7},
             ]
 
@@ -70,6 +71,26 @@ class Weekly1557ReporterTests(unittest.IsolatedAsyncioTestCase):
             target_channel_id=100,
             now=datetime(2026, 6, 22, 0, 1, 0),
             fetch_counts=lambda: [],
+            clear_counts=lambda: calls.append("clear"),
+            log=lambda _message: None,
+        )
+
+        self.assertTrue(sent)
+        self.assertEqual(
+            bot.channel.messages,
+            ["📊 이번 주 1557 카운트 기록된 사용자가 없습니다."],
+        )
+        self.assertEqual(calls, ["clear"])
+
+    async def test_sends_empty_report_when_all_counts_are_zero(self):
+        bot = _Bot(channel=_Channel())
+        calls: list[str] = []
+
+        sent = await run_weekly_1557_report(
+            bot,
+            target_channel_id=100,
+            now=datetime(2026, 6, 22, 0, 1, 0),
+            fetch_counts=lambda: [{"user_id": 1, "count": 0}],
             clear_counts=lambda: calls.append("clear"),
             log=lambda _message: None,
         )

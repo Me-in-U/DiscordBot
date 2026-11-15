@@ -65,6 +65,7 @@ async def run_weekly_1557_report(
         if snapshot["done"]:
             return False
         data = {int(user): count for user,count in snapshot["counts"].items()}
+    data = {user_id: count for user_id, count in data.items() if count > 0}
     if not data:
         report = "📊 이번 주 1557 카운트 기록된 사용자가 없습니다."
     else:
