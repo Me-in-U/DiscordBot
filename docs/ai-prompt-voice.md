@@ -1,13 +1,13 @@
 # AI 응답 말투와 저장형 프롬프트
 
-2026-11-18 기준으로 사용 중인 저장형 프롬프트 15개의 자연어 지시문은 모두 한국어다. 이미 한국어로 구조화한 `god_question` v11은 유지하고 나머지 14개는 역할, 입력, 판단 기준, 자료 경계, 예외와 출력 계약을 구분해 게시했다. API 변수 이름과 JSON 키는 호출 코드의 계약이므로 유지한다.
+2026-11-18 기준으로 사용 중인 저장형 프롬프트 15개의 자연어 지시문은 모두 한국어다. 14개는 역할, 입력, 판단 기준, 자료 경계, 예외와 출력 계약을 구분해 게시했다. `god_question`은 v12에서 본섭 이벤트와 테스트월드 패치노트를 함께 확인하고 현재 이벤트에서 다음 이벤트로 이어지는 상황을 설명하도록 보강했다. API 변수 이름과 JSON 키는 호출 코드의 계약이므로 유지한다.
 
 ## 게시 버전과 전문
 
 | 기능 | 버전 | 전문 |
 |---|---|---|
 | 일반 질문 | 13 | [general_prompt](prompts/general_prompt.md) |
-| 신이시여 | 11 | [god_question](prompts/god-question.md) |
+| 신이시여 | 12 | [god_question](prompts/god-question.md) |
 | 해석 | 23 | [interpret](prompts/interpret.md) |
 | 설명 | 12 | [explanation](prompts/explanation.md) |
 | 번역 | 12 | [translation](prompts/translation.md) |

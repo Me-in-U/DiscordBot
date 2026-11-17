@@ -1,5 +1,6 @@
 import os
 import unittest
+from datetime import datetime, timezone
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
 
@@ -19,6 +20,7 @@ class GodQuestionPromptTests(unittest.IsolatedAsyncioTestCase):
                     followup=SimpleNamespace(send=AsyncMock()),
                     guild=SimpleNamespace(id=123),
                     channel_id=456,
+                    created_at=datetime(2026, 11, 17, 23, 30, tzinfo=timezone.utc),
                     user=SimpleNamespace(name="용사"),
                 )
                 with (
@@ -29,8 +31,9 @@ class GodQuestionPromptTests(unittest.IsolatedAsyncioTestCase):
 
                 self.assertEqual(model.call_args.kwargs["prompt"], {
                     "id": "pmpt_68acfa93ac6481959537fcb1853c883307d25e6bf62ef36c",
-                    "version": "11",
+                    "version": "12",
                     "variables": {
+                        "current_time_kst": "2026-11-18T08:30:00+09:00",
                         "recent_messages": "최근 대화",
                         "user_name": "용사",
                         "question": "질문",

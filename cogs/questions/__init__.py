@@ -1,4 +1,5 @@
 import asyncio
+from datetime import timedelta, timezone
 from common.discord_output import send_text
 import logging
 
@@ -15,7 +16,7 @@ from util.logging_utils import log_user_error
 GENERAL_PROMPT_ID = "pmpt_68ac254fa8008190861e8f3f686556d50c6160cd272b9aca"
 GENERAL_PROMPT_VERSION = "13"
 GOD_QUESTION_PROMPT_ID = "pmpt_68acfa93ac6481959537fcb1853c883307d25e6bf62ef36c"
-GOD_QUESTION_PROMPT_VERSION = "11"
+GOD_QUESTION_PROMPT_VERSION = "12"
 logger = logging.getLogger(__name__)
 
 
@@ -111,6 +112,9 @@ class QuestionCommands(commands.Cog):
                     GOD_QUESTION_PROMPT_ID,
                     GOD_QUESTION_PROMPT_VERSION,
                     {
+                        "current_time_kst": interaction.created_at.astimezone(
+                            timezone(timedelta(hours=9))
+                        ).isoformat(timespec="seconds"),
                         "recent_messages": get_recent_messages(
                             client=self.bot, guild_id=interaction.guild.id, limit=20, channel_id=interaction.channel_id, requester=interaction.user
                         ),
