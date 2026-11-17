@@ -337,7 +337,7 @@ class LoopTasks(commands.Cog):
 
     @tasks.loop(seconds=5)
     async def emsc_earthquake_stream(self):
-        """한국 M5.5 이상과 기타 국가 M7.5 이상 EMSC 지진을 수신합니다."""
+        """한국 M3.5 이상과 기타 국가 M7.5 이상 EMSC 지진을 수신합니다."""
         try:
             await run_emsc_stream(self.bot)
         except Exception:

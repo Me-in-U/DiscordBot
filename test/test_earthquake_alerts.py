@@ -240,11 +240,11 @@ class JmaEewParserTests(unittest.TestCase):
         self.assertNotIn("일본지진알림", readme_source)
         for source in (cog_source, help_source, loop_source, readme_source):
             self.assertIn("M6.5", source)
-            self.assertIn("M5.5", source)
+            self.assertIn("M3.5", source)
             self.assertIn("M7.5", source)
         self.assertIn("한국 및 한반도 근처 M6.0 이상은 @everyone", help_source)
         self.assertIn("한국 및 한반도 근처 M6.0 이상은 사건당 한 번 @everyone", cog_source)
-        self.assertIn("| 한국 및 한반도 인접 해역 | EMSC/CSEM | M5.5 이상 | M6.0 이상 |", readme_source)
+        self.assertIn("| 한국 및 한반도 인접 해역 | EMSC/CSEM | M3.5 이상 | M6.0 이상 |", readme_source)
         self.assertIn("그 밖의 국가에서 발생한 EMSC 지진은 M7.5 이상부터 멘션합니다", readme_source)
         self.assertIn("Notification Delivery Pairing", agents_source)
         self.assertIn("same `channel_type` key", agents_source)
@@ -293,9 +293,9 @@ class EmscParserTests(unittest.TestCase):
         self.assertEqual(event.event_type, "ke")
         self.assertFalse(event.is_deleted)
 
-    def test_uses_higher_send_threshold_than_jma(self):
+    def test_regional_send_thresholds(self):
         self.assertEqual(JMA_EEW_MIN_MAGNITUDE, 6.5)
-        self.assertEqual(EMSC_KOREA_MIN_MAGNITUDE, 5.5)
+        self.assertEqual(EMSC_KOREA_MIN_MAGNITUDE, 3.5)
         self.assertEqual(EMSC_KOREA_EVERYONE_MAGNITUDE, 6.0)
         self.assertEqual(EMSC_MIN_MAGNITUDE, 7.5)
 
@@ -318,7 +318,7 @@ class EmscParserTests(unittest.TestCase):
         self.assertTrue(is_korea_emsc_event(coordinate_event))
         self.assertEqual(
             minimum_magnitude_for_emsc_event(region_event),
-            5.5,
+            3.5,
         )
         self.assertEqual(
             minimum_magnitude_for_emsc_event(_emsc_event()),
@@ -1022,9 +1022,9 @@ class JmaEewAlertTests(unittest.IsolatedAsyncioTestCase):
 
 
 class EmscAlertTests(unittest.IsolatedAsyncioTestCase):
-    async def test_sends_first_korea_magnitude_five_point_five_event(self):
+    async def test_sends_first_korea_magnitude_three_point_five_event(self):
         event = _emsc_event(
-            magnitude=5.5,
+            magnitude=3.5,
             region="SOUTH KOREA",
         )
         sent_events = []
@@ -1059,9 +1059,9 @@ class EmscAlertTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(results[0].action, "sent")
         self.assertEqual(sent_events, [event])
 
-    async def test_skips_first_korea_event_below_magnitude_five_point_five(self):
+    async def test_skips_first_korea_event_below_magnitude_three_point_five(self):
         event = _emsc_event(
-            magnitude=5.4,
+            magnitude=3.4,
             region="SOUTH KOREA",
         )
 
@@ -1069,7 +1069,7 @@ class EmscAlertTests(unittest.IsolatedAsyncioTestCase):
             return {1: 100}
 
         async def send(_target, _event, _notify_everyone):
-            raise AssertionError("한국 EMSC M5.5 미만은 보내면 안 됩니다.")
+            raise AssertionError("한국 EMSC M3.5 미만은 보내면 안 됩니다.")
 
         results = await process_emsc_event(
             object(),
@@ -1289,7 +1289,7 @@ class EmscAlertTests(unittest.IsolatedAsyncioTestCase):
             return message_id
 
         for event in (
-            _emsc_event(magnitude=5.5, region="SOUTH KOREA"),
+            _emsc_event(magnitude=3.5, region="SOUTH KOREA"),
             _emsc_event(
                 action="update",
                 magnitude=6.0,
@@ -1646,7 +1646,7 @@ class EmscStreamTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(count, 1)
-        self.assertEqual(session.params["minmag"], "5.5")
+        self.assertEqual(session.params["minmag"], "3.5")
         self.assertIn("updatedafter", session.params)
         self.assertEqual(processed_events[0].action, "update")
 
