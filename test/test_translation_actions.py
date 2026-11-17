@@ -29,10 +29,10 @@ class TranslationTargetTests(unittest.IsolatedAsyncioTestCase):
             {
                 "id": TRANSLATION_PROMPT_ID,
                 "version": TRANSLATION_PROMPT_VERSION,
-                "variables": {"target_message": "example target_message"},
+                "variables": {"target_message": "example target_message", "recent_messages": ""},
             },
         )
-        self.assertEqual(TRANSLATION_PROMPT_VERSION, "10")
+        self.assertEqual(TRANSLATION_PROMPT_VERSION, "12")
         self.assertIsNone(captured_kwargs["image_content"])
 
     async def test_translate_target_returns_safe_message_on_model_failure(self):

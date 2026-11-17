@@ -13,12 +13,14 @@ from util.message.context import (
     build_message_action_target,
     build_message_select_label,
     build_recent_message_option,
+    build_surrounding_message_context,
 )
 from util.logging_utils import log_user_error
+from util.message.recent import get_interaction_context
 
 
 TRANSLATION_PROMPT_ID = "pmpt_68ac23cf2e6c81969b355cc2d2ab11600ddeea74b62910b3"
-TRANSLATION_PROMPT_VERSION = "10"
+TRANSLATION_PROMPT_VERSION = "12"
 logger = logging.getLogger(__name__)
 
 
@@ -28,6 +30,7 @@ async def translate_text(
     prompt_version: str = TRANSLATION_PROMPT_VERSION,
     *,
     instructions: str | None = None,
+    recent_messages: str = "",
 ) -> str:
     normalized_message = target_message.strip()
     if image_url and not normalized_message:
@@ -49,7 +52,7 @@ async def translate_text(
         prompt=build_prompt(
             TRANSLATION_PROMPT_ID,
             prompt_version,
-            {"target_message": normalized_message},
+            {"target_message": normalized_message, "recent_messages": recent_messages},
         ),
         **options,
     )
@@ -59,9 +62,10 @@ async def translate_target(
     target_message: str,
     image_url: str | None,
     prompt_version: str = TRANSLATION_PROMPT_VERSION,
+    *, recent_messages: str = "",
 ) -> str:
     try:
-        return await translate_text(target_message, image_url, prompt_version)
+        return await translate_text(target_message, image_url, prompt_version, recent_messages=recent_messages)
     except Exception as exc:
         return log_user_error(logger, "번역", exc)
 
@@ -80,7 +84,11 @@ async def translate_message_context_menu(
         return
 
     await interaction.response.defer(thinking=True)
-    translated_message = await translate_target(target.text, target.image_url)
+    context = await build_surrounding_message_context(message, requester=getattr(interaction, "user", None))
+    translated_message = await translate_target(
+        target.text, target.image_url,
+        recent_messages="\n".join(filter(None, (context.previous_messages, context.following_messages))),
+    )
     await send_text(interaction.followup, translated_message)
 
 
@@ -133,6 +141,7 @@ class TranslationSelectView(SafeView):
             str(msg["id"]): {
                 "content": msg["content"],
                 "image_url": msg.get("image_url"),
+                "message": msg.get("message"),
             }
             for msg in options_data
         }
@@ -152,7 +161,13 @@ class TranslationSelectView(SafeView):
         target_message = self.selected_message.get("content", "")
         image_url = self.selected_message.get("image_url")
 
-        result_message = await translate_target(target_message, image_url)
+        context = await build_surrounding_message_context(
+            self.selected_message.get("message"), requester=getattr(interaction, "user", None),
+        )
+        result_message = await translate_target(
+            target_message, image_url,
+            recent_messages="\n".join(filter(None, (context.previous_messages, context.following_messages))),
+        )
 
         # 원본 메시지를 번역 결과로 덮어쓰기
         if isinstance(self.original_message, discord.Message):
@@ -219,20 +234,18 @@ class TranslationCommands(commands.Cog):
                 target_message,
                 image_url,
                 prompt_version=TRANSLATION_PROMPT_VERSION,
+                recent_messages=get_interaction_context(self.bot, interaction),
             )
 
             await send_text(interaction.followup, translated_message)
         else:
             messages_options = []
             async for msg in interaction.channel.history(limit=20):
-                # 봇 자신의 메시지와 슬래시 커맨드 메시지는 제외
-                if msg.author == self.bot.user:
-                    continue
-
                 opt = build_recent_message_option(msg)
                 if opt is None:
                     continue
 
+                opt["message"] = msg
                 messages_options.append(opt)
                 if len(messages_options) >= 20:
                     break

@@ -176,18 +176,36 @@ class MessageContextActionTests(unittest.TestCase):
 
 
 class SurroundingMessageContextTests(unittest.IsolatedAsyncioTestCase):
-    async def test_build_surrounding_context_uses_closest_ten_messages_each_side(self):
+    async def test_surrounding_context_respects_requester_history_permission(self):
+        from types import SimpleNamespace
+
+        target = DummyMessage("대상", message_id=2)
+        channel = DummyChannel([DummyMessage("비공개 이력", message_id=1), target])
+        channel.permissions_for = lambda _: SimpleNamespace(view_channel=True, read_message_history=False)
+        context = await build_surrounding_message_context(target, requester=object())
+        self.assertEqual(context.previous_messages, "")
+        self.assertEqual(context.following_messages, "")
+
+    async def test_surrounding_context_labels_actual_bot_speaker(self):
+        bot = DummyAuthor(2, "도우미")
+        bot.bot = True
+        target = DummyMessage("대상", message_id=2)
+        DummyChannel([DummyMessage("봇 답변", message_id=1, author=bot), target])
+        context = await build_surrounding_message_context(target)
+        self.assertEqual(context.previous_messages, "도우미(봇): 봇 답변")
+
+    async def test_build_surrounding_context_uses_closest_twenty_messages_each_side(self):
         author = DummyAuthor(1, "Alice")
-        target = DummyMessage("해석할 대상", message_id=20, author=author)
+        target = DummyMessage("해석할 대상", message_id=30, author=author)
         messages = [
             *[
                 DummyMessage(f"이전 {index}", message_id=index, author=author)
-                for index in range(1, 13)
+                for index in range(1, 26)
             ],
             target,
             *[
                 DummyMessage(f"이후 {index}", message_id=index, author=author)
-                for index in range(21, 34)
+                for index in range(31, 56)
             ],
         ]
         DummyChannel(messages)
@@ -196,11 +214,11 @@ class SurroundingMessageContextTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(
             context.previous_messages,
-            "\n".join(f"Alice: 이전 {index}" for index in range(3, 13)),
+            "\n".join(f"Alice: 이전 {index}" for index in range(6, 26)),
         )
         self.assertEqual(
             context.following_messages,
-            "\n".join(f"Alice: 이후 {index}" for index in range(21, 31)),
+            "\n".join(f"Alice: 이후 {index}" for index in range(31, 51)),
         )
 
     async def test_build_surrounding_context_includes_bot_but_skips_commands(self):

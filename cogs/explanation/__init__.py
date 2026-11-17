@@ -22,10 +22,11 @@ from util.message.context import (
     build_surrounding_message_context,
 )
 from util.logging_utils import log_user_error
+from util.message.recent import get_interaction_context
 
 
 EXPLANATION_PROMPT_ID = "pmpt_69fabdb4fa308190867e700bb0a2de160eaa5a328b9e0f83"
-EXPLANATION_PROMPT_VERSION = "11"
+EXPLANATION_PROMPT_VERSION = "12"
 logger = logging.getLogger(__name__)
 _EXPLANATION_RESPONSE_LABEL_PATTERN = re.compile(
     r"(?i)\b(Summary|Details|Explanation|Context|Unclear|요약|설명|주요 내용|맥락|추가 맥락|불확실한 부분)\s*:"
@@ -173,7 +174,7 @@ async def explain_message_context_menu(
 
     await interaction.response.defer(thinking=True)
     context = await build_surrounding_message_context(
-        message,
+        message, requester=getattr(interaction, "user", None),
     )
     explained = await explain_target(
         target.text,
@@ -247,7 +248,7 @@ class ExplanationSelectView(SafeView):
 
         source_message = self.selected_message.get("message")
         context = await build_surrounding_message_context(
-            source_message,
+            source_message, requester=getattr(interaction, "user", None),
         )
 
         result_message = await explain_target(
@@ -305,15 +306,15 @@ class ExplanationCommands(commands.Cog):
         await interaction.response.defer(thinking=True)
         if text or image:
             image_url = image.url if image else None
-            explained = await explain_target(text or "", image_url)
+            explained = await explain_target(
+                text or "", image_url,
+                previous_messages=get_interaction_context(self.bot, interaction),
+            )
             await send_text(interaction.followup, explained)
             return
 
         messages_options = []
         async for message in interaction.channel.history(limit=20):
-            if message.author == self.bot.user:
-                continue
-
             option = build_recent_message_option(message)
             if option is None:
                 continue

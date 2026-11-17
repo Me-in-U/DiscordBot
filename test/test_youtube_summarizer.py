@@ -19,8 +19,8 @@ from func.youtube_summarizer import (
 
 class YouTubeSummarizerTests(unittest.TestCase):
     def test_uses_published_summary_prompt_versions(self):
-        self.assertEqual(COMMENTS_SUMMARY_PROMPT_VERSION, "13")
-        self.assertEqual(YOUTUBE_SUMMARY_PROMPT_VERSION, "11")
+        self.assertEqual(COMMENTS_SUMMARY_PROMPT_VERSION, "14")
+        self.assertEqual(YOUTUBE_SUMMARY_PROMPT_VERSION, "12")
 
     def test_summarize_comments_joins_comments_for_prompt_payload(self):
         with patch("func.youtube_summarizer.build_prompt", return_value={"p": "comments"}) as build_prompt:

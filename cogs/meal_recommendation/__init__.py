@@ -10,10 +10,11 @@ from discord.ext import commands
 
 from api.chatGPT import custom_prompt_model
 from common.openai_prompt import build_prompt
+from util.message.recent import get_interaction_context
 
 
 MEAL_RECOMMENDATION_PROMPT_ID = "pmpt_6ac5ae2d5b98819382e307d2853394010028d27bf97a5ecd"
-MEAL_RECOMMENDATION_PROMPT_VERSION = "2"
+MEAL_RECOMMENDATION_PROMPT_VERSION = "4"
 MEAL_RECOMMENDATION_ERROR_MESSAGE = "⚠️ 음식 추천 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
 MEAL_RECOMMENDATION_CATEGORIES = {
     "한식": ("제육덮밥", "불고기덮밥", "비빔밥", "오므라이스", "오징어덮밥", "낙지덮밥"),
@@ -87,11 +88,12 @@ class MealRecommendationCommands(commands.Cog):
             cuisines.extend(MEAL_RECOMMENDATION_CATEGORIES)
             random.shuffle(cuisines)
         cuisine = cuisines.pop()
+        recent_messages = get_interaction_context(self.bot, interaction)
 
         try:
-            menu = await self._generate_menu(cuisine, recent_menus)
+            menu = await self._generate_menu(cuisine, recent_menus, recent_messages)
             if not menu or menu in recent_menus:
-                menu = await self._generate_menu(cuisine, recent_menus)
+                menu = await self._generate_menu(cuisine, recent_menus, recent_messages)
 
             if not menu or menu in recent_menus:
                 raise ValueError("OpenAI returned an empty or repeated meal recommendation.")
@@ -107,7 +109,7 @@ class MealRecommendationCommands(commands.Cog):
         except (discord.NotFound, discord.Forbidden, discord.HTTPException):
             logger.debug("음식 메뉴 추천 응답 전송 실패", exc_info=True)
 
-    async def _generate_menu(self, cuisine: str, recent_menus: deque[str]) -> str:
+    async def _generate_menu(self, cuisine: str, recent_menus: deque[str], recent_messages: str = "") -> str:
         model_output = await asyncio.to_thread(
             custom_prompt_model,
             prompt=build_prompt(
@@ -117,6 +119,7 @@ class MealRecommendationCommands(commands.Cog):
                     "cuisine": f"{cuisine}\n허용 메뉴: {' | '.join(MEAL_RECOMMENDATION_CATEGORIES[cuisine])}",
                     "recent_menus": "\n".join(recent_menus) or "없음",
                     "selection_seed": str(random.getrandbits(64)),
+                    "recent_messages": recent_messages,
                 },
             ),
         )

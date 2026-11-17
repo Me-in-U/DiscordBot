@@ -70,7 +70,7 @@ class CodexResetsSenderTests(unittest.IsolatedAsyncioTestCase):
         create.assert_called_once()
         self.assertEqual(
             create.call_args.kwargs["prompt"],
-            {"id": "pmpt_6acb11b275008195b640735bc30880b60285ae979fb0bf4d", "version": "2"},
+            {"id": "pmpt_6acb11b275008195b640735bc30880b60285ae979fb0bf4d", "version": "3"},
         )
         self.assertNotIn("instructions", create.call_args.kwargs)
         self.assertEqual(

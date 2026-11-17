@@ -8,7 +8,7 @@ from util.codex_resets.fetcher import CodexResetEvent
 
 
 CODEX_RESET_TRANSLATION_PROMPT_ID = "pmpt_6acb11b275008195b640735bc30880b60285ae979fb0bf4d"
-CODEX_RESET_TRANSLATION_PROMPT_VERSION = "2"
+CODEX_RESET_TRANSLATION_PROMPT_VERSION = "3"
 
 
 async def translate_codex_reset(event: CodexResetEvent) -> str:

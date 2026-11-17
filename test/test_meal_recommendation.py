@@ -116,7 +116,7 @@ class MealRecommendationTests(unittest.TestCase):
         category, allowed_menus = variables["cuisine"].split("\n허용 메뉴: ")
         self.assertIn(category, MEAL_RECOMMENDATION_CATEGORIES)
         self.assertEqual(allowed_menus.split(" | "), list(MEAL_RECOMMENDATION_CATEGORIES[category]))
-        self.assertEqual(MEAL_RECOMMENDATION_PROMPT_VERSION, "2")
+        self.assertEqual(MEAL_RECOMMENDATION_PROMPT_VERSION, "4")
         self.assertEqual(variables["recent_menus"], "없음")
         self.assertTrue(variables["selection_seed"].isdigit())
 

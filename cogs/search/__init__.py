@@ -9,10 +9,11 @@ from discord.ext import commands
 from api.chatGPT import custom_prompt_model
 from common.openai_prompt import build_prompt, build_single_image_content
 from util.logging_utils import log_user_error
+from util.message.recent import get_interaction_context
 
 
 SEARCH_PROMPT_ID = "pmpt_68b25c89c1a48193a60de5a3cb23a1eb0c25a13613efd1bf"
-SEARCH_PROMPT_VERSION = "13"
+SEARCH_PROMPT_VERSION = "15"
 logger = logging.getLogger(__name__)
 
 
@@ -52,7 +53,7 @@ class SearchCommands(commands.Cog):
                 prompt=build_prompt(
                     SEARCH_PROMPT_ID,
                     SEARCH_PROMPT_VERSION,
-                    {"user_input": text.strip()},
+                    {"user_input": text.strip(), "recent_messages": get_interaction_context(self.bot, interaction)},
                 ),
             )
         except Exception as exc:

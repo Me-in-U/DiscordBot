@@ -23,7 +23,7 @@ class SearchPromptTests(unittest.TestCase):
             SEARCH_PROMPT_ID,
             "pmpt_68b25c89c1a48193a60de5a3cb23a1eb0c25a13613efd1bf",
         )
-        self.assertEqual(SEARCH_PROMPT_VERSION, "13")
+        self.assertEqual(SEARCH_PROMPT_VERSION, "15")
 
 
 class SearchImageTests(unittest.IsolatedAsyncioTestCase):
@@ -45,7 +45,7 @@ class SearchImageTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(
             captured_kwargs["prompt"]["variables"],
-            {"user_input": "검색 요청"},
+            {"user_input": "검색 요청", "recent_messages": ""},
         )
         self.assertEqual(
             captured_kwargs["image_content"][0]["content"][0],

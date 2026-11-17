@@ -24,7 +24,7 @@ from util.guild.channel_settings import get_channels_by_purpose
 
 TIBO_URL = "https://codex-resets.com/tibo-28"
 TIBO_SUMMARY_PROMPT_ID = "pmpt_6acb1292a3d081949de6159ba2e7b8980f0a4220cb94db05"
-TIBO_SUMMARY_PROMPT_VERSION = "1"
+TIBO_SUMMARY_PROMPT_VERSION = "2"
 logger = logging.getLogger(__name__)
 _state_lock = asyncio.Lock()
 _VOID_TAGS = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"}

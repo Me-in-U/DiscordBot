@@ -65,8 +65,16 @@ def _first_image_url(attachments) -> str | None:
 
 
 def build_message_action_target(message) -> MessageActionTarget:
+    text = str(getattr(message, "content", "") or "").strip()
+    if getattr(getattr(message, "author", None), "bot", False) is True:
+        parts = [text] if text else []
+        for embed in getattr(message, "embeds", []) or []:
+            parts.extend(value for value in (embed.title, embed.description) if value)
+            for field in embed.fields:
+                parts.append(f"{field.name}: {field.value}")
+        text = "\n".join(parts)
     return MessageActionTarget(
-        text=str(getattr(message, "content", "") or "").strip(),
+        text=text,
         image_url=_first_image_url(getattr(message, "attachments", []) or []),
     )
 
@@ -119,7 +127,10 @@ def _format_context_message(message, image_label: str | None = None) -> str:
         )
 
     content = " ".join(content_parts).strip() or "(내용 없음)"
-    return f"{_author_display_name(message)}: {content}"
+    author = _author_display_name(message)
+    if getattr(getattr(message, "author", None), "bot", False) is True:
+        author += "(봇)"
+    return f"{author}: {content}"
 
 
 def _is_surrounding_context_candidate(message) -> bool:
@@ -167,11 +178,16 @@ def _collect_surrounding_context_images(
 async def build_surrounding_message_context(
     message,
     *,
-    limit: int = 10,
+    limit: int = 20,
+    requester=None,
 ) -> SurroundingMessageContext:
     channel = getattr(message, "channel", None)
     if channel is None or limit <= 0:
         return SurroundingMessageContext()
+    if requester is not None:
+        permissions = channel.permissions_for(requester)
+        if not permissions.view_channel or not permissions.read_message_history:
+            return SurroundingMessageContext()
 
     fetch_limit = limit * 5
     try:

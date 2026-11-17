@@ -5,6 +5,16 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 
 
+def get_interaction_context(client, interaction) -> str:
+    guild_id = getattr(interaction, "guild_id", None)
+    channel_id = getattr(interaction, "channel_id", None)
+    if not isinstance(guild_id, int) or not isinstance(channel_id, int):
+        return ""
+    return get_recent_messages(
+        client, guild_id, limit=20, channel_id=channel_id, requester=interaction.user,
+    )
+
+
 def _format_content(content):
     if isinstance(content, str):
         return content.strip()
@@ -90,7 +100,7 @@ def _get_recent_entries(client, guild_id: int, limit: int, channel_id=None, requ
         guild_id,
         len(all_messages),
     )
-    all_messages.sort(key=_parse_time, reverse=True)
+    all_messages.sort(key=lambda entry: (_parse_time(entry), entry.get("message_id", 0)), reverse=True)
     return list(reversed(all_messages[: max(limit, 0)]))
 
 

@@ -50,7 +50,7 @@ class ExplanationActionTests(unittest.TestCase):
                 },
             },
         )
-        self.assertEqual(EXPLANATION_PROMPT_VERSION, "11")
+        self.assertEqual(EXPLANATION_PROMPT_VERSION, "12")
 
     def test_build_explanation_prompt_uses_image_fallback_text(self):
         prompt = build_explanation_prompt("   ", has_image=True)

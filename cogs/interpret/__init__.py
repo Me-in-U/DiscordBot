@@ -23,9 +23,10 @@ from util.message.context import (
     build_surrounding_message_context,
 )
 from util.logging_utils import log_user_error
+from util.message.recent import get_interaction_context
 
 INTERPRET_PROMPT_ID = "pmpt_68abf98a25b481938994e409ffd1ecf20db1ff235be9e7ab"
-INTERPRET_PROMPT_VERSION = "22"
+INTERPRET_PROMPT_VERSION = "23"
 logger = logging.getLogger(__name__)
 _INTERPRET_RESPONSE_LABEL_PATTERN = re.compile(
     r"(?i)\b(Reasoning|Conclusion|Hidden meaning)\s*:"
@@ -140,7 +141,7 @@ async def interpret_message_context_menu(
 
     await interaction.response.defer(thinking=True)
     context = await build_surrounding_message_context(
-        message,
+        message, requester=getattr(interaction, "user", None),
     )
     interpreted = await interpret_target(
         target.text,
@@ -222,7 +223,7 @@ class InterpretSelectView(SafeView):
         image_url = self.selected_message.get("image_url")
         source_message = self.selected_message.get("message")
         context = await build_surrounding_message_context(
-            source_message,
+            source_message, requester=getattr(interaction, "user", None),
         )
 
         result_message = await interpret_target(
@@ -296,6 +297,7 @@ class InterpretCommands(commands.Cog):
                 text or "",
                 image_url,
                 prompt_version=INTERPRET_PROMPT_VERSION,
+                previous_messages=get_interaction_context(self.bot, interaction),
             )
             try:
                 await send_text(interaction.followup, interpreted)
@@ -304,10 +306,6 @@ class InterpretCommands(commands.Cog):
         else:
             messages_options = []
             async for message in interaction.channel.history(limit=20):
-                # 봇의 메시지나 빈 내용, 그리고 '/'로 시작하는 커맨드는 제외합니다.
-                if message.author == self.bot.user:
-                    continue
-
                 option = build_recent_message_option(message)
                 if option is None:
                     continue

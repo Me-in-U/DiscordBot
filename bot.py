@@ -17,6 +17,7 @@ from func.youtube_summary import check_youtube_link
 from util.db import close_db_pool, ensure_schema_ready, upsert_guild, upsert_user
 from util.env_utils import getenv_clean, sanitize_environment
 from util.logging_utils import configure_logging, user_error_message
+from util.message.context import IMAGE_EXTENSIONS, build_message_action_target
 
 configure_logging()
 logger = logging.getLogger(__name__)
@@ -69,9 +70,42 @@ def append_cached_message(
         messages = []
         guild_map[author_key] = messages
 
+    message_id = message.get("message_id")
+    if message_id is not None:
+        messages[:] = [entry for entry in messages if entry.get("message_id") != message_id]
     messages.append(message)
+    messages.sort(key=lambda entry: (entry.get("time", ""), entry.get("message_id", 0)))
     if limit > 0 and len(messages) > limit:
         del messages[:-limit]
+
+
+def cache_discord_message(message: discord.Message) -> None:
+    if not message.guild:
+        return
+    target = build_message_action_target(message)
+    parts: list[MessagePart] = []
+    if target.text:
+        parts.append({"type": "input_text", "text": target.text})
+    for attachment in message.attachments:
+        content_type = str(getattr(attachment, "content_type", "") or "").lower()
+        filename = str(getattr(attachment, "filename", "") or "").lower()
+        if content_type.startswith("image/") or any(filename.endswith(ext) for ext in IMAGE_EXTENSIONS):
+            parts.append({"type": "input_image", "image_url": attachment.url})
+    if not parts:
+        return
+    author = message.author
+    append_cached_message(
+        DISCORD_CLIENT.USER_MESSAGES.setdefault(message.guild.id, {}),
+        str(author.id),
+        {
+            "author": getattr(author, "display_name", None) or author.name,
+            "role": "assistant" if author == DISCORD_CLIENT.user or author.bot else "user",
+            "content": parts,
+            "time": message.created_at.astimezone(SEOUL_TZ).strftime("%Y-%m-%d %H:%M:%S"),
+            "channel_id": message.channel.id,
+            "message_id": message.id,
+        },
+    )
 
 
 async def check_youtube_link_safely(message: discord.Message) -> None:
@@ -354,8 +388,18 @@ async def on_raw_message_delete(payload):
 
 @DISCORD_CLIENT.event
 async def on_raw_message_edit(payload):
-    for messages in DISCORD_CLIENT.USER_MESSAGES.get(payload.guild_id, {}).values():
+    if payload.guild_id is None:
+        return
+    guild_map = DISCORD_CLIENT.USER_MESSAGES.get(payload.guild_id, {})
+    for messages in guild_map.values():
         messages[:] = [entry for entry in messages if entry.get("message_id") != payload.message_id]
+    channel = DISCORD_CLIENT.get_channel(payload.channel_id)
+    if channel is None:
+        return
+    try:
+        cache_discord_message(await channel.fetch_message(payload.message_id))
+    except (discord.Forbidden, discord.HTTPException):
+        logger.debug("수정된 맥락 메시지 조회 실패", exc_info=True)
 
 
 @DISCORD_CLIENT.event
@@ -369,96 +413,12 @@ async def on_message(message: discord.Message) -> None:
     """
     일반 메시지 처리
     """
-    #! 현재 시간(서울 시간대 적용)으로 타임스탬프 생성
-    timestamp = message.created_at.astimezone(SEOUL_TZ).strftime("%Y-%m-%d %H:%M:%S")
-
-    image_url = None
-    # 이미지 첨부 확인
-    if message.attachments:
-        image_url = message.attachments[0].url
-    # 유저 닉네임 혹은 글로벌 이름 가져오기
-    # 유저 이름 가져오기 (Member vs User 구분)
-    if isinstance(message.author, discord.Member):
-        # 서버 내 멤버라면 nick(별명) 우선, 없으면 username
-        author_key = message.author.nick or message.author.name
-    else:
-        # DM 또는 봇(Self) 메시지 등은 name
-        author_key = message.author.name
-
-    logger.debug(
-        "message cached: guild_id=%s channel_id=%s author=%s has_image=%s content_length=%s",
-        getattr(message.guild, "id", None),
-        getattr(getattr(message, "channel", None), "id", None),
-        author_key,
-        bool(image_url),
-        len(message.content or ""),
-    )
-
-    # 길드별 -> 유저별 저장소 준비 (DM은 스킵)
+    cache_discord_message(message)
+    if message.author == DISCORD_CLIENT.user:
+        return
     if not message.guild:
-        # 길드 외(DM)는 길드별 로그에 포함하지 않음
         await DISCORD_CLIENT.process_commands(message)
         return
-    guild_id = message.guild.id
-    if guild_id not in DISCORD_CLIENT.USER_MESSAGES:
-        DISCORD_CLIENT.USER_MESSAGES[guild_id] = {}
-    guild_map = DISCORD_CLIENT.USER_MESSAGES[guild_id]
-    #! 봇 메시지는 이하 명령 무시 / 단순 채팅 저장만
-    if message.author == DISCORD_CLIENT.user:
-        append_cached_message(
-            guild_map,
-            str(message.author.id),
-            {
-                "author": author_key,
-                "role": "assistant",
-                "content": [
-                    {"type": "input_text", "text": message.content},
-                    {
-                        "type": "input_image",
-                        "image_url": image_url,
-                    },
-                ],
-                "time": timestamp,
-                "channel_id": message.channel.id,
-                "message_id": message.id,
-            },
-        )
-        return  # client 스스로가 보낸 메세지는 무시
-    else:
-        if image_url:
-            append_cached_message(
-                guild_map,
-                str(message.author.id),
-                {
-                    "author": author_key,
-                    "role": "user",
-                    "content": [
-                        {"type": "input_text", "text": message.content},
-                        {
-                            "type": "input_image",
-                            "image_url": image_url,
-                        },
-                    ],
-                    "time": timestamp,
-                    "channel_id": message.channel.id,
-                    "message_id": message.id,
-                },
-            )
-        else:
-            append_cached_message(
-                guild_map,
-                str(message.author.id),
-                {
-                    "author": author_key,
-                    "role": "user",
-                    "content": [
-                        {"type": "input_text", "text": message.content},
-                    ],
-                    "time": timestamp,
-                    "channel_id": message.channel.id,
-                    "message_id": message.id,
-                },
-            )
 
     #! 유튜브 링크 처리
     await check_youtube_link_safely(message)
@@ -529,61 +489,10 @@ async def load_recent_messages(guild_id: int | None = None) -> None:
                 async for message in channel.history(limit=100):
                     # 날짜 필터(오늘)
                     message_kst = message.created_at.astimezone(SEOUL_TZ)
-                    message_timestamp = message_kst.strftime("%Y-%m-%d %H:%M:%S")
                     if message_kst.date() != today:
                         continue
 
-                    # 작성자 키(닉 우선)
-                    if isinstance(message.author, discord.Member):
-                        author_key = message.author.nick or message.author.name
-                    else:
-                        author_key = message.author.name
-
-                    guild_map = DISCORD_CLIENT.USER_MESSAGES[guild.id]
-                    # content 파츠 구성
-                    parts: list[MessagePart] = []
-                    text = (message.content or "").strip()
-                    if text:
-                        parts.append({"type": "input_text", "text": text})
-
-                    def _is_image(att: discord.Attachment) -> bool:
-                        try:
-                            if getattr(att, "content_type", None):
-                                return (
-                                    str(att.content_type).lower().startswith("image/")
-                                )
-                        except Exception:
-                            logger.debug("attachment content_type check failed", exc_info=True)
-                        name = (getattr(att, "filename", "") or "").lower()
-                        return name.endswith(
-                            (".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp")
-                        )
-
-                    for att in getattr(message, "attachments", []):
-                        if _is_image(att):
-                            url = getattr(att, "url", None) or getattr(
-                                att, "proxy_url", None
-                            )
-                            if url:
-                                parts.append({"type": "input_image", "image_url": url})
-
-                    role = (
-                        "assistant" if message.author == DISCORD_CLIENT.user else "user"
-                    )
-                    append_cached_message(
-                        guild_map,
-                        str(message.author.id),
-                        {
-                            "author": author_key,
-                            "role": role,
-                            "content": (
-                                parts if parts else [{"type": "input_text", "text": ""}]
-                            ),
-                            "time": message_timestamp,
-                            "channel_id": channel.id,
-                            "message_id": message.id,
-                        },
-                    )
+                    cache_discord_message(message)
             except Exception:
                 # 채널 접근 권한 없음 등은 무시
                 logger.debug(
@@ -593,12 +502,6 @@ async def load_recent_messages(guild_id: int | None = None) -> None:
                     exc_info=True,
                 )
                 continue
-
-        # 작성자별 오래된→최신 정렬
-        for author in DISCORD_CLIENT.USER_MESSAGES[guild.id].keys():
-            DISCORD_CLIENT.USER_MESSAGES[guild.id][author] = list(
-                reversed(DISCORD_CLIENT.USER_MESSAGES[guild.id][author])
-            )
 
         message_count = sum(
             len(messages) for messages in DISCORD_CLIENT.USER_MESSAGES[guild.id].values()

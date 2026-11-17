@@ -329,7 +329,7 @@ class TiboSummaryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(json.loads(translate.call_args.kwargs["image_content"][0]["content"][0]["text"])), len(entries))
         self.assertEqual(
             translate.call_args.kwargs["prompt"],
-            {"id": "pmpt_6acb1292a3d081949de6159ba2e7b8980f0a4220cb94db05", "version": "1"},
+            {"id": "pmpt_6acb1292a3d081949de6159ba2e7b8980f0a4220cb94db05", "version": "2"},
         )
         self.assertNotIn("instructions", translate.call_args.kwargs)
 
