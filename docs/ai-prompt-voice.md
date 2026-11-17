@@ -15,8 +15,11 @@
 | web_search | `pmpt_68b25c89c1a48193a60de5a3cb23a1eb0c25a13613efd1bf` | 13 |
 | youtube_post_summary | `pmpt_6aedb39c5eb88190bfc93fa1dbfd5f3f05961944c524521a` | 1 |
 | game_notice_summary | `pmpt_6aedb402631c8194a37d69483f3b22fd0394b3a05c1b7b24` | 2 |
+| god_question | `pmpt_68acfa93ac6481959537fcb1853c883307d25e6bf62ef36c` | 11 |
 
 기존 모델, 추론 강도, 검색 도구와 출력 형식은 유지했다. 해석은 GPT-6.1 Sol과 reasoning high를 유지한다. 새 게시물/게임 공지 프롬프트는 기존 코드와 같은 GPT-6 Luna, reasoning low, verbosity low를 사용하며 웹 검색은 사용하지 않는다.
+
+2026-11-18에 `/신이시여`는 별도로 전면 개편했다. v11은 GPT-6.1 Terra, reasoning medium, 웹 검색 활성화를 사용한다. 공통 반말 규칙 대신 김창섭 디렉터의 공개 방송 설명 방식에 기반한 존댓말 패러디로 답하며, 인벤 자료를 검색하되 공식 홈페이지의 관련 안내만 링크한다. 한국어 지시문 전문과 조사 범위는 [신이시여 프롬프트](prompts/god-question.md)에 기록했다.
 
 ## 말투 규칙
 
@@ -34,6 +37,6 @@
 
 ## 변경하지 않은 프롬프트
 
-신이시여 v10, 번역 v10, 뭐먹지 v2, 1557 이미지 판별 v9, Codex 리셋 번역 v2, Tibo 일일 소식 요약 v1은 변경하지 않았다.
+번역 v10, 뭐먹지 v2, 1557 이미지 판별 v9, Codex 리셋 번역 v2, Tibo 일일 소식 요약 v1은 변경하지 않았다.
 
 코드가 저장형 프롬프트의 특정 버전을 지정하므로 원격 새 버전을 발행한 뒤 코드 버전도 함께 갱신해야 한다.
