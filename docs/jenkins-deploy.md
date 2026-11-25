@@ -57,6 +57,16 @@
 
 - 다른 ID 를 쓰려면 자신의 Jenkins 환경에 맞게 `Jenkinsfile` 을 함께 수정한다.
 
+## 전국 재난문자 설정
+
+1. 행정안전부 긴급재난문자 API 이용을 신청한다. 하루 호출 한도는 승인된 값을 확인한다. [재난안전데이터공유플랫폼](https://www.safetydata.go.kr/disaster-data/view?dataSn=228)
+2. 로컬 실행에는 `.env`, 배포에는 `.env.deploy`의 `SAFETYDATA_SERVICE_KEY`에 서비스 키를 지정한다. 키가 비어 있으면 봇은 API를 조회하지 않는다.
+3. `SAFETYDATA_DAILY_QUOTA`에는 승인된 일일 한도를 지정한다. 기본값 1,000건에서는 구독 채널이 있을 때 90초 간격으로 조회해 24시간 기준 약 960건을 호출한다. 한도가 낮으면 간격이 늘어난다.
+4. Jenkins Secret text `discordbot-env`에 최신 `.env.deploy` 전체를 반영하고 저장된 내용이 로컬 파일과 일치하는지 확인한다. 서비스 키는 Git과 빌드 로그에 남기지 않는다.
+5. 배포 후 서버 관리자가 텍스트 채널에서 `/재난문자 상태:true`를 실행한다. 발령 멘션을 사용하려면 봇에 대상 채널의 `@everyone` 멘션 권한을 부여한다. [명령과 메시지 예시](../README.md#전국-재난문자-알림)
+
+실제 채널 전송 없이 조회, 발령 멘션, 해제와 정정, 중복 건너뛰기를 검증하려면 `python -m unittest discover -s test -p "test_disaster_sms.py"`를 실행한다. 이 테스트는 API 응답과 Discord 전송에 테스트 대역을 사용한다.
+
 ## Jenkins Job 생성 예시
 
 1. Jenkins 에서 새 `Pipeline` Job 을 만든다.

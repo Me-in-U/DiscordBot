@@ -48,6 +48,7 @@
 | [cogs/codex_resets/__init__.py](../cogs/codex_resets/__init__.py) | `코덱스리셋알림` |
 | [cogs/custom_help/__init__.py](../cogs/custom_help/__init__.py) | `도움`, `기가채드` |
 | [cogs/dday/__init__.py](../cogs/dday/__init__.py) | `dday추가`, `dday삭제`, `dday목록` |
+| [cogs/disaster_sms.py](../cogs/disaster_sms.py) | `재난문자` |
 | [cogs/earthquake_alert/__init__.py](../cogs/earthquake_alert/__init__.py) | `지진알림` |
 | [cogs/exchange_rate/__init__.py](../cogs/exchange_rate/__init__.py) | `환율` |
 | [cogs/explanation/__init__.py](../cogs/explanation/__init__.py) | `메시지 설명 (메시지 메뉴)`, `설명` |
