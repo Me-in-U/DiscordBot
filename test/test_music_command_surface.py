@@ -2,6 +2,8 @@ import ast
 import unittest
 from pathlib import Path
 
+from cogs.channel_settings import ChannelSettings
+
 
 MUSIC_PATH = Path("cogs/music/__init__.py")
 MUSIC_LOGGING_PATH = Path("util/music/logging.py")
@@ -128,8 +130,8 @@ class MusicCommandSurfaceTests(unittest.TestCase):
             text,
         )
         self.assertIn(
-            "기념일/도박/음악/유튜브/메이플공지/로아공지/코덱스리셋/지진알림",
-            text,
+            "메이플공지",
+            ChannelSettings.configure_channel.description,
         )
         self.assertIn("for purpose_key, purpose_label in PURPOSE_CHOICES.items()", text)
         self.assertIn("summary.get(purpose_key)", text)

@@ -8,6 +8,8 @@ from discord.ext import commands
 from util.earthquake.state import delete_earthquake_alert_state
 from util.codex_resets.tibo import reset_tibo_daily_log_state
 from util.codex_resets.events import seed_codex_reset_state_for_guild
+from util.disaster_sms import CHANNEL_TYPE as DISASTER_SMS_CHANNEL_TYPE
+from util.disaster_sms import configure_channel as configure_disaster_sms_channel
 from util.guild.channel_settings import get_settings_for_guild, set_channel
 from util.lostark.notices import configure_lostark_notice_channel
 
@@ -22,8 +24,9 @@ PURPOSE_CHOICES = {
     "lostark_notice": "로아공지",
     "codex_reset": "코덱스리셋",
     "earthquake_alert": "지진알림",
+    DISASTER_SMS_CHANNEL_TYPE: "재난문자",
 }
-PURPOSE_DESCRIPTION = "기념일/도박/음악/유튜브/메이플공지/로아공지/코덱스리셋/지진알림"
+PURPOSE_DESCRIPTION = "/".join(PURPOSE_CHOICES.values())
 
 
 def _add_current_channel_fields(
@@ -66,6 +69,7 @@ class ChannelSettings(commands.Cog):
                 name="지진알림",
                 value="earthquake_alert",
             ),
+            app_commands.Choice(name="재난문자", value=DISASTER_SMS_CHANNEL_TYPE),
         ]
     )
     async def configure_channel(
@@ -106,6 +110,8 @@ class ChannelSettings(commands.Cog):
                 logger.exception("로스트아크 공지 채널 설정 실패: guild=%s", guild_id)
                 await interaction.followup.send("로스트아크 공지 채널 설정에 실패했습니다. 잠시 후 다시 시도해 주세요.", ephemeral=True)
                 return
+        elif purpose.value == DISASTER_SMS_CHANNEL_TYPE:
+            await configure_disaster_sms_channel(guild_id, channel.id if channel else None)
         else:
             await set_channel(guild_id, purpose.value, channel.id if channel else None)
         if purpose.value == "earthquake_alert":
