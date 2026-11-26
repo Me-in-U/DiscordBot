@@ -22,6 +22,7 @@ from func.youtube_workspace import subtitle_output_template
 
 
 logger = logging.getLogger(__name__)
+_MAX_VIDEO_DURATION_SECONDS = 1800
 _stt_lock = threading.Lock()
 _stt_model = None
 
@@ -29,7 +30,7 @@ class MediaLimitError(ValueError):
     pass
 
 def _duration_limit(info, **kwargs):
-    if (info.get("duration") or 0) > 1800:
+    if (info.get("duration") or 0) > _MAX_VIDEO_DURATION_SECONDS:
         raise MediaLimitError("30분 이하 영상만 요약할 수 있습니다.")
     return None
 
@@ -177,6 +178,8 @@ def download_youtube_subtitles(
                 "자동생성 " if auto else "",
             )
 
+        except MediaLimitError:
+            raise
         except (DownloadError, OSError, ValueError):
             logger.warning(
                 "%s %s자막 다운로드 중 오류",
@@ -269,7 +272,8 @@ async def youtube_to_mp3(
         logger.warning("yt-dlp 다운로드/변환 실패, ffmpeg 직접 추출 시도: url=%s", url, exc_info=True)
         try:
             page_url = normalize_youtube_link(url)
-            audio_url, _ = await fetch_stream_info(page_url)
+            audio_url, stream_info = await fetch_stream_info(page_url)
+            _duration_limit(stream_info)
             if not audio_url:
                 raise RuntimeError("오디오 스트림 URL을 찾지 못했습니다.")
 
@@ -285,7 +289,7 @@ async def youtube_to_mp3(
                     build_headers_str(HEADERS),
                     "-i",
                     audio_url,
-                    "-t", "1800",
+                    "-t", str(_MAX_VIDEO_DURATION_SECONDS),
                     "-fs", str(30 * 1024 * 1024),
                     "-vn",
                     "-acodec",
@@ -301,6 +305,8 @@ async def youtube_to_mp3(
                 logger.debug("MP3 파일이 생성되었습니다.(ffmpeg): path=%s", output_path_obj)
             else:
                 raise FileNotFoundError(f"{output_path_obj} 파일이 생성되지 않았습니다.(ffmpeg)")
+        except MediaLimitError:
+            raise
         except (
             aiohttp.ClientError,
             asyncio.TimeoutError,

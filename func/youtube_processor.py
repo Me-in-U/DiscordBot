@@ -9,7 +9,12 @@ from yt_dlp.utils import DownloadError
 
 from api.chatGPT import OpenAIModelError
 from common.http import EXTERNAL_HTTP_TIMEOUT
-from func.youtube_api import YouTubeApiError, fetch_youtube_comments, check_video_summary_available
+from func.youtube_api import (
+    YouTubeApiError,
+    YouTubeSummaryUnavailable,
+    check_video_summary_available,
+    fetch_youtube_comments,
+)
 from func.youtube_links import (
     YOUTUBE_POST_KIND,
     extract_video_id,
@@ -18,6 +23,7 @@ from func.youtube_links import (
 )
 from func.youtube_media import (
     HEADERS,
+    MediaLimitError,
     download_youtube_subtitles,
     speech_to_text,
     youtube_to_mp3,
@@ -152,6 +158,8 @@ async def process_youtube_link(url: str) -> str:
         return await process_youtube_video_link(url)
     except YouTubeSummaryError:
         raise
+    except MediaLimitError as exc:
+        raise YouTubeSummaryUnavailable(str(exc)) from exc
     except (
         aiohttp.ClientError,
         asyncio.TimeoutError,

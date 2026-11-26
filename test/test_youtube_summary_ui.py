@@ -45,6 +45,36 @@ class YouTubeSummaryUiTests(unittest.TestCase):
 
 
 class YouTubeSummaryViewTests(unittest.IsolatedAsyncioTestCase):
+    async def test_overlong_video_stops_at_first_subtitle_attempt_and_shows_limit(self):
+        from func import youtube_media, youtube_processor
+
+        url = "https://youtu.be/test-video"
+        view = YouTubeSummaryView(url, YOUTUBE_VIDEO_KIND)
+        view.original_message = Mock(edit=AsyncMock())
+        interaction = Mock()
+        interaction.response.defer = AsyncMock()
+
+        with (
+            patch.object(youtube_processor, "check_video_summary_available"),
+            patch.object(youtube_media, "YoutubeDL") as youtube_dl,
+            patch.object(youtube_processor, "youtube_to_mp3") as download_audio,
+            self.assertNoLogs(youtube_media.__name__, level="WARNING"),
+            self.assertNoLogs("func.youtube_summary_ui", level="ERROR"),
+        ):
+            def download(_urls):
+                options = youtube_dl.call_args.args[0]
+                options["match_filter"]({"duration": 1801}, incomplete=False)
+
+            youtube_dl.return_value.__enter__.return_value.download.side_effect = download
+            await view.children[0].callback(interaction)
+
+        youtube_dl.assert_called_once()
+        download_audio.assert_not_called()
+        self.assertEqual(
+            view.original_message.edit.await_args.kwargs,
+            {"content": "30분 이하 영상만 요약할 수 있습니다.", "view": None},
+        )
+
     async def test_openai_failure_edits_message_with_admin_contact_message(self):
         async def failing_processor(_url: str) -> str:
             raise OpenAIModelError("OpenAI prompt response failed.")

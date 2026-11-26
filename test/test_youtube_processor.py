@@ -20,7 +20,10 @@ class YouTubeProcessorModuleTests(unittest.IsolatedAsyncioTestCase):
                 await youtube_processor.process_youtube_link("https://youtu.be/test-video")
 
         self.assertIsInstance(captured.exception.__cause__, ValueError)
-        self.assertNotIn("raw-secret", str(captured.exception))
+        self.assertEqual(
+            str(captured.exception),
+            "유튜브 요약을 처리하지 못했습니다. 잠시 후 다시 시도해주세요.",
+        )
 
 
 class YouTubeProcessorCompatibilityTests(unittest.TestCase):
