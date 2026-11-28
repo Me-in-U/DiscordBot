@@ -32,7 +32,9 @@ class DisasterSmsTests(unittest.IsolatedAsyncioTestCase):
             (notice("규모 6.0 지진", "지진", "위급재난"), "alert"),
             (notice("지진해일경보 발령", "지진해일", "긴급재난"), "alert"),
             (notice("지진해일주의보 발령", "지진해일", "긴급재난"), None),
-            (notice("산불 확산으로 주민 대피명령 발령", "산불", "긴급재난"), "alert"),
+            (notice("산불 확산으로 주민 대피명령 발령", "산불", "긴급재난"), None),
+            (notice("산불 확산으로 즉시 대피하세요.", "화재", "위급재난"), None),
+            (notice("주민 대피명령 발령", "산불", "긴급재난"), None),
             (notice("화재 발생. 대피 준비 바랍니다.", "화재"), None),
             (notice("홍수로 인근 주민은 즉시 대피하세요.", "홍수", "긴급재난"), "alert"),
             (notice("홍수 수위가 높아질 예정이니 접근을 자제하세요.", "홍수", "긴급재난"), None),
@@ -41,6 +43,10 @@ class DisasterSmsTests(unittest.IsolatedAsyncioTestCase):
             with self.subTest(row=row):
                 self.assertEqual(disaster_sms.classify_notice(row), expected)
         self.assertEqual(disaster_sms.notice_time(cases[0][0]).utcoffset(), timedelta(hours=9))
+
+    def test_excludes_wildfire_followup_for_previous_alert(self):
+        row = notice("주민 대피명령 해제", "산불", "긴급재난")
+        self.assertIsNone(disaster_sms.classify_notice(row, related=True))
 
     async def test_delivers_alert_and_mutes_followups_without_replay(self):
         bot = MagicMock()

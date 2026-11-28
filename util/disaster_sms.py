@@ -33,7 +33,7 @@ _EVACUATION = re.compile(
     r"|(?:실내|건물\s*(?:내|안)|지하\s*시설)[^.!?\n]{0,20}대피"
 )
 _DANGER = re.compile(
-    r"테러|방사(?:선|능|성물질)|원전|댐\s*붕괴|급류|범람|침수|홍수|산불|산사태"
+    r"테러|방사(?:선|능|성물질)|원전|댐\s*붕괴|급류|범람|침수|홍수|산사태"
     r"|폭발|화재|화학물질|유독가스|지진해일"
 )
 
@@ -44,6 +44,9 @@ def classify_notice(row: dict, *, related: bool = False) -> str | None:
         return None
 
     category = row.get("DST_SE_NM")
+    if category == "산불" or "산불" in body:
+        return None
+
     level = row.get("EMRG_STEP_NM")
     civil = category == "민방공" or bool(_CIVIL_WARNING.search(body))
     tsunami = category == "지진해일" and bool(re.search(r"해일\s*경보", body))
